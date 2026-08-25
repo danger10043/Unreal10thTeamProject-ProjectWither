@@ -1,2 +1,2 @@
-# Develocket TeamProject - <천천히, 꾸준히>
-<img width="720" height="558" alt="image" src="https://github.com/user-attachments/assets/55ebfcf2-14f7-4cf4-8a9c-f4433fd705e0" />
+# Develocket TeamProject - <Project:Wither>
+<img width="340" height="292" alt="image" src="https://github.com/user-attachments/assets/6c753aad-9eed-4885-bf0c-dbc27c7f0568" />
