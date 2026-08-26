@@ -59,4 +59,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Base")
 	bool bIsDead = false; // 사망 여부
+
+private:
+	float InValidTargetActor = -1.0f;
 };

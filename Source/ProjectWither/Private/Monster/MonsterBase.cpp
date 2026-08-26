@@ -27,24 +27,29 @@ void AMonsterBase::Tick(float DeltaTime)
 
 void AMonsterBase::SetMonsterState(EMonsterState NewState)
 {
+	MonsterState = NewState;
 }
 
 void AMonsterBase::SetTarget(AActor* NewTarget)
 {
+	TargetActor = NewTarget;
 }
 
 void AMonsterBase::ClearTarget()
 {
+	TargetActor = nullptr;
 }
 
 AActor* AMonsterBase::GetTargetActor()
 {
-	return nullptr;
+	return TargetActor;
 }
 
 float AMonsterBase::GetDistanceToTarget()
 {
-	return 0.0f;
+	if (!TargetActor) return InValidTargetActor;
+
+	return GetDistanceTo(TargetActor);
 }
 
 // Called to bind functionality to input
