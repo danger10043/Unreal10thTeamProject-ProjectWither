@@ -25,6 +25,28 @@ void AMonsterBase::Tick(float DeltaTime)
 
 }
 
+void AMonsterBase::SetMonsterState(EMonsterState NewState)
+{
+}
+
+void AMonsterBase::SetTarget(AActor* NewTarget)
+{
+}
+
+void AMonsterBase::ClearTarget()
+{
+}
+
+AActor* AMonsterBase::GetTargetActor()
+{
+	return nullptr;
+}
+
+float AMonsterBase::GetDistanceToTarget()
+{
+	return 0.0f;
+}
+
 // Called to bind functionality to input
 void AMonsterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
