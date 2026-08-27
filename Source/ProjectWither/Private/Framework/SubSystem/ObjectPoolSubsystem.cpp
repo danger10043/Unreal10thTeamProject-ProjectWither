@@ -18,8 +18,22 @@ void UObjectPoolSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		if (!DataAsset.IsNull())
 		{
-			TObjectPtr<UObjectPoolDataAsset> LoadedDataAsset = DataAsset.LoadSynchronous();
-			FObjectPool& Pool = ObjectPools.FindOrAdd(LoadedDataAsset->ActorClass.LoadSynchronous());
+			UObjectPoolDataAsset* LoadedDataAsset = DataAsset.LoadSynchronous();
+
+			if (!IsValid(LoadedDataAsset) || LoadedDataAsset->ActorClass.IsNull())
+			{
+				continue;
+			}
+
+			UClass* LoadedClass = LoadedDataAsset->ActorClass.LoadSynchronous();
+
+			if (!IsValid(LoadedClass))
+			{
+				continue;
+			}
+
+			FObjectPool& Pool = ObjectPools.FindOrAdd(LoadedClass);
+
 			Pool.InitialSize = LoadedDataAsset->InitialSize;
 			Pool.MaxSize = LoadedDataAsset->MaxSize;
 			Pool.MaxPolicy = LoadedDataAsset->MaxPolicy;
@@ -47,6 +61,11 @@ bool UObjectPoolSubsystem::RegisterPoolDataAsset(const UObjectPoolDataAsset* InD
 
 	TSubclassOf<AActor> LoadedActorClass = InDataAsset->ActorClass.LoadSynchronous();
 
+	if (!LoadedActorClass)
+	{
+		return false;
+	}
+
 	ClearPool(LoadedActorClass);	// 이미 있으면 정리
 
 	FObjectPool& Pool = ObjectPools.Add(LoadedActorClass);	// 새로 추가
@@ -67,6 +86,12 @@ bool UObjectPoolSubsystem::UnregisterPoolDataAsset(const UObjectPoolDataAsset* I
 	if (!InDataAsset || InDataAsset->ActorClass.IsNull()) return false;
 
 	TSubclassOf<AActor> LoadedActorClass = InDataAsset->ActorClass.LoadSynchronous();
+
+	if (!LoadedActorClass || !ObjectPools.Contains(LoadedActorClass))
+	{
+		return false;
+	}
+
 	ClearPool(LoadedActorClass);
 
 	return true;
@@ -76,8 +101,17 @@ void UObjectPoolSubsystem::Warmup(TSubclassOf<AActor> InClass)
 {
 	if (FObjectPool* Pool = ObjectPools.Find(InClass))
 	{
+		const int32 CurrentCount =
+			Pool->ReadyActors.Num() + Pool->ActiveActors.Num();
+
+		const int32 TargetCount =
+			FMath::Min(Pool->InitialSize, Pool->MaxSize);
+
+		const int32 CreateCount =
+			FMath::Max(0, TargetCount - CurrentCount);
+
 		FTransform Init(FVector::DownVector * 10000.0f);
-		for (int i = 0; i < Pool->InitialSize; i++)
+		for (int i = 0; i < CreateCount; i++)
 		{
 			// 액터 스폰해서 바로 ReadyActors에 넣기			
 			AActor* Spawned = CreateNewObject(InClass, Init);
@@ -87,14 +121,12 @@ void UObjectPoolSubsystem::Warmup(TSubclassOf<AActor> InClass)
 			{
 				if (Spawned->GetClass()->ImplementsInterface(UPoolableInterface::StaticClass()))
 				{
-					IPoolableInterface::Execute_OnReturn(Spawned);
+					IPoolableInterface::Execute_OnReturnToPool(Spawned);
 				}
-				else
-				{
-					Spawned->SetActorHiddenInGame(true);
-					Spawned->SetActorTickEnabled(false);
-					Spawned->SetActorEnableCollision(false);
-				}
+
+				Spawned->SetActorHiddenInGame(true);
+				Spawned->SetActorTickEnabled(false);
+				Spawned->SetActorEnableCollision(false);
 
 				Pool->ReadyActors.Add(Spawned);
 			}
@@ -157,9 +189,11 @@ AActor* UObjectPoolSubsystem::Spawn(TSubclassOf<AActor> InClassType, const FTran
 	FObjectPool* Pool = ObjectPools.Find(InClassType);
 	if (!Pool) return nullptr;
 
+	RemoveInvalidActors(*Pool);
+
 	AActor* Spawned = nullptr;
 
-	// ReadyActors에 쓸 수 있는게 있으면 쓴다.
+	// ReadyActors에 쓸 수 있는게 있으면 사용
 	Spawned = GetReadyActor(Pool);
 	if (Spawned)
 	{
@@ -168,7 +202,7 @@ AActor* UObjectPoolSubsystem::Spawn(TSubclassOf<AActor> InClassType, const FTran
 	}
 	else
 	{
-		// ReadyActors에서 쓸 수 있는 것이 없다 => 새로 만들기
+		// ReadyActors에서 쓸 수 있는 것이 없으면 새로 만들기
 		const uint32 TotalCount = Pool->ActiveActors.Num() + Pool->ReadyActors.Num();
 		const bool bMax = TotalCount >= static_cast<uint32>(Pool->MaxSize);
 
@@ -191,8 +225,18 @@ AActor* UObjectPoolSubsystem::Spawn(TSubclassOf<AActor> InClassType, const FTran
 				if (FOrderNode* HeadNode = Pool->ActiveOrderList->GetHead())
 				{
 					AActor* OldestActor = HeadNode->GetValue();
-					ReturnPool(OldestActor);		// 편의성 + 리셋을 위해
+					if (!ReturnPool(OldestActor))
+					{
+						return nullptr;
+					}
+
 					Spawned = GetReadyActor(Pool);
+
+					if (!IsValid(Spawned))
+					{
+						return nullptr;
+					}
+
 					Spawned->SetActorTransform(InTransform);
 
 					UE_LOG(LogTemp, Log, TEXT("Spawn(Oldest) : %s"), Spawned ? *Spawned->GetName() : TEXT("None"));
@@ -204,23 +248,21 @@ AActor* UObjectPoolSubsystem::Spawn(TSubclassOf<AActor> InClassType, const FTran
 
 	if (Spawned)
 	{
-		// ReadyActors에서 꺼냈던, 새로 만들었던 스폰되었을 때 해야할 일을 처리
-		if (Spawned->GetClass()->ImplementsInterface(UPoolableInterface::StaticClass()))
-		{
-			//UE_LOG(LogTemp, Log, TEXT("OnSpawn"));
-			IPoolableInterface::Execute_OnSpawn(Spawned);
-		}
-		else
-		{
-			Spawned->SetActorHiddenInGame(false);
-			Spawned->SetActorTickEnabled(true);
-			Spawned->SetActorEnableCollision(true);
-		}
+		Spawned->SetActorHiddenInGame(false);
+		Spawned->SetActorTickEnabled(true);
+		Spawned->SetActorEnableCollision(true);
 
 		Pool->ActiveActors.Add(Spawned);
+
 		FOrderNode* NewNode = new FOrderNode(Spawned);
 		Pool->ActiveOrderList->AddTail(NewNode);
 		Pool->ActiveNodeMap->Add(Spawned, NewNode);
+
+		if (Spawned->GetClass()->ImplementsInterface(
+			UPoolableInterface::StaticClass()))
+		{
+			IPoolableInterface::Execute_OnSpawnFromPool(Spawned);
+		}
 	}
 
 	return Spawned;
@@ -228,7 +270,7 @@ AActor* UObjectPoolSubsystem::Spawn(TSubclassOf<AActor> InClassType, const FTran
 
 bool UObjectPoolSubsystem::ReturnPool(AActor* InActor)
 {
-	if (!InActor) return false;
+	if (!IsValid(InActor)) return false;
 
 	TSubclassOf<AActor> ActorClass = InActor->GetClass();
 	FObjectPool* Pool = ObjectPools.Find(ActorClass);
@@ -237,24 +279,27 @@ bool UObjectPoolSubsystem::ReturnPool(AActor* InActor)
 
 	UE_LOG(LogTemp, Log, TEXT("Return : %s"), InActor ? *InActor->GetName() : TEXT("None"));
 
-	if (InActor->GetClass()->ImplementsInterface(UPoolableInterface::StaticClass()))
-	{
-		IPoolableInterface::Execute_OnReturn(InActor);
-	}
-	else
-	{
-		InActor->SetActorHiddenInGame(true);
-		InActor->SetActorTickEnabled(false);
-		InActor->SetActorEnableCollision(false);
-	}
-
 	Pool->ActiveActors.Remove(InActor);
+
 	if (FOrderNode** FoundNode = Pool->ActiveNodeMap->Find(InActor))
 	{
-		Pool->ActiveOrderList->RemoveNode(*FoundNode, true);	// 리스트에서 FoundNode 제거하고, delete까지 처리
+		Pool->ActiveOrderList->RemoveNode(*FoundNode, true);
 		Pool->ActiveNodeMap->Remove(InActor);
 	}
-	Pool->ReadyActors.Add(InActor);
+
+	InActor->SetActorEnableCollision(false);
+	InActor->SetActorTickEnabled(false);
+	InActor->SetActorHiddenInGame(true);
+
+	if (InActor->GetClass()->ImplementsInterface(UPoolableInterface::StaticClass()))
+	{
+		IPoolableInterface::Execute_OnReturnToPool(InActor);
+	}
+
+	if (IsValid(InActor))
+	{
+		Pool->ReadyActors.Add(InActor);
+	}
 
 	return true;
 }
@@ -266,6 +311,8 @@ AActor* UObjectPoolSubsystem::CreateNewObject(TSubclassOf<AActor> InClassType, c
 	FActorSpawnParameters SpawnParam;
 	SpawnParam.Owner = nullptr;
 	SpawnParam.ObjectFlags = RF_Transient;
+	SpawnParam.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	AActor* Spawned = GetWorld()->SpawnActor<AActor>(InClassType, InTransform, SpawnParam);
 #if WITH_EDITOR
@@ -292,4 +339,32 @@ AActor* UObjectPoolSubsystem::GetReadyActor(FObjectPool* InPool)
 		}
 	}
 	return ReadyActor;
+}
+
+void UObjectPoolSubsystem::RemoveInvalidActors(FObjectPool& Pool)
+{
+	Pool.ReadyActors.RemoveAll(
+		[](const TObjectPtr<AActor>& Actor)
+		{
+			return !IsValid(Actor);
+		});
+
+	for (auto It = Pool.ActiveActors.CreateIterator(); It; ++It)
+	{
+		AActor* Actor = *It;
+
+		if (IsValid(Actor))
+		{
+			continue;
+		}
+
+		if (FOrderNode** Node =
+			Pool.ActiveNodeMap->Find(Actor))
+		{
+			Pool.ActiveOrderList->RemoveNode(*Node, true);
+			Pool.ActiveNodeMap->Remove(Actor);
+		}
+
+		It.RemoveCurrent();
+	}
 }
