@@ -11,6 +11,7 @@ class UCameraComponent;
 class USpringArmComponent;
 class UInputAction;
 class UInputMappingContext;
+class UAnimMontage;
 
 UCLASS()
 class PROJECTWITHER_API APlayerCharacter : public ACharacter
@@ -45,6 +46,10 @@ private:
 
 	void UpdateMovementSpeed();
 
+	void StartRoll();
+
+	void OnRollMontageEnded( UAnimMontage* Montage, bool bInterrupted);
+
 private:
 	// 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Camera", meta = (AllowPrivateAccess = "true"))
@@ -64,9 +69,16 @@ private:
 	TObjectPtr<UInputAction> RunAction;
 
 	UPROPERTY( EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> RollAction;
+
+	UPROPERTY( EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
-	// Move 설정
+	// 구르기 설정
+	UPROPERTY( EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement|Roll", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> RollMontage;
+
+	// 이동 설정
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float WalkSpeed = 600.0f;
 
@@ -86,5 +98,8 @@ private:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true"))
 	bool bCanMove = true;
+
+	UPROPERTY( VisibleInstanceOnly, BlueprintReadOnly, Category = "Player|Movement|Roll", meta = (AllowPrivateAccess = "true"))
+	bool bIsRolling = false;
 
 };

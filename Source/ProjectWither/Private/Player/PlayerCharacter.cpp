@@ -13,6 +13,9 @@
 #include "GameFramework/PlayerController.h"
 #include "InputMappingContext.h"
 
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+
 APlayerCharacter::APlayerCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -85,6 +88,7 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction( RunAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRun);
     EnhancedInput->BindAction( RunAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopRun);
     EnhancedInput->BindAction( RunAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopRun);
+    EnhancedInput->BindAction( RollAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRoll);
 }
 
 void APlayerCharacter::Move(const FInputActionValue& Value)
@@ -130,5 +134,54 @@ void APlayerCharacter::UpdateMovementSpeed()
 
     if (!Movement) { return; }
     Movement->MaxWalkSpeed = bIsRunning ? RunSpeed : WalkSpeed;
+}
+
+void APlayerCharacter::StartRoll()
+{
+    if (!bCanMove || bIsRolling || !RollMontage) { return; }
+
+    UCharacterMovementComponent* Movement = GetCharacterMovement();
+    if (!Movement || !Movement->IsMovingOnGround()) { return; }
+
+    UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+    if (!AnimInstance) { return; }
+
+    // 입력 중이면 입력 방향으로 구릅니다.
+    FVector RollDirection = GetLastMovementInputVector().GetSafeNormal2D();
+    // 입력이 없으면 캐릭터가 바라보는 방향으로 구릅니다.
+    if (RollDirection.IsNearlyZero())
+    {
+        RollDirection = GetActorForwardVector().GetSafeNormal2D();
+    }
+
+    StopRun();
+    Movement->StopMovementImmediately();
+
+    SetActorRotation(RollDirection.Rotation());
+
+    bIsRolling = true;
+    bCanMove = false;
+
+    const float PlayedLength = PlayAnimMontage(RollMontage);
+
+    if (PlayedLength <= 0.0f)
+    {
+        bIsRolling = false;
+        bCanMove = true;
+        return;
+    }
+
+    FOnMontageEnded EndDelegate;
+    EndDelegate.BindUObject( this, &APlayerCharacter::OnRollMontageEnded);
+
+    AnimInstance->Montage_SetEndDelegate( EndDelegate, RollMontage);
+}
+
+void APlayerCharacter::OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+    if (Montage != RollMontage) { return; }
+
+    bIsRolling = false;
+    bCanMove = true;
 }
 
