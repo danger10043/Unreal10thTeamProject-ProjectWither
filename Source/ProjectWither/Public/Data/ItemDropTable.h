@@ -1,12 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "MonsterDropData.generated.h"
+#include "Engine/DataTable.h"
+#include "ItemDropTable.generated.h"
 
 class UItemDataAsset;
 
 USTRUCT(BlueprintType)
-struct PROJECTWITHER_API FMonsterDropData
+struct FItemDropTable : public FTableRowBase
 {
 public:
 	GENERATED_USTRUCT_BODY()
