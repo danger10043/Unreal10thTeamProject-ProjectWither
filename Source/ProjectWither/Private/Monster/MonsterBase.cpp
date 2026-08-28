@@ -4,13 +4,14 @@
 #include "Monster/MonsterBase.h"
 #include "Data/ItemDropTable.h"
 #include "Item/PickupItem.h"
+#include "Component/StatComponent.h"
 
 // Sets default values
 AMonsterBase::AMonsterBase()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
+	StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
 }
 
 // Called when the game starts or when spawned
@@ -25,6 +26,28 @@ void AMonsterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+}
+
+float AMonsterBase::TakeDamage(float Damage, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	if (bIsDead || !StatComponent)
+	{
+		return 0.0f;
+	}
+
+	float ReceivedDamage = Super::TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
+
+	const float AppliedDamage = StatComponent->ApplyDamage(ReceivedDamage);
+
+	if (StatComponent->IsHealthZero())
+	{
+		bIsDead = true;
+
+		CalculateDrops();
+		DropItems();
+	}
+
+	return AppliedDamage;
 }
 
 void AMonsterBase::SetMonsterState(EMonsterState NewState)

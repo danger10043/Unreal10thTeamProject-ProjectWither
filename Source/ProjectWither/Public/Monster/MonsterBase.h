@@ -28,6 +28,8 @@ protected:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	virtual float TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
 	UFUNCTION(BlueprintCallable)
 	void SetMonsterState(EMonsterState NewState); // 몬스터 상태 변경
 
@@ -65,7 +67,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	TObjectPtr<AActor> TargetActor = nullptr; // 현재 추적 또는 공격 대상
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
 	bool bIsDead = false; // 사망 여부
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Drop")
@@ -75,13 +77,13 @@ protected:
 	TSubclassOf<APickupItem> ItemPickupClass;	// 아이템 픽업 클래스
 
 	UPROPERTY(EditDefaultsOnly, Category = "Drop")
-	float DropRange = 100.0f;		// 드랍 범위
+	float DropRange = 100.0f;		// 드랍 아이템 랜덤 범위 (X, Y)
 
 	UPROPERTY(EditDefaultsOnly, Category = "Drop")
-	float DropHeight = 20.0f;		// 드랍 높이
+	float DropHeight = 20.0f;		// 드랍 아이템 랜덤 높이 (Z)
 
 private:
-	float InValidTargetActor = -1.0f;
+	float InValidTargetActor = -1.0f; // 타겟이 유효하지 않을때 반환용(private)
 
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들
