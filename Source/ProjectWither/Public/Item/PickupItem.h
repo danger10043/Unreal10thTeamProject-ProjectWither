@@ -106,6 +106,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TObjectPtr<UNiagaraComponent> NiagaraComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaticMeshComponent> ItemMeshComponent = nullptr;
+
 private:
 	// 스폰 연출용 누적 시간
 	float ElapsedTime = 0.0f;

@@ -12,7 +12,6 @@
 // Sets default values
 APickupItem::APickupItem()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
 	SphereCollision = CreateDefaultSubobject<USphereComponent>(TEXT("RootCollision"));
@@ -20,6 +19,11 @@ APickupItem::APickupItem()
 	SphereCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
 	SphereCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	SetRootComponent(SphereCollision);
+
+	ItemMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh"));
+	ItemMeshComponent->SetupAttachment(SphereCollision);
+	ItemMeshComponent->SetCollisionEnabled(
+		ECollisionEnabled::NoCollision);
 
 	NiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("VFX"));
 	NiagaraComponent->SetupAttachment(SphereCollision);
@@ -29,6 +33,11 @@ void APickupItem::InitializePickup(UItemDataAsset* InItemData, int32 InQuantity)
 {
 	ItemData = InItemData;
 	Quantity = InQuantity;
+
+	if (ItemMeshComponent && ItemData)
+	{
+		ItemMeshComponent->SetStaticMesh(ItemData->GetItemMesh());
+	}
 }
 
 void APickupItem::OnConstruction(const FTransform& Transform)
@@ -197,7 +206,7 @@ void APickupItem::OnUpdateUpdownSpin(float InDeltaTime)
 
 UMeshComponent* APickupItem::GetMesh() const
 {
-	return nullptr;
+	return ItemMeshComponent;
 }
 
 bool APickupItem::IsCurveAssetReady() const
