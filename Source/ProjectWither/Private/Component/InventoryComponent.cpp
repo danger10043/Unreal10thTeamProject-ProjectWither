@@ -166,6 +166,7 @@ bool UInventoryComponent::RemoveItemAtSlot(int32 SlotIndex, int32 RemoveQuantity
 
 bool UInventoryComponent::UseItem(int32 ItemId)
 {
+	return false;
 }
 
 
