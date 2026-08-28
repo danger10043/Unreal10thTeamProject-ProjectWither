@@ -2,6 +2,7 @@
 
 
 #include "Item/PickupItem.h"
+#include "DataAsset/ItemDataAsset.h"
 
 // Sets default values
 APickupItem::APickupItem()
@@ -9,6 +10,12 @@ APickupItem::APickupItem()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+}
+
+void APickupItem::InitializePickup(UItemDataAsset* InItemData, int32 InQuantity)
+{
+	ItemData = InItemData;
+	Quantity = InQuantity;
 }
 
 // Called when the game starts or when spawned
