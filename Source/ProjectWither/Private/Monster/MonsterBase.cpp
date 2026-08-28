@@ -3,6 +3,7 @@
 
 #include "Monster/MonsterBase.h"
 #include "Data/ItemDropTable.h"
+#include "Item/PickupItem.h"
 
 // Sets default values
 AMonsterBase::AMonsterBase()
@@ -80,5 +81,40 @@ void AMonsterBase::CalculateDrops()
 
 void AMonsterBase::DropItems()
 {
+	if (!ItemPickupClass) return;
 
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (const TPair<TObjectPtr<UItemDataAsset>, int32>& Drop : DropItem)
+	{
+		if (!Drop.Key || Drop.Value <= 0)
+		{
+			continue;
+		}
+
+		const FVector DropLocation =
+			GetActorLocation() +
+			FVector(
+				FMath::RandRange(-DropRange, DropRange),
+				FMath::RandRange(-DropRange, DropRange),
+				DropHeight
+			);
+
+		APickupItem* Pickup = World->SpawnActor<APickupItem>(
+			ItemPickupClass,
+			DropLocation,
+			FRotator::ZeroRotator
+		);
+
+		if (Pickup)
+		{
+			Pickup->InitializePickup(Drop.Key, Drop.Value);
+		}
+	}
+
+	DropItem.Reset();
 }

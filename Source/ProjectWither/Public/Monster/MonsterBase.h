@@ -10,6 +10,7 @@
 class UStatComponent;
 class UItemDataAsset;
 class UDataTable;
+class APickupItem;
 
 UCLASS()
 class PROJECTWITHER_API AMonsterBase : public ACharacter
@@ -69,6 +70,15 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Drop")
 	TObjectPtr<UDataTable> ItemDropTable = nullptr;	// 몬스터 드랍 테이블
+
+	UPROPERTY(EditDefaultsOnly, Category = "Drop")
+	TSubclassOf<APickupItem> ItemPickupClass;	// 아이템 픽업 클래스
+
+	UPROPERTY(EditDefaultsOnly, Category = "Drop")
+	float DropRange = 100.0f;		// 드랍 범위
+
+	UPROPERTY(EditDefaultsOnly, Category = "Drop")
+	float DropHeight = 20.0f;		// 드랍 높이
 
 private:
 	float InValidTargetActor = -1.0f;
