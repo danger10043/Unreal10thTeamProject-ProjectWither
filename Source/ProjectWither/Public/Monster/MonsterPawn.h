@@ -29,4 +29,16 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+
+protected:
+	UPROPERTY(EditAnywhere, Category = "Movement")
+	float FloorTraceDistance = 1000.f;
+
+	UPROPERTY(EditAnywhere, Category = "Movement")
+	float HeightAboveFloor = 0.f; // 캡슐 피벗이 바닥 기준 몇 cm 위인지에 맞춰 조정
+
+	void SnapToFloor(float DeltaTime);
+
+	UPROPERTY(EditAnywhere, Category = "Movement")
+	float TraceOffsetRadius = 800.f; // 몬스터 몸통 크기에 맞춰 조정
 };

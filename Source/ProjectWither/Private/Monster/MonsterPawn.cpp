@@ -30,12 +30,54 @@ void AMonsterPawn::Tick(float DeltaTime)
 		FRotator NewRotation = FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, RotationInterpSpeed);
 		SetActorRotation(NewRotation);
 	}
+	SnapToFloor(DeltaTime);
 }
+
+
 
 // Called to bind functionality to input
 void AMonsterPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
+}
+
+void AMonsterPawn::SnapToFloor(float DeltaTime)
+{
+	FVector Origin = GetActorLocation();
+	FVector Forward = GetActorForwardVector();
+	FVector Right = GetActorRightVector();
+
+	TArray<FVector> TraceOffsets = {
+		FVector::ZeroVector,
+		Forward * TraceOffsetRadius,
+		-Forward * TraceOffsetRadius,
+		Right * TraceOffsetRadius,
+		-Right * TraceOffsetRadius
+	};
+
+	TArray<float> HitHeights;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	for (const FVector& Offset : TraceOffsets)
+	{
+		FVector Start = Origin + Offset;
+		FVector End = Start - FVector(0.f, 0.f, FloorTraceDistance);
+
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+		{
+			HitHeights.Add(Hit.Location.Z);
+		}
+	}
+
+	if (HitHeights.Num() > 0)
+	{
+		float TargetZ = FMath::Max(HitHeights);
+		FVector TargetLocation = FVector(Origin.X, Origin.Y, TargetZ + HeightAboveFloor);
+		FVector NewLocation = FMath::VInterpTo(Origin, TargetLocation, DeltaTime, 10.f);
+		SetActorLocation(NewLocation, true);
+	}
 }
 
