@@ -2,6 +2,7 @@
 
 
 #include "Monster/MonsterBase.h"
+#include "Data/ItemDropTable.h"
 
 // Sets default values
 AMonsterBase::AMonsterBase()
@@ -52,10 +53,32 @@ float AMonsterBase::GetDistanceToTarget()
 	return GetDistanceTo(TargetActor);
 }
 
-// Called to bind functionality to input
-void AMonsterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void AMonsterBase::CalculateDrops()
 {
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	if (!ItemDropTable) return;
 
+	DropItem.Reset();	// 혹시나 남아있을 드랍 아이템 목록 초기화
+
+	TArray<FItemDropTable*> AllRows;
+	ItemDropTable->GetAllRows<FItemDropTable>(
+		TEXT("AMonsterBase::CalculateDrops"),
+		AllRows
+	);
+	for (FItemDropTable* Row : AllRows)
+	{
+		// 필수 데이터 확인
+		if (!Row || !Row->ItemData) continue;
+
+		// 드랍 확률 체크
+		if (FMath::FRand() > Row->DropRate) continue;
+
+		int32 Quantity = FMath::RandRange(Row->MinQuantity, Row->MaxQuantity);
+		
+		DropItem.FindOrAdd(Row->ItemData) += Quantity;
+	}
 }
 
+void AMonsterBase::DropItems()
+{
+
+}
