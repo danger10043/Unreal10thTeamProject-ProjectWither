@@ -2,6 +2,9 @@
 
 
 #include "Player/PlayerCharacter.h"
+#include "Component/StatComponent.h"
+#include "Component/WeaponComponent.h"
+#include "Component/CombatComponent.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -30,15 +33,18 @@ APlayerCharacter::APlayerCharacter()
     GetCharacterMovement()->RotationRate = FRotator(0.0f, RotationRate, 0.0f);
     GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 
-    CameraArm = CreateDefaultSubobject<USpringArmComponent>( TEXT("CameraArm"));
+    CameraArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraArm"));
     CameraArm->SetupAttachment(GetRootComponent());
     CameraArm->TargetArmLength = CameraDistance;
     CameraArm->bUsePawnControlRotation = true;
 
-    PlayerCamera = CreateDefaultSubobject<UCameraComponent>( TEXT("PlayerCamera"));
+    PlayerCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("PlayerCamera"));
     PlayerCamera->SetupAttachment( CameraArm, USpringArmComponent::SocketName);
     PlayerCamera->bUsePawnControlRotation = false;
 
+    StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
+    CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+    WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
 }
 
 void APlayerCharacter::SetCanMove(bool bNewCanMove)
@@ -50,6 +56,21 @@ void APlayerCharacter::SetCanMove(bool bNewCanMove)
         StopRun();
         GetCharacterMovement()->StopMovementImmediately();
     }
+}
+
+UStatComponent* APlayerCharacter::GetStatComponent_Implementation() const
+{
+    return StatComponent;
+}
+
+UWeaponComponent* APlayerCharacter::GetWeaponComponent_Implementation() const
+{
+    return WeaponComponent;
+}
+
+UCombatComponent* APlayerCharacter::GetCombatComponent_Implementation() const
+{
+    return CombatComponent;
 }
 
 void APlayerCharacter::BeginPlay()
