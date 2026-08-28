@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Item/ItemInstance.h"
 #include "PickupItem.generated.h"
 
 class UItemDataAsset;
@@ -21,7 +22,7 @@ public:
 	// Sets default values for this actor's properties
 	APickupItem();
 
-	void InitializePickup(UItemDataAsset* InItemData, int32 InQuantity);
+	void InitializePickup(FItemInstance InItemData);
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -50,11 +51,8 @@ private:
 	bool IsPickupEffectAssetReady() const;
 
 protected:
-	UPROPERTY(VisibleInstanceOnly)
-	TObjectPtr<UItemDataAsset> ItemData = nullptr; // 픽업시 획득할 아이템 데이터 에셋
-
-	UPROPERTY(VisibleInstanceOnly)
-	int32 Quantity = 0;		// 픽업시 획득할 아이템의 개수
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Item")
+	FItemInstance ItemInstance; // 픽업시 획득할 아이템 데이터 에셋
 
 	// 메시의 기본 위치
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Data")

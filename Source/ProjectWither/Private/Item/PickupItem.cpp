@@ -3,7 +3,8 @@
 
 #include "Item/PickupItem.h"
 #include "DataAsset/ItemDataAsset.h"
-//#include "Component/InventoryComponent.h"
+#include "Component/InventoryComponent.h"
+#include "Item/ItemInstance.h"
 
 #include "Components/SphereComponent.h"
 #include "Components/MeshComponent.h"
@@ -29,21 +30,24 @@ APickupItem::APickupItem()
 	NiagaraComponent->SetupAttachment(SphereCollision);
 }
 
-void APickupItem::InitializePickup(UItemDataAsset* InItemData, int32 InQuantity)
+void APickupItem::InitializePickup(FItemInstance InItemData)
 {
-	ItemData = InItemData;
-	Quantity = InQuantity;
+	ItemInstance = InItemData;
 
-	if (ItemMeshComponent && ItemData)
+	if (ItemMeshComponent && ItemInstance.ItemData)
 	{
-		ItemMeshComponent->SetStaticMesh(ItemData->GetItemMesh());
+		ItemMeshComponent->SetStaticMesh(ItemInstance.ItemData->GetItemMesh());
 	}
 }
 
 void APickupItem::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	//InitializePickup(ItemData);
+
+	if (ItemInstance.ItemData)
+	{
+		InitializePickup(ItemInstance);
+	}
 }
 
 // Called when the game starts or when spawned
@@ -79,11 +83,10 @@ void APickupItem::Tick(float DeltaTime)
 
 void APickupItem::OnBeginOverlap(AActor* OverlappedActor, AActor* OtherActor)
 {
-	// 인벤토리 컴포넌트 구현 후 주석 해제
-	/*if (!IsValid(OtherActor) || OtherActor->FindComponentByClass<UInventoryComponent>() == nullptr)
+	if (!IsValid(OtherActor) || OtherActor->FindComponentByClass<UInventoryComponent>() == nullptr)
 	{
 		return;
-	}*/
+	}
 	OnPickup(OtherActor);
 }
 

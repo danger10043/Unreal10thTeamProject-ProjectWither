@@ -135,7 +135,11 @@ void AMonsterBase::DropItems()
 
 		if (Pickup)
 		{
-			Pickup->InitializePickup(Drop.Key, Drop.Value);
+			FItemInstance DroppedItem;
+			DroppedItem.ItemData = Drop.Key;
+			DroppedItem.Quantity = Drop.Value;
+
+			Pickup->InitializePickup(DroppedItem);
 		}
 	}
 
