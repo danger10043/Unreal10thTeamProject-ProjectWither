@@ -70,6 +70,10 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
 	bool bIsDead = false; // 사망 여부
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	float AllowRange = 100.0f;	// 플레이어에게 최대한 접근할 수 있는 거리
+
+	// Drop --------------------------------------------------------------------
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Drop")
 	TObjectPtr<UDataTable> ItemDropTable = nullptr;	// 몬스터 드랍 테이블
 
@@ -81,6 +85,7 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Drop")
 	float DropHeight = 20.0f;		// 드랍 아이템 랜덤 높이 (Z)
+	// -------------------------------------------------------------------------
 
 private:
 	float InValidTargetActor = -1.0f; // 타겟이 유효하지 않을때 반환용(private)
