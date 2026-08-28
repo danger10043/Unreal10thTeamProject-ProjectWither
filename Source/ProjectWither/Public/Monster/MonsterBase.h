@@ -7,10 +7,6 @@
 #include "CommonHeader/MonsterStateEnums.h"
 #include "MonsterBase.generated.h"
 
-class UStatComponent;
-class UItemDataAsset;
-class UDataTable;
-
 UCLASS()
 class PROJECTWITHER_API AMonsterBase : public ACharacter
 {
@@ -19,6 +15,9 @@ class PROJECTWITHER_API AMonsterBase : public ACharacter
 public:
 	// Sets default values for this character's properties
 	AMonsterBase();
+
+	// Called to bind functionality to input
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 protected:
 	// Called when the game starts or when spawned
@@ -42,37 +41,25 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	float GetDistanceToTarget(); // 현재 타겟까지 거리 반환
 
-	UFUNCTION(BlueprintCallable)
-	void CalculateDrops();		// 드랍 여부 및 개수 결정
-
-	UFUNCTION(BlueprintCallable)
-	void DropItems();			// 계산된 아이템을 월드에 생성
-
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Base")
 	int32 MonsterId = 0; // 몬스터 고유 ID
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Base")
 	EMonsterState MonsterState = EMonsterState::Idle; // 현재 몬스터 상태
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Base")
-	TObjectPtr<UStatComponent> StatComponent = nullptr; // 스탯 컴포넌트
+	//UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Base")
+	//TObjectPtr<UStatComponent> StatComponent = nullptr; // 스탯 컴포넌트
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Base")
 	FVector SpawnLocation = FVector(0, 0, 0); // 최초 생성 위치
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Base")
 	TObjectPtr<AActor> TargetActor = nullptr; // 현재 추적 또는 공격 대상
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Base")
 	bool bIsDead = false; // 사망 여부
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Drop")
-	TObjectPtr<UDataTable> ItemDropTable = nullptr;	// 몬스터 드랍 테이블
 
 private:
 	float InValidTargetActor = -1.0f;
-
-	UPROPERTY(Transient)
-	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들
 };

@@ -12,15 +12,15 @@ struct PROJECTWITHER_API FItemInstance
 
 public:
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Instance")		// 원본 아이템 데이터
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Instance")
 	TObjectPtr<UItemDataAsset> ItemData = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Instance", meta = (ClampMin = "0"))	// 아이템 보유 수량
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Instance", meta = (ClampMin = "0"))
 	int32 Quantity = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Instance", meta = (ClampMin = "0"))	// 현재 강화 수치 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Instance", meta = (ClampMin = "0"))
 	int32 EnhanceLevel = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Instance", meta = (ClampMin = "0"))	// 무기가 총일 경우 현재 장전된 탄약 수
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item Instance", meta = (ClampMin = "0"))
 	int32 CurrentAmmo = 0;
 };

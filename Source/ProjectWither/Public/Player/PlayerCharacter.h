@@ -5,9 +5,6 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
-#include "Interface/StatComponentUserInterface.h"
-#include "Interface/WeaponComponentUserInterface.h"
-#include "Interface/CombatComponentUserInterface.h"
 #include "PlayerCharacter.generated.h"
 
 class UCameraComponent;
@@ -15,15 +12,9 @@ class USpringArmComponent;
 class UInputAction;
 class UInputMappingContext;
 class UAnimMontage;
-class UStatComponent;
-class UWeaponComponent;
 
 UCLASS()
-class PROJECTWITHER_API APlayerCharacter : 
-	public ACharacter,
-	public IStatComponentUserInterface,
-	public ICombatComponentUserInterface,
-	public IWeaponComponentUserInterface
+class PROJECTWITHER_API APlayerCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
@@ -38,12 +29,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Player|Movement")
 	bool IsRunning() const { return bIsRunning; }
-
-	virtual UStatComponent* GetStatComponent_Implementation() const override;
-
-	virtual UWeaponComponent* GetWeaponComponent_Implementation() const override;
-
-	virtual UCombatComponent* GetCombatComponent_Implementation() const override;
 
 protected:
 	virtual void BeginPlay() override;
@@ -66,15 +51,6 @@ private:
 	void OnRollMontageEnded( UAnimMontage* Montage, bool bInterrupted);
 
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStatComponent> StatComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UCombatComponent> CombatComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UWeaponComponent> WeaponComponent;
-
 	// 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Camera", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USpringArmComponent> CameraArm;

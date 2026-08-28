@@ -14,6 +14,4 @@ class PROJECTWITHER_API UMaterialDataAsset : public UItemDataAsset
 {
 	GENERATED_BODY()
 	
-public:
-	UMaterialDataAsset();
 };
