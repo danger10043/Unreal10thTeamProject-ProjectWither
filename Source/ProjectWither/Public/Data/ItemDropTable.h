@@ -17,7 +17,7 @@ public:
 	TObjectPtr<UItemDataAsset> ItemData = nullptr; // 드랍 가능한 아이템
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Drop", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float DropRate;	// 드랍 확률 0.0 ~ 1.0
+	float DropRate = 0.0f;	// 드랍 확률 0.0 ~ 1.0
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Drop", meta = (ClampMin = "1"))
 	int32 MinQuantity = 1; // 최소 드랍 개수
