@@ -23,6 +23,17 @@ void UStatComponent::BeginPlay()
 	CurrentStamina = MaxStamina;
 }
 
+void UStatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(StaminaRecoveryDelayTimerHandle);
+		World->GetTimerManager().ClearTimer(StaminaRecoveryTimerHandle);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 float UStatComponent::RecoverHealth(float Amount)
 {
 	if (Amount <= 0.0f || IsHealthZero()) return 0.0f;
@@ -73,6 +84,7 @@ float UStatComponent::RecoverStamina(float Amount)
 
 	if (RecoveredAmount > 0.0f)
 	{
+		UE_LOG(LogTemp, Log, TEXT("스태미나 회복 : %.1f / %.1f (+%1.f)"), CurrentStamina, MaxStamina, RecoveredAmount);
 		OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina, RecoveredAmount);
 	}
 
@@ -85,9 +97,83 @@ float UStatComponent::UseStamina(float Amount)
 
 	CurrentStamina -= Amount;
 
+	UE_LOG(LogTemp, Log, TEXT("스태미나 소모 : %.1f / %.1f (-%.1f"), CurrentStamina, MaxStamina, Amount);
 	OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina, -Amount);
 
+	RestartStaminaRecoveryDelay();
+
 	return Amount;
+}
+
+void UStatComponent::RestartStaminaRecoveryDelay()
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World)) return;
+
+	FTimerManager& TimerManager = World->GetTimerManager();
+
+	TimerManager.ClearTimer(StaminaRecoveryDelayTimerHandle);
+	TimerManager.ClearTimer(StaminaRecoveryTimerHandle);
+
+	if (CurrentStamina >= MaxStamina)
+	{
+		return;
+	}
+
+	if (StaminaRecoveryDelay <= 0.0f)
+	{
+		StartStaminaRecovery();
+		return;
+	}
+
+	TimerManager.SetTimer(
+		StaminaRecoveryDelayTimerHandle,
+		this,
+		&UStatComponent::StartStaminaRecovery,
+		StaminaRecoveryDelay,
+		false
+	);
+}
+
+void UStatComponent::StartStaminaRecovery()
+{
+	if (CurrentStamina >= MaxStamina)
+	{
+		return;
+	}
+
+	if (StaminaRecoveryAmountPerTick <= 0.0f || StaminaRecoveryInterval <= 0.0f)
+	{
+		return;
+	}
+
+	RecoverStaminaTick();
+
+	if (CurrentStamina >= MaxStamina)
+	{
+		return;
+	}
+
+	GetWorld()->GetTimerManager().SetTimer(
+		StaminaRecoveryTimerHandle,
+		this,
+		&UStatComponent::RecoverStaminaTick,
+		StaminaRecoveryInterval,
+		true
+	);
+}
+
+void UStatComponent::RecoverStaminaTick()
+{
+	RecoverStamina(StaminaRecoveryAmountPerTick);
+
+	if (CurrentStamina >= MaxStamina)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(StaminaRecoveryTimerHandle);
+		}
+	}
 }
 
 

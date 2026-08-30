@@ -91,6 +91,13 @@ void APlayerCharacter::BeginPlay()
     }
 }
 
+void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    GetWorldTimerManager().ClearTimer(RunStaminaTimerHandle);
+
+    Super::EndPlay(EndPlayReason);
+}
+
 void APlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -138,15 +145,69 @@ void APlayerCharacter::Look(const FInputActionValue& Value)
 
 void APlayerCharacter::StartRun()
 {
-    if (!bCanMove) { return; }
+    if (!bCanMove || !IsValid(StatComponent)) return;
+
+
+    if (StatComponent->GetCurrentStamina() <= 0.0f)
+    {
+        return;
+    }
+
     bIsRunning = true;
     UpdateMovementSpeed();
+
+    const float ConsumptionInterval = FMath::Max(RunStaminaConsumptionInterval, 0.01f);
+
+    GetWorldTimerManager().SetTimer(
+        RunStaminaTimerHandle,
+        this,
+        &APlayerCharacter::ConsumeRunStamina,
+        ConsumptionInterval,
+        true
+    );
 }
 
 void APlayerCharacter::StopRun()
 {
+    GetWorldTimerManager().ClearTimer(RunStaminaTimerHandle);
+
     bIsRunning = false;
     UpdateMovementSpeed();
+}
+
+void APlayerCharacter::ConsumeRunStamina()
+{
+    if (!bIsRunning || !IsValid(StatComponent))
+    {
+        StopRun();
+        return;
+    }
+
+    // Shift 눌러도 실제로 이동 중일 때만 소모하기
+    const UCharacterMovementComponent* Movement = GetCharacterMovement();
+
+    if (!IsValid(Movement) || Movement->Velocity.SizeSquared2D() <= UE_KINDA_SMALL_NUMBER)
+    {
+        return;
+    }
+
+    if (StatComponent->HasEnoughStamina(RunStaminaCostPerTick))
+    {
+        StatComponent->UseStamina(RunStaminaCostPerTick);
+    }
+    else
+    {
+        const float RemainingStamina = StatComponent->GetCurrentStamina();
+        if (RemainingStamina > 0.0f)
+        {
+            StatComponent->UseStamina(RemainingStamina);
+        }
+    }
+
+    if (StatComponent->GetCurrentStamina() <= UE_KINDA_SMALL_NUMBER)
+    {
+        StopRun();
+    }
 }
 
 void APlayerCharacter::UpdateMovementSpeed()

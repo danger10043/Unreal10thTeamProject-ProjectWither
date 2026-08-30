@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "TimerManager.h"
 #include "StatComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
@@ -30,6 +31,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
 	/*
@@ -107,6 +110,13 @@ public:
 	FOnHealthZeropDelegate OnHealthZero;
 
 private:
+	void RestartStaminaRecoveryDelay();
+
+	void StartStaminaRecovery();
+
+	void RecoverStaminaTick();
+
+private:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Stat|Health", meta = (AllowPrivateAccess = "true"))
 	float CurrentHealth = 0.0f;
 
@@ -118,6 +128,19 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat|Stamina", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float MaxStamina = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat|Stamina|Recovery", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float StaminaRecoveryDelay = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat|Stamina|Recovery", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float StaminaRecoveryInterval = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat|Stamina|Recovery", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float StaminaRecoveryAmountPerTick = 2.0f;
+
+	FTimerHandle StaminaRecoveryDelayTimerHandle;
+
+	FTimerHandle StaminaRecoveryTimerHandle;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float MinAttackPower = 10.0f;

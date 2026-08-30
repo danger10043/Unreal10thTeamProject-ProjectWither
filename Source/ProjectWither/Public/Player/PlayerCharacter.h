@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "TimerManager.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Interface/WeaponComponentUserInterface.h"
 #include "Interface/CombatComponentUserInterface.h"
@@ -47,6 +48,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	virtual void Tick(float DeltaTime) override;
 
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -57,6 +60,8 @@ private:
 
 	void StartRun();
 	void StopRun();
+
+	void ConsumeRunStamina();
 
 	void UpdateMovementSpeed();
 
@@ -101,6 +106,14 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RunSpeed = 1200.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement|Run", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float RunStaminaCostPerTick = 2.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement|Run", meta = (AllowPrivateAccess = "true", ClampMin = "0.01", Units = "s"))
+	float RunStaminaConsumptionInterval = 0.2f;
+
+	FTimerHandle RunStaminaTimerHandle;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RotationRate = 720.0f;
