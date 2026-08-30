@@ -21,6 +21,7 @@ class APlayerCharacter;
 class UStatComponent;
 class UWeaponComponent;
 class UAnimMontage;
+class UCurveFloat;
 
 UCLASS( ClassGroup=(Custom), Blueprintable, meta=(BlueprintSpawnableComponent))
 class PROJECTWITHER_API UCombatComponent : public UActorComponent
@@ -152,6 +153,12 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Roll", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimMontage> RollMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Roll", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCurveFloat> RollSpeedCurve;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Roll", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
+	float RollDistance = 500.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina",
 		meta = (ClampMin = "0.0"))
