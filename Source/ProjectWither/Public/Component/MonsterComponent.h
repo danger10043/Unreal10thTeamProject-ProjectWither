@@ -3,32 +3,53 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Character.h"
+#include "Components/ActorComponent.h"
 #include "CommonHeader/MonsterStateEnums.h"
-#include "MonsterBase.generated.h"
+#include "MonsterComponent.generated.h"
 
 class UStatComponent;
 class UItemDataAsset;
 class UDataTable;
 class APickupItem;
 
-UCLASS()
-class PROJECTWITHER_API AMonsterBase : public ACharacter
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterDied);
+
+UCLASS(ClassGroup=(Monster), meta=(BlueprintSpawnableComponent))
+class PROJECTWITHER_API UMonsterComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
-	AMonsterBase();
+	// Shared gameplay state for both Character and Pawn monsters.
+	UMonsterComponent();
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	virtual float TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+public:
+    // Both monster actor types forward their damage here.
+    float ApplyMonsterDamage(float Damage);
+
+    UFUNCTION(BlueprintPure, Category = "Monster")
+    bool IsDead() const { return bIsDead; }
+
+    UFUNCTION(BlueprintPure, Category = "Monster")
+    int32 GetMonsterId() const { return MonsterId; }
+
+    UFUNCTION(BlueprintPure, Category = "Monster")
+    EMonsterState GetMonsterState() const { return MonsterState; }
+
+    UFUNCTION(BlueprintPure, Category = "Monster")
+    FVector GetSpawnLocation() const { return SpawnLocation; }
+
+    UFUNCTION(BlueprintPure, Category = "Monster")
+    float GetAllowRange() const { return AllowRange; }
+
+    UPROPERTY(BlueprintAssignable, Category = "Monster")
+    FOnMonsterDied OnMonsterDied;
 
 	UFUNCTION(BlueprintCallable)
 	void SetMonsterState(EMonsterState NewState); // 몬스터 상태 변경
@@ -40,10 +61,10 @@ protected:
 	void ClearTarget(); // 현재 타겟 제거
 
 	UFUNCTION(BlueprintCallable)
-	AActor* GetTargetActor(); // 현재 타겟 반환
+	AActor* GetTargetActor() const; // 현재 타겟 반환
 
 	UFUNCTION(BlueprintCallable)
-	float GetDistanceToTarget(); // 현재 타겟까지 거리 반환
+	float GetDistanceToTarget() const; // 현재 타겟까지 거리 반환
 
 	UFUNCTION(BlueprintCallable)
 	void CalculateDrops();		// 드랍 여부 및 개수 결정
@@ -61,10 +82,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Base")
 	TObjectPtr<UStatComponent> StatComponent = nullptr; // 스탯 컴포넌트
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
 	FVector SpawnLocation = FVector(0, 0, 0); // 최초 생성 위치
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
 	TObjectPtr<AActor> TargetActor = nullptr; // 현재 추적 또는 공격 대상
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
@@ -88,7 +109,8 @@ protected:
 	// -------------------------------------------------------------------------
 
 private:
-	float InValidTargetActor = -1.0f; // 타겟이 유효하지 않을때 반환용(private)
+	UFUNCTION()
+	void HandleDeath();
 
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들
