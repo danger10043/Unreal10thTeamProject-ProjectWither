@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Item/PickupItem.h"
@@ -154,37 +154,43 @@ void APickupItem::OnUpdatePickupEffect()
 
 void APickupItem::OnFinishPickupEffect()
 {
-	// 획득 이팩트용 타이머 클리어
 	GetWorldTimerManager().ClearTimer(PickupEffectTimerHandle);
 
-	// 대상의 인벤토리에 아이템 추가
-	//if (IInventoryUserInterface* Inven = Cast<IInventoryUserInterface>(TargetActor))
-	//{
-	//	FInventoryCommand Command = FInventoryCommand::MakeAdd(DataAsset, 1);
-	//	FInventoryCommandResult Result;
-	//	if (!Inven->ExecuteInventoryCommand(Command, Result))
-	//	{
-	//		// 실패하면 다시 스폰
-	//		UPickupFactorySubsystem* Factory = GetWorld()->GetSubsystem<UPickupFactorySubsystem>();
-	//		FTransform SpawnTransform = TargetActor->GetActorTransform();
-	//		FVector NewLocation(FMath::RandPointInCircle(300.0f), 0.0f);	// 액터 위치를 중심으로 반경 3m의 서클 안 랜덤 위치
-	//		SpawnTransform.AddToTranslation(NewLocation);
-	//		Factory->SpawnPickupAsync(DataAsset, SpawnTransform,
-	//			FOnPickupSpawned::CreateWeakLambda(
-	//				this,
-	//				[this](APickupBase* InSpawned)
-	//				{
-	//					UE_LOG(LogTemp, Log, TEXT("%s가 스폰되었습니다."), *InSpawned->GetName());
-	//					Destroy(); // 기존에 먹었던 픽업은 삭제
-	//				}
-	//			));
-	//	}
-	//	else
-	//	{
-	//		// 성공했으면 인벤토리에 들어갔으니 픽업 삭제
-	//		Destroy();
-	//	}
-	//}
+	AActor* Target = TargetActor.Get();
+
+	UInventoryComponent* Inventory = IsValid(Target)
+		? Target->FindComponentByClass<UInventoryComponent>()
+		: nullptr;
+
+	if (IsValid(Inventory) &&
+		IsValid(ItemInstance.ItemData.Get()) &&
+		ItemInstance.Quantity > 0)
+	{
+		const int32 AddedQuantity = Inventory->AddItem(
+			ItemInstance.ItemData.Get(),
+			ItemInstance.Quantity
+		);
+
+		ItemInstance.Quantity -= AddedQuantity;
+
+		if (ItemInstance.Quantity <= 0)
+		{
+			Destroy();
+			return;
+		}
+	}
+
+	TargetActor.Reset();
+	PickupElapsedTime = 0.0f;
+	bIdle = true;
+
+	if (UMeshComponent* PickupMesh = GetMesh())
+	{
+		PickupMesh->SetRelativeLocation(MeshBaseLocation);
+		PickupMesh->SetRelativeScale3D(FVector::OneVector);
+	}
+
+	SphereCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 }
 
 void APickupItem::OnUpdateUpdownSpin(float InDeltaTime)

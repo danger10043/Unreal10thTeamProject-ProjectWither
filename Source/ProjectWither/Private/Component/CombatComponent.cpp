@@ -9,6 +9,12 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/RootMotionSource.h"
+
+namespace
+{
+	const FName RollRootMotionSourceName(TEXT("CombatRoll"));
+}
 
 UCombatComponent::UCombatComponent()
 {
@@ -135,6 +141,21 @@ void UCombatComponent::Roll()
 		return;
 	}
 
+	const float RollSpeed = PlayedLength > UE_SMALL_NUMBER ? RollDistance / PlayedLength : 0.0f;
+
+	TSharedPtr<FRootMotionSource_ConstantForce> RollMovement = MakeShared<FRootMotionSource_ConstantForce>();
+
+	RollMovement->InstanceName = RollRootMotionSourceName;
+	RollMovement->Priority = 500;
+	RollMovement->AccumulateMode = ERootMotionAccumulateMode::Override;
+	RollMovement->Duration = PlayedLength;
+	RollMovement->Force = RollDirection * RollSpeed;
+	RollMovement->StrengthOverTime = RollSpeedCurve;
+	RollMovement->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
+	RollMovement->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
+
+	Movement->ApplyRootMotionSource(RollMovement);
+
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(this, &UCombatComponent::OnRollMontageEnded);
 
@@ -147,6 +168,14 @@ void UCombatComponent::OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupt
 {
 	if (Montage != RollMontage) return;
 	if (ActionState != EPlayerActionState::Rolling) return;
+
+	if (IsValid(OwnerPlayer))
+	{
+		if (UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement())
+		{
+			Movement->RemoveRootMotionSource(RollRootMotionSourceName);
+		}
+	}
 
 	if (IsValid(OwnerPlayer))
 	{
@@ -194,6 +223,12 @@ bool UCombatComponent::CanRoll() const
 	if (!IsValid(RollMontage))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UCombatComponent::CanRoll 실패: CombatComponent에 RollMontage가 지정되지 않았습니다."));
+		return false;
+	}
+
+	if (!IsValid(RollSpeedCurve))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UCombatComponent::CanRoll 실패: CombatComponent에 RollSpeedCurve가 지정되지 않았습니다."));
 		return false;
 	}
 
@@ -271,10 +306,23 @@ ECombatWeaponType UCombatComponent::ResolveWeaponType_Implementation() const
 
 bool UCombatComponent::IsOwnerAlive() const
 {
-	return IsValid(OwnerPlayer)
-		&& IsValid(StatComponent)
-		&& !StatComponent->IsHealthZero()
-		&& ActionState != EPlayerActionState::Dead;
+	if (!IsValid(OwnerPlayer)) {
+		UE_LOG(LogTemp, Warning, TEXT("OwnerPlayer 가 유효하지 않습니다."));
+		return false;
+	}
+	if (!IsValid(StatComponent)) {
+		UE_LOG(LogTemp, Warning, TEXT("StatComponent 가 유효하지 않습니다."));
+		return false;
+	}
+	if (StatComponent->IsHealthZero()) {
+		UE_LOG(LogTemp, Warning, TEXT("플레이어의 체력이 0입니다."));
+		return false;
+	}
+	if (ActionState == EPlayerActionState::Dead) {
+		UE_LOG(LogTemp, Warning, TEXT("플레이어는 현재 사망 상태입니다."));
+		return false;
+	}
+	return true;
 }
 
 bool UCombatComponent::TrySpendStamina(float Cost)
