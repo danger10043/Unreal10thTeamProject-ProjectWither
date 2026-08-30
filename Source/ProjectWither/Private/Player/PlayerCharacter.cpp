@@ -159,50 +159,14 @@ void APlayerCharacter::UpdateMovementSpeed()
 
 void APlayerCharacter::StartRoll()
 {
-    if (!bCanMove || bIsRolling || !RollMontage) { return; }
+    UE_LOG(LogTemp, Log, TEXT("APlayerCharacter::StartRoll - 호출됨"));
 
-    UCharacterMovementComponent* Movement = GetCharacterMovement();
-    if (!Movement || !Movement->IsMovingOnGround()) { return; }
-
-    UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-    if (!AnimInstance) { return; }
-
-    // 입력 중이면 입력 방향으로 구릅니다.
-    FVector RollDirection = GetLastMovementInputVector().GetSafeNormal2D();
-    // 입력이 없으면 캐릭터가 바라보는 방향으로 구릅니다.
-    if (RollDirection.IsNearlyZero())
+    if (!IsValid(CombatComponent))
     {
-        RollDirection = GetActorForwardVector().GetSafeNormal2D();
-    }
-
-    StopRun();
-    Movement->StopMovementImmediately();
-
-    SetActorRotation(RollDirection.Rotation());
-
-    bIsRolling = true;
-    bCanMove = false;
-
-    const float PlayedLength = PlayAnimMontage(RollMontage);
-
-    if (PlayedLength <= 0.0f)
-    {
-        bIsRolling = false;
-        bCanMove = true;
+        UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::StartRoll - CombatComponent가 유효하지 않습니다."));
         return;
     }
 
-    FOnMontageEnded EndDelegate;
-    EndDelegate.BindUObject( this, &APlayerCharacter::OnRollMontageEnded);
-
-    AnimInstance->Montage_SetEndDelegate( EndDelegate, RollMontage);
-}
-
-void APlayerCharacter::OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted)
-{
-    if (Montage != RollMontage) { return; }
-
-    bIsRolling = false;
-    bCanMove = true;
+    CombatComponent->Roll();
 }
 

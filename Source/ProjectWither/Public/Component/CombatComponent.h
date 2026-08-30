@@ -20,6 +20,7 @@ enum class ECombatWeaponType : uint8
 class APlayerCharacter;
 class UStatComponent;
 class UWeaponComponent;
+class UAnimMontage;
 
 UCLASS( ClassGroup=(Custom), Blueprintable, meta=(BlueprintSpawnableComponent))
 class PROJECTWITHER_API UCombatComponent : public UActorComponent
@@ -121,6 +122,8 @@ private:
 
 	void CloseParryWindow();
 
+	void OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
 	// 외부에서 행동 검사 없이 상태를 바꾸지 못하도록 제한
 	void SetActionState(EPlayerActionState State);
 
@@ -146,6 +149,9 @@ private:
 		meta = (AllowPrivateAccess = "true")
 	)
 	EPlayerActionState ActionState = EPlayerActionState::None;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Roll", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> RollMontage;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina",
 		meta = (ClampMin = "0.0"))

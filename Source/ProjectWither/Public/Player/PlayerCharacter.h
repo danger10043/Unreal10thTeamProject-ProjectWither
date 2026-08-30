@@ -14,7 +14,6 @@ class UCameraComponent;
 class USpringArmComponent;
 class UInputAction;
 class UInputMappingContext;
-class UAnimMontage;
 class UStatComponent;
 class UWeaponComponent;
 //
@@ -63,8 +62,6 @@ private:
 
 	void StartRoll();
 
-	void OnRollMontageEnded( UAnimMontage* Montage, bool bInterrupted);
-
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStatComponent> StatComponent;
@@ -98,10 +95,6 @@ private:
 	UPROPERTY( EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
-	// 구르기 설정
-	UPROPERTY( EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement|Roll", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UAnimMontage> RollMontage;
-
 	// 이동 설정
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float WalkSpeed = 600.0f;
@@ -122,8 +115,5 @@ private:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true"))
 	bool bCanMove = true;
-
-	UPROPERTY( VisibleInstanceOnly, BlueprintReadOnly, Category = "Player|Movement|Roll", meta = (AllowPrivateAccess = "true"))
-	bool bIsRolling = false;
 
 };
