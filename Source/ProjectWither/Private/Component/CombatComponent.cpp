@@ -215,14 +215,49 @@ void UCombatComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterru
 
 void UCombatComponent::StartBlock()
 {
+	if (!CanBlock()) { return; }
+
+	SetActionState(EPlayerActionState::Blocking);
+	OpenParryWindow();
+	// 가드 애니메이션 시작
 }
 
 void UCombatComponent::StopBlock()
 {
+	if (ActionState != EPlayerActionState::Blocking) { return; }
+
+	CloseParryWindow();
+	FinishAction(EPlayerActionState::Blocking);
+	// 가드 애니메이션 종료
 }
 
-void UCombatComponent::ReceiveHit()
+float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, AController* EventInstigator)
 {
+	if (!IsOwnerAlive() || DamageAmount <= 0.0f) { return 0.0f; }
+
+	if (ActionState == EPlayerActionState::Blocking)
+	{
+		if (bParryWindowOpen)
+		{
+			CloseParryWindow();
+
+			OnParrySucceeded();
+
+			// 공격한 적에게 패링 성공 전달
+			return 0.0f;
+		}
+
+		OnBlockSucceeded();
+
+		// 현재 기획에서는 모든 피해 방어
+		return 0.0f;
+	}
+
+	const float AppliedDamage = StatComponent->ApplyDamage(DamageAmount);
+
+	OnHitReceived();
+
+	return AppliedDamage;
 }
 
 void UCombatComponent::Die()
@@ -304,7 +339,11 @@ bool UCombatComponent::CanRoll() const
 
 bool UCombatComponent::CanBlock() const
 {
-	return false;
+	if (!IsOwnerAlive()) { return false; }
+
+	if (ActionState != EPlayerActionState::None) { return false; }
+
+	return true;
 }
 
 ECombatWeaponType UCombatComponent::ResolveWeaponType_Implementation() const
@@ -397,10 +436,21 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 
 void UCombatComponent::OpenParryWindow()
 {
+	bParryWindowOpen = true;
+
+	GetWorld()->GetTimerManager().ClearTimer(ParryTimerHandle);
+
+	GetWorld()->GetTimerManager().SetTimer(ParryTimerHandle, this, &UCombatComponent::CloseParryWindow, ParryWindow, false);
 }
 
 void UCombatComponent::CloseParryWindow()
 {
+	bParryWindowOpen = false;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ParryTimerHandle);
+	}
 }
 
 
