@@ -337,7 +337,7 @@ void UMonsterComponent::ResetAttackCooldown()
 
 }
 
-void UMonsterComponent::ApplyAttackDamage()
+void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget)
 {
 }
 

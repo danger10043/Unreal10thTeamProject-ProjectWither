@@ -91,7 +91,7 @@ public:
 	void ResetAttackCooldown();	// 쿨타임 종료 처리
 
 	UFUNCTION(BlueprintCallable)
-	void ApplyAttackDamage();	// 실제 타격 판정, 피해 적용
+	void ApplyAttackDamage(AActor* HitTarget);	// 실제 타격 판정, 피해 적용
 
 	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
 	void RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox);	// 공격 히트 박스 등록
