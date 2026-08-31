@@ -9,6 +9,7 @@
 #include "BrainComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Monster/MonsterAIController.h"
+#include "Animation/AnimMontage.h"
 
 UMonsterComponent::UMonsterComponent()
 {
@@ -170,4 +171,98 @@ void UMonsterComponent::DropItems()
 	}
 
 	DropItem.Reset();
+}
+
+bool UMonsterComponent::IsInAttackRange()
+{
+	if (!IsValid(TargetActor) || !IsValid(GetOwner()))
+	{
+		return false;
+	}
+
+	const float Distance = GetDistanceToTarget();
+
+	return Distance >= 0.0f && Distance <= AttackRange;
+}
+
+bool UMonsterComponent::CanAttack()
+{
+	if (bIsDead || !bCanAttack)
+	{
+		return false;
+	}
+
+	if (!IsValid(StatComponent) || StatComponent->IsHealthZero())
+	{
+		return false;
+	}
+
+	if (MonsterState == EMonsterState::Attack ||
+		MonsterState == EMonsterState::Hit ||
+		MonsterState == EMonsterState::Dead)
+	{
+		return false;
+	}
+
+	return IsInAttackRange();
+}
+
+void UMonsterComponent::Attack()
+{
+	if (!CanAttack() || !IsValid(AttackMontage))
+	{
+		return;
+	}
+
+
+
+	bCanAttack = false;
+	SetMonsterState(EMonsterState::Attack);
+
+}
+
+void UMonsterComponent::FinishAttack()
+{
+}
+
+void UMonsterComponent::ResetAttackCooldown()
+{
+}
+
+void UMonsterComponent::ApplyAttackDamage()
+{
+}
+
+FName UMonsterComponent::SelectAttackSection() const
+{
+	if (!IsValid(AttackMontage))
+	{
+		return NAME_None;
+	}
+
+	TArray<FName> Candidates;
+
+	for (int32 Index = 0; Index < AttackMontage->GetNumSections(); Index++)
+	{
+		const FName SectionName = AttackMontage->GetSectionName(Index);
+
+		if (!SectionName.ToString().StartsWith(AttackSectionPrefix))
+		{
+			continue;
+		}
+
+		if (SectionName == LastAttackSection)
+		{
+			continue;
+		}
+
+		Candidates.Add(SectionName);
+	}
+
+	if (Candidates.IsEmpty())
+	{
+		return NAME_None;
+	}
+
+	return Candidates[FMath::RandRange(0, Candidates.Num() - 1)];
 }

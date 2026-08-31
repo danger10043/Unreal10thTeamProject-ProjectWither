@@ -9,8 +9,10 @@
 
 class UStatComponent;
 class UItemDataAsset;
+class UAnimMontage;
 class UDataTable;
 class APickupItem;
+class UPrimitiveComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterDied);
 
@@ -72,6 +74,38 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void DropItems();			// 계산된 아이템을 월드에 생성
 
+	UFUNCTION(BlueprintCallable)
+	bool IsInAttackRange();		// 유효한 타겟이 공격 거리 안에 있는지
+
+	UFUNCTION(BlueprintCallable)
+	bool CanAttack();			// 생존·타겟·거리·쿨타임을 검사
+
+	UFUNCTION(BlueprintCallable)
+	void Attack();				// 공격
+
+	UFUNCTION(BlueprintCallable)
+	void FinishAttack();		// 공격 종료 상태 처리
+
+	UFUNCTION(BlueprintCallable)
+	void ResetAttackCooldown();	// 쿨타임 종료 처리
+
+	UFUNCTION(BlueprintCallable)
+	void ApplyAttackDamage();	// 실제 타격 판정, 피해 적용
+
+	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
+	void RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox);	// 공격 히트 박스 등록
+
+	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
+	void BeginAttackHitWindow(FName HitboxName);	// 공격 시작, 히트 킴
+
+	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
+	void EndAttackHitWindow(FName HitboxName);		// 공격 종료, 히트 끔
+
+private:
+	FName SelectAttackSection() const;	// 공격 애니메이션 섹션 랜덤 선택 함수
+
+	void DisableAllAttackHitboxes();	// 모든 공격 히트 박스 비활성화
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	int32 MonsterId = 0; // 몬스터 고유 ID
@@ -89,10 +123,19 @@ protected:
 	TObjectPtr<AActor> TargetActor = nullptr; // 현재 추적 또는 공격 대상
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
-	bool bIsDead = false; // 사망 여부
+	bool bIsDead = false;		// 사망 여부
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
+	bool bCanAttack = true;	// 공격 가능 여부
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	float AllowRange = 100.0f;	// 플레이어에게 최대한 접근할 수 있는 거리
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	float AttackRange = 300.0f;	// 공격 범위
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
+	float AttackCooldown = 1.0f;	// 공격 간격
 
 	// Drop --------------------------------------------------------------------
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Drop")
@@ -108,10 +151,23 @@ protected:
 	float DropHeight = 20.0f;		// 드랍 아이템 랜덤 높이 (Z)
 	// -------------------------------------------------------------------------
 
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Montage")
+	TObjectPtr<UAnimMontage> AttackMontage = nullptr;	// 공격 몽타주
+
+	UPROPERTY(EditDefaultsOnly, Category = "Montage")
+	FString AttackSectionPrefix = TEXT("Attack_");
+
+	UPROPERTY(Transient)
+	FName LastAttackSection = NAME_None;
+
 private:
 	UFUNCTION()
 	void HandleDeath();
 
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들
+
+	UPROPERTY(Transient)
+	TMap<FName, TObjectPtr<UPrimitiveComponent>> AttackHitboxes; // 공격 히트 박스 
 };
