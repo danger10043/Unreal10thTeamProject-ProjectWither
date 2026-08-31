@@ -347,6 +347,23 @@ void UMonsterComponent::BeginAttackHitWindow(FName HitboxName)
 
 void UMonsterComponent::EndAttackHitWindow(FName HitboxName)
 {
+	const TObjectPtr<UPrimitiveComponent>* Found =
+		AttackHitboxes.Find(HitboxName);
+
+	if (!Found || !IsValid(Found->Get()))
+	{
+		return;
+	}
+
+	UPrimitiveComponent* Hitbox = Found->Get();
+
+	if (ActiveAttackHitbox.Get() == Hitbox)
+	{
+		ActiveAttackHitbox = nullptr;
+		HitActors.Reset();
+	}
+
+	Hitbox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 FName UMonsterComponent::SelectAttackSection() const
