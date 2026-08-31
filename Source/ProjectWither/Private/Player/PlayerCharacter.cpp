@@ -231,3 +231,9 @@ void APlayerCharacter::StartRoll()
     CombatComponent->Roll();
 }
 
+void APlayerCharacter::AttackInput()
+{
+    if (!IsValid(CombatComponent)) { return; }
+    CombatComponent->Attack();
+}
+
