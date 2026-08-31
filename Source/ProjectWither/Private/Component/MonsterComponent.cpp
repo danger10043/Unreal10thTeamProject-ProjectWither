@@ -8,6 +8,7 @@
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "GameFramework/Pawn.h"
+#include "Monster/MonsterAIController.h"
 
 UMonsterComponent::UMonsterComponent()
 {
@@ -52,17 +53,25 @@ void UMonsterComponent::HandleDeath()
     MonsterState = EMonsterState::Dead;
     ClearTarget();
 
-    if (APawn* Pawn = Cast<APawn>(GetOwner()))
-    {
-        if (AAIController* AI = Cast<AAIController>(Pawn->GetController()))
-        {
-            AI->StopMovement();
-            if (UBrainComponent* Brain = AI->GetBrainComponent())
-            {
-                Brain->StopLogic(TEXT("Monster died"));
-            }
-        }
-    }
+	if (APawn* Pawn = Cast<APawn>(GetOwner()))
+	{
+		if (AMonsterAIController* MonsterAI =
+			Cast<AMonsterAIController>(Pawn->GetController()))
+		{
+			MonsterAI->StopAI();
+		}
+		else if (AAIController* AI =
+			Cast<AAIController>(Pawn->GetController()))
+		{
+			// 다른 AIController를 사용하는 경우의 기본 처리
+			if (UBrainComponent* Brain = AI->GetBrainComponent())
+			{
+				Brain->StopLogic(TEXT("Monster died"));
+			}
+
+			AI->StopMovement();
+		}
+	}
     CalculateDrops();
     DropItems();
     OnMonsterDied.Broadcast();

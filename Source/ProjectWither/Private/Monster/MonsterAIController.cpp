@@ -10,6 +10,8 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "Perception/AISense_Sight.h"
+#include "BrainComponent.h"
 
 AMonsterAIController::AMonsterAIController()
 {
@@ -31,31 +33,31 @@ AMonsterAIController::AMonsterAIController()
 
 void AMonsterAIController::OnPossess(APawn* InPawn)
 {
-	Super::OnPossess(InPawn);
+    Super::OnPossess(InPawn);
 
-	SetMonsterComponent(InPawn);
+    SetMonsterComponent(InPawn);
 
-	if (!IsValid(MonsterComponent) || MonsterComponent->IsDead())
-	{
-		return;
-	}
+    if (!IsValid(MonsterComponent) || MonsterComponent->IsDead())
+    {
+        return;
+    }
 
-	if (IsValid(BehaviorTree))
-	{
-		UBlackboardComponent* BlackboardComp = nullptr;
+    if (IsValid(BehaviorTree))
+    {
+        UBlackboardComponent* BlackboardComp = nullptr;
 
-		if (UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp))
-		{
-			RunBehaviorTree(BehaviorTree);
-		}
-	}
+        if (UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp))
+        {
+            RunBehaviorTree(BehaviorTree);
+        }
+    }
 }
 
 void AMonsterAIController::SetMonsterComponent(APawn* InPawn)
 {
-	MonsterComponent = IsValid(InPawn)
-		? InPawn->FindComponentByClass<UMonsterComponent>()
-		: nullptr;
+    MonsterComponent = IsValid(InPawn)
+        ? InPawn->FindComponentByClass<UMonsterComponent>()
+        : nullptr;
 }
 
 void AMonsterAIController::SetTargetActor(AActor* NewTarget)
@@ -95,6 +97,22 @@ void AMonsterAIController::ClearTargetActor()
 
 void AMonsterAIController::StopAI()
 {
+	// 사망 이후 새로운 시야 감지 중단
+	if (IsValid(AIPerceptionComponent))
+	{
+		AIPerceptionComponent->SetSenseEnabled(UAISense_Sight::StaticClass(), false);
+	}
+
+	// 블랙보드 변경으로 다른 행동이 시작되지 않도록 먼저 중단
+	if (UBrainComponent* Brain = GetBrainComponent())
+	{
+		Brain->StopLogic(TEXT("Monster died"));
+	}
+
+	StopMovement();
+
+	// 컴포넌트와 블랙보드 타겟 모두 제거
+	ClearTargetActor();
 }
 
 bool AMonsterAIController::IsValidTarget(AActor* InActor)
