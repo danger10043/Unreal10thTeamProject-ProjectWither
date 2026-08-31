@@ -214,10 +214,38 @@ void UMonsterComponent::Attack()
 		return;
 	}
 
+	USkeletalMeshComponent* Mesh =
+		GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
 
+	UAnimInstance* AnimInstance =
+		IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+
+	if (!IsValid(AnimInstance)) return;
+
+	const FName SelectedSection = SelectAttackSection();
+	if (SelectedSection.IsNone()) return;
+
+	const EMonsterState PreviousState = MonsterState;
 
 	bCanAttack = false;
 	SetMonsterState(EMonsterState::Attack);
+
+	const float PlayedLength =
+		AnimInstance->Montage_Play(AttackMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		// 재생 실패 시 공격 잠금 복구
+		bCanAttack = true;
+		SetMonsterState(PreviousState);
+		return;
+	}
+
+	AnimInstance->Montage_JumpToSection(
+		SelectedSection, AttackMontage);
+
+	// 재생에 성공한 경우에만 직전 공격으로 기록
+	LastAttackSection = SelectedSection;
 
 }
 
@@ -230,6 +258,18 @@ void UMonsterComponent::ResetAttackCooldown()
 }
 
 void UMonsterComponent::ApplyAttackDamage()
+{
+}
+
+void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox)
+{
+}
+
+void UMonsterComponent::BeginAttackHitWindow(FName HitboxName)
+{
+}
+
+void UMonsterComponent::EndAttackHitWindow(FName HitboxName)
 {
 }
 
@@ -265,4 +305,8 @@ FName UMonsterComponent::SelectAttackSection() const
 	}
 
 	return Candidates[FMath::RandRange(0, Candidates.Num() - 1)];
+}
+
+void UMonsterComponent::DisableAllAttackHitboxes()
+{
 }
