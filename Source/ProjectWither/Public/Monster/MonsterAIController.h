@@ -8,6 +8,7 @@
 #include "MonsterAIController.generated.h"
 
 class UAIPerceptionComponent;
+class UMonsterComponent;
 class UAISenseConfig_Sight;
 class UBehaviorTree;
 
@@ -24,8 +25,12 @@ public:
 
 	virtual void OnPossess(APawn* InPawn) override;
 
+	void SetMonsterComponent(APawn* InPawn);
 	void SetTargetActor(AActor* NewTarget);
 	void ClearTargetActor();
+	void StopAI();
+
+	bool IsValidTarget(AActor* InActor);
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "AI")
@@ -39,4 +44,7 @@ protected:
 
 	UFUNCTION()
 	void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
+
+	UPROPERTY(VisibleAnywhere, Category = "Component")
+	TObjectPtr<UMonsterComponent> MonsterComponent;
 };

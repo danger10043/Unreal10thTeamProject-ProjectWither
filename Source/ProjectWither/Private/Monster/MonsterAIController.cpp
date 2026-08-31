@@ -1,10 +1,17 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Monster/MonsterAIController.h"
+#include "Component/MonsterComponent.h"
+#include "Player/PlayerCharacter.h"
+#include "Component/StatComponent.h"
+#include "Interface/StatComponentUserInterface.h"
+
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "Perception/AISense_Sight.h"
+#include "BrainComponent.h"
 
 AMonsterAIController::AMonsterAIController()
 {
@@ -26,40 +33,134 @@ AMonsterAIController::AMonsterAIController()
 
 void AMonsterAIController::OnPossess(APawn* InPawn)
 {
-	Super::OnPossess(InPawn);
+    Super::OnPossess(InPawn);
 
-	if (BehaviorTree)
-	{
-		UBlackboardComponent* BlackboardComp = nullptr;
-		UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp);
-		RunBehaviorTree(BehaviorTree);
-	}
+    SetMonsterComponent(InPawn);
+
+    if (!IsValid(MonsterComponent) || MonsterComponent->IsDead())
+    {
+        return;
+    }
+
+    if (IsValid(BehaviorTree))
+    {
+        UBlackboardComponent* BlackboardComp = nullptr;
+
+        if (UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp))
+        {
+            RunBehaviorTree(BehaviorTree);
+        }
+    }
+}
+
+void AMonsterAIController::SetMonsterComponent(APawn* InPawn)
+{
+    MonsterComponent = IsValid(InPawn)
+        ? InPawn->FindComponentByClass<UMonsterComponent>()
+        : nullptr;
 }
 
 void AMonsterAIController::SetTargetActor(AActor* NewTarget)
 {
+	if (!IsValid(MonsterComponent) || MonsterComponent->IsDead())
+	{
+		return;
+	}
+
+	if (!IsValidTarget(NewTarget))
+	{
+		return;
+	}
+
+	MonsterComponent->SetTarget(NewTarget);
+
 	if (UBlackboardComponent* BB = GetBlackboardComponent())
 	{
 		BB->SetValueAsObject(TEXT("TargetActor"), NewTarget);
-		BB->SetValueAsBool(TEXT("bHasTarget"), NewTarget != nullptr);
+		BB->SetValueAsBool(TEXT("bHasTarget"), true);
 	}
 }
 
 void AMonsterAIController::ClearTargetActor()
 {
-	SetTargetActor(nullptr);
+	if (IsValid(MonsterComponent))
+	{
+		MonsterComponent->ClearTarget();
+	}
+
+	if (UBlackboardComponent* BB = GetBlackboardComponent())
+	{
+		BB->ClearValue(TEXT("TargetActor"));
+		BB->SetValueAsBool(TEXT("bHasTarget"), false);
+	}
 }
 
-void AMonsterAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
+void AMonsterAIController::StopAI()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Perception: %s, Sensed: %d"), *GetNameSafe(Actor), Stimulus.WasSuccessfullySensed());
+	// 사망 이후 새로운 시야 감지 중단
+	if (IsValid(AIPerceptionComponent))
+	{
+		AIPerceptionComponent->SetSenseEnabled(UAISense_Sight::StaticClass(), false);
+	}
+
+	// 블랙보드 변경으로 다른 행동이 시작되지 않도록 먼저 중단
+	if (UBrainComponent* Brain = GetBrainComponent())
+	{
+		Brain->StopLogic(TEXT("Monster died"));
+	}
+
+	StopMovement();
+
+	// 컴포넌트와 블랙보드 타겟 모두 제거
+	ClearTargetActor();
+}
+
+bool AMonsterAIController::IsValidTarget(AActor* InActor)
+{
+	// 파괴되었거나 없는 액터는 제외
+	if (!IsValid(InActor))
+	{
+		return false;
+	}
+
+	// 자기 자신은 제외
+	if (InActor == GetPawn())
+	{
+		return false;
+	}
+
+	// 플레이어 캐릭터만 공격 대상으로 허용
+	APlayerCharacter* Player = Cast<APlayerCharacter>(InActor);
+	if (!IsValid(Player))
+	{
+		return false;
+	}
+
+	// 스탯 인터페이스를 통해 플레이어 체력 확인
+	UStatComponent* TargetStat =
+		IStatComponentUserInterface::Execute_GetStatComponent(Player);
+
+	return IsValid(TargetStat) && !TargetStat->IsHealthZero();
+}
+
+void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulus Stimulus)
+{
+	if (!IsValid(MonsterComponent) || MonsterComponent->IsDead())
+	{
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Perception: %s, Sensed: %d"), *GetNameSafe(InActor), Stimulus.WasSuccessfullySensed());
 
 	if (Stimulus.WasSuccessfullySensed())
 	{
-		SetTargetActor(Actor);
+		SetTargetActor(InActor);
 	}
 	else
 	{
-		ClearTargetActor();
+		if (InActor == MonsterComponent->GetTargetActor())
+		{
+			ClearTargetActor();
+		}
 	}
 }
