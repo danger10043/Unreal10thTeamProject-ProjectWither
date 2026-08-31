@@ -51,6 +51,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	int32 GetItemCount(int32 ItemId) const;															// 지정한 아이템의 총 보유 수량 반환
 
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	TArray<FItemInstance> GetInventoryItems() const;												// UI 표시용 현재 인벤토리 아이템 목록 반환
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	bool GetItemAtSlot(int32 SlotIndex, FItemInstance& OutItem) const;								// 지정한 슬롯의 아이템 정보를 반환
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	FORCEINLINE int32 GetMaxInventorySlot() const { return MaxInventorySlot; }						// 최대 인벤토리 슬롯 수 반환
+
 	const FItemInstance* FindItem(int32 ItemId) const;												// 지정한 아이템 정보를 찾아 C++ 전용 읽기 포인터 반환
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
@@ -68,6 +77,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|Gold")
 	FORCEINLINE bool HasEnoughGold(int32 Amount) const { return Amount >= 0 && Gold >= Amount; }	// 가지고 있는 골드가 지정한 금액에 대해 충분한 지 반환
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Gold")
+	FORCEINLINE int32 GetGold() const { return Gold; }												// 현재 보유 골드 반환
 
 private:
 	void ClearSlotData(FItemInstance& InventoryItem);												// 슬롯 하나의 아이템 데이터 초기화
