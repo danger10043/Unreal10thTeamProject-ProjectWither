@@ -181,8 +181,13 @@ private:
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들
 
+	// 공격 콜리전 모음
 	UPROPERTY(Transient)
-	TMap<FName, TObjectPtr<UPrimitiveComponent>> AttackHitboxes; // 현재 활성화한 공격 콜리전
+	TMap<FName, TObjectPtr<UPrimitiveComponent>> AttackHitboxes;
+
+	// 현재 활성화한 공격 콜리전
+	UPROPERTY(Transient)
+	TObjectPtr<UPrimitiveComponent> ActiveAttackHitbox = nullptr;
 
 	TSet<TWeakObjectPtr<AActor>> HitActors; 	// 같은 타격 구간에서 중복 처리 방지
 

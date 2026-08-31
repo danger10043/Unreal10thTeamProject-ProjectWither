@@ -311,6 +311,38 @@ void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveCompone
 
 void UMonsterComponent::BeginAttackHitWindow(FName HitboxName)
 {
+	if (bIsDead || MonsterState != EMonsterState::Attack)
+	{
+		return;
+	}
+
+	// 이전 구간 종료
+	DisableAllAttackHitboxes();
+
+	const TObjectPtr<UPrimitiveComponent>* Found =
+		AttackHitboxes.Find(HitboxName);
+
+	if (!Found || !IsValid(Found->Get()))
+	{
+		return;
+	}
+
+	UPrimitiveComponent* Hitbox = Found->Get();
+
+	// 활성화 순간 Overlap이 발생할 수 있으므로 먼저 기록
+	HitActors.Reset();
+	ActiveAttackHitbox = Hitbox;
+
+	Hitbox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
+	// 활성화 시 이미 겹쳐 있는 대상도 검사
+	TArray<AActor*> OverlappingActors;
+	Hitbox->GetOverlappingActors(OverlappingActors);
+
+	for (AActor* Actor : OverlappingActors)
+	{
+		ProcessAttackOverlap(Actor);
+	}
 }
 
 void UMonsterComponent::EndAttackHitWindow(FName HitboxName)
