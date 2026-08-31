@@ -111,12 +111,33 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     UEnhancedInputComponent* EnhancedInput =  Cast<UEnhancedInputComponent>(PlayerInputComponent);
 
     if (!EnhancedInput) { return; }
-    EnhancedInput->BindAction( MoveAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Move);
-    EnhancedInput->BindAction( LookAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Look);
-    EnhancedInput->BindAction( RunAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRun);
-    EnhancedInput->BindAction( RunAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopRun);
-    EnhancedInput->BindAction( RunAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopRun);
-    EnhancedInput->BindAction( RollAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRoll);
+    EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Move);
+
+    EnhancedInput->BindAction(LookAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Look);
+    
+    EnhancedInput->BindAction(RunAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRun);
+    EnhancedInput->BindAction(RunAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopRun);
+    EnhancedInput->BindAction(RunAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopRun);
+
+    EnhancedInput->BindAction(RollAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRoll);
+
+    EnhancedInput->BindAction(BlockAction, ETriggerEvent::Started, this, &APlayerCharacter::StartBlockInput);
+    EnhancedInput->BindAction(BlockAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopBlockInput);
+    EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
+}
+
+float APlayerCharacter::TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+    const float IncomingDamage = Super::TakeDamage(
+        Damage,
+        DamageEvent,
+        EventInstigator,
+        DamageCauser
+    );
+
+    if (!IsValid(CombatComponent)) { return 0.0f; }
+
+    return CombatComponent->ReceiveHit(IncomingDamage, DamageCauser, EventInstigator);
 }
 
 void APlayerCharacter::Move(const FInputActionValue& Value)
@@ -227,7 +248,6 @@ void APlayerCharacter::StartRoll()
         UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::StartRoll - CombatComponent가 유효하지 않습니다."));
         return;
     }
-
     CombatComponent->Roll();
 }
 
@@ -235,5 +255,17 @@ void APlayerCharacter::AttackInput()
 {
     if (!IsValid(CombatComponent)) { return; }
     CombatComponent->Attack();
+}
+
+void APlayerCharacter::StartBlockInput()
+{
+    if (!IsValid(CombatComponent)) { return; }
+    CombatComponent->StartBlock();
+}
+
+void APlayerCharacter::StopBlockInput()
+{
+    if (!IsValid(CombatComponent)) { return; }
+    CombatComponent->StopBlock();
 }
 

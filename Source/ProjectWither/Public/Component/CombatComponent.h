@@ -56,7 +56,7 @@ public:
 	void StopBlock();
 
 	UFUNCTION(BlueprintCallable, Category = "Combat")
-	void ReceiveHit();
+	float ReceiveHit(float DamageAmount, AActor* DamageCauser, AController* EventInstigator );
 
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void Die();
@@ -159,7 +159,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.0"))
 	float GunAttackStaminaCost = 5.0f;
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Parry", meta = (ClampMin = "0.0", Units = "s"))
-	float ParryWindow = 0.2f;
+	float ParryWindow = 0.5f;
 
 	bool bParryWindowOpen = false;
 
