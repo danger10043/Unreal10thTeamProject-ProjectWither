@@ -62,16 +62,19 @@ void AMonsterAIController::ClearTargetActor()
 	SetTargetActor(nullptr);
 }
 
-void AMonsterAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
+void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulus Stimulus)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Perception: %s, Sensed: %d"), *GetNameSafe(Actor), Stimulus.WasSuccessfullySensed());
+	UE_LOG(LogTemp, Warning, TEXT("Perception: %s, Sensed: %d"), *GetNameSafe(InActor), Stimulus.WasSuccessfullySensed());
 
 	if (Stimulus.WasSuccessfullySensed())
 	{
-		SetTargetActor(Actor);
+		SetTargetActor(InActor);
 	}
 	else
 	{
-		ClearTargetActor();
+		if (InActor == MonsterComponent->GetTargetActor())
+		{
+			ClearTargetActor();
+		}
 	}
 }
