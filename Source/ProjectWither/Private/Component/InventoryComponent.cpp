@@ -190,6 +190,23 @@ int32 UInventoryComponent::GetItemCount(int32 ItemId) const
 	return TotalQuantity;																			// 같은 아이템이 있으면 수량 반환
 }	
 
+TArray<FItemInstance> UInventoryComponent::GetInventoryItems() const
+{
+	return InventoryItems;
+}
+
+bool UInventoryComponent::GetItemAtSlot(int32 SlotIndex, FItemInstance& OutItem) const
+{
+	if (!InventoryItems.IsValidIndex(SlotIndex))
+	{
+		OutItem = FItemInstance();
+		return false;
+	}
+
+	OutItem = InventoryItems[SlotIndex];
+	return true;
+}
+
 const FItemInstance* UInventoryComponent::FindItem(int32 ItemId) const
 {
 	for (const FItemInstance& InventoryItem : InventoryItems)
