@@ -81,10 +81,25 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void UCombatComponent::Attack()
 {
+	switch (ResolveWeaponType())
+	{
+	case ECombatWeaponType::Sword:
+		SwordAttack();
+		break;
+
+	case ECombatWeaponType::Gun:
+		GunAttack();
+		break;
+
+	default:
+		UE_LOG( LogTemp, Warning, TEXT("장착된 무기가 없어 공격할 수 없습니다."));
+		break;
+	}
 }
 
 void UCombatComponent::SwordAttack()
 {
+	StartAttack( ECombatWeaponType::Sword, EPlayerActionState::AttackingWithSword, SwordAttackStaminaCost);
 }
 
 void UCombatComponent::GunAttack()
@@ -184,6 +199,20 @@ void UCombatComponent::OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupt
 	FinishAction(EPlayerActionState::Rolling);
 }
 
+void UCombatComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != SwordAttackMontage) { return; }
+
+	if (ActionState != EPlayerActionState::AttackingWithSword) { return; }
+
+	if (IsValid(OwnerPlayer))
+	{
+		OwnerPlayer->SetCanMove(true);
+	}
+
+	FinishAction(EPlayerActionState::AttackingWithSword);
+}
+
 void UCombatComponent::StartBlock()
 {
 }
@@ -209,7 +238,13 @@ void UCombatComponent::FinishAction(EPlayerActionState ExpectedState)
 
 bool UCombatComponent::CanAttack() const
 {
-	return false;
+	if (!IsOwnerAlive()) { return false; }
+
+	if (!IsValid(OwnerPlayer) || !OwnerPlayer->CanMove()) { return false; }
+
+	if (ActionState != EPlayerActionState::None) { return false; }
+
+	return true;
 }
 
 bool UCombatComponent::CanRoll() const
@@ -240,29 +275,17 @@ bool UCombatComponent::CanRoll() const
 
 	if (ActionState != EPlayerActionState::None)
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("UCombatComponent::CanRoll 실패: 현재 ActionState는 %d입니다."),
-			static_cast<int32>(ActionState)
-		);
+		UE_LOG(LogTemp, Warning, TEXT("UCombatComponent::CanRoll 실패: 현재 ActionState는 %d입니다."), static_cast<int32>(ActionState));
 		return false;
 	}
 
 	if (!StatComponent->HasEnoughStamina(RollStaminaCost))
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("UCombatComponent::CanRoll 실패: 스태미나가 부족합니다. 현재 %.1f / 필요 %.1f"),
-			StatComponent->GetCurrentStamina(),
-			RollStaminaCost
-		);
+		UE_LOG(LogTemp, Warning, TEXT("UCombatComponent::CanRoll 실패: 스태미나가 부족합니다. 현재 %.1f / 필요 %.1f"), StatComponent->GetCurrentStamina(), RollStaminaCost);
 		return false;
 	}
 
-	const UCharacterMovementComponent* Movement =
-		OwnerPlayer->GetCharacterMovement();
+	const UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement();
 
 	if (!IsValid(Movement))
 	{
@@ -335,6 +358,41 @@ bool UCombatComponent::TrySpendStamina(float Cost)
 
 void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActionState AttackState, float StaminaCost)
 {
+	if (!CanAttack()) { return; }
+
+	if (RequiredWeapon != ECombatWeaponType::Sword || !IsValid(SwordAttackMontage)) { return; }
+
+	UAnimInstance* AnimInstance = OwnerPlayer->GetMesh() ? OwnerPlayer->GetMesh()->GetAnimInstance() : nullptr;
+
+	if (!IsValid(AnimInstance)) { return; }
+
+	if (!TrySpendStamina(StaminaCost))
+	{
+		UE_LOG( LogTemp, Warning, TEXT("공격에 필요한 스태미나가 부족합니다."));
+		return;
+	}
+
+	// SetCanMove(false) 내부에서 달리기도 종료됩니다.
+	OwnerPlayer->SetCanMove(false);
+	SetActionState(AttackState);
+
+	const float PlayedLength = OwnerPlayer->PlayAnimMontage(SwordAttackMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		StatComponent->RecoverStamina(StaminaCost);
+		OwnerPlayer->SetCanMove(true);
+		FinishAction(AttackState);
+		return;
+	}
+
+	FOnMontageEnded EndDelegate;
+
+	EndDelegate.BindUObject( this, &UCombatComponent::OnAttackMontageEnded);
+
+	AnimInstance->Montage_SetEndDelegate( EndDelegate, SwordAttackMontage);
+
+	OnAttackStarted(RequiredWeapon);
 }
 
 void UCombatComponent::OpenParryWindow()

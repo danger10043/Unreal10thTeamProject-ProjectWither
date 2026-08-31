@@ -113,17 +113,15 @@ private:
 
 	bool TrySpendStamina(float Cost);
 
-	void StartAttack(
-		ECombatWeaponType RequiredWeapon,
-		EPlayerActionState AttackState,
-		float StaminaCost
-	);
+	void StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActionState AttackState, float StaminaCost);
 
 	void OpenParryWindow();
 
 	void CloseParryWindow();
 
 	void OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	// 외부에서 행동 검사 없이 상태를 바꾸지 못하도록 제한
 	void SetActionState(EPlayerActionState State);
@@ -135,20 +133,10 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UStatComponent> StatComponent;
 
-	UPROPERTY(
-		Transient,
-		BlueprintReadOnly,
-		Category = "Combat",
-		meta = (AllowPrivateAccess = "true")
-	)
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UWeaponComponent> WeaponComponent;
 
-	UPROPERTY(
-		VisibleInstanceOnly,
-		BlueprintReadOnly,
-		Category = "Combat",
-		meta = (AllowPrivateAccess = "true")
-	)
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	EPlayerActionState ActionState = EPlayerActionState::None;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Roll", meta = (AllowPrivateAccess = "true"))
@@ -157,27 +145,20 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Roll", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCurveFloat> RollSpeedCurve;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> SwordAttackMontage;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Roll", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float RollDistance = 500.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina",
-		meta = (ClampMin = "0.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.0"))
 	float RollStaminaCost = 20.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina",
-		meta = (ClampMin = "0.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.0"))
 	float BlockStaminaCost = 10.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina",
-		meta = (ClampMin = "0.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.0"))
 	float SwordAttackStaminaCost = 15.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina",
-		meta = (ClampMin = "0.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.0"))
 	float GunAttackStaminaCost = 5.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Combat|Parry",
-		meta = (ClampMin = "0.0", Units = "s"))
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Parry", meta = (ClampMin = "0.0", Units = "s"))
 	float ParryWindow = 0.2f;
 
 	bool bParryWindowOpen = false;
