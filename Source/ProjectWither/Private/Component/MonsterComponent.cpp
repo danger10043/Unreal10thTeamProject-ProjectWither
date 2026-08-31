@@ -535,7 +535,7 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 
 
 	// Todo: 실제 피해 적용
-	ApplyAttackDamage();
+	ApplyAttackDamage(Player);
 }
 
 void UMonsterComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
