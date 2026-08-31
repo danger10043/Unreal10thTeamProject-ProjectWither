@@ -42,6 +42,11 @@ void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
     {
         StatComponent->OnHealthZero.RemoveDynamic(this, &UMonsterComponent::HandleDeath);
     }
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AttackCooldownTimerHandle);
+	}
+
 	DisableAllAttackHitboxes();
 
 	for (const auto& Entry : AttackHitboxes)
@@ -71,6 +76,10 @@ void UMonsterComponent::HandleDeath()
 {
     if (bIsDead) return;
     bIsDead = true;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AttackCooldownTimerHandle);
+	}
 	DisableAllAttackHitboxes();
 
     MonsterState = EMonsterState::Dead;
@@ -340,6 +349,11 @@ void UMonsterComponent::FinishAttack()
 
 void UMonsterComponent::ResetAttackCooldown()
 {
+	if (bIsDead) return;
+
+	bCanAttack = true;
+
+	UE_LOG(LogTemp, Log, TEXT("공격 쿨타임 종료"));
 }
 
 void UMonsterComponent::ApplyAttackDamage()
@@ -544,7 +558,8 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 		*GetNameSafe(ActiveAttackHitbox.Get()),
 		*GetNameSafe(OtherActor));
 
-	// Todo: 실제 피해 적용 
+	// Todo: 실제 피해 적용
+	ApplyAttackDamage();
 }
 
 void UMonsterComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
