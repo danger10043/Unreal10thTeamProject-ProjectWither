@@ -42,6 +42,20 @@ void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
     {
         StatComponent->OnHealthZero.RemoveDynamic(this, &UMonsterComponent::HandleDeath);
     }
+	DisableAllAttackHitboxes();
+
+	for (const auto& Entry : AttackHitboxes)
+	{
+		if (IsValid(Entry.Value.Get()))
+		{
+			Entry.Value->OnComponentBeginOverlap.RemoveDynamic(
+				this,
+				&UMonsterComponent::OnAttackHitboxOverlap);
+		}
+	}
+
+	AttackHitboxes.Reset();
+
     Super::EndPlay(EndPlayReason);
 }
 
@@ -57,6 +71,8 @@ void UMonsterComponent::HandleDeath()
 {
     if (bIsDead) return;
     bIsDead = true;
+	DisableAllAttackHitboxes();
+
     MonsterState = EMonsterState::Dead;
     ClearTarget();
 
@@ -416,8 +432,54 @@ void UMonsterComponent::DisableAllAttackHitboxes()
 
 void UMonsterComponent::OnAttackHitboxOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+	if (OverlappedComponent != ActiveAttackHitbox.Get())
+	{
+		return;
+	}
+
+	ProcessAttackOverlap(OtherActor);
 }
 
 void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 {
+	if (bIsDead ||
+		MonsterState != EMonsterState::Attack ||
+		!IsValid(ActiveAttackHitbox))
+	{
+		return;
+	}
+
+	if (!IsValid(OtherActor) || OtherActor == GetOwner())
+	{
+		return;
+	}
+
+	APlayerCharacter* Player = Cast<APlayerCharacter>(OtherActor);
+	if (!IsValid(Player))
+	{
+		return;
+	}
+
+	UStatComponent* PlayerStat =
+		IStatComponentUserInterface::Execute_GetStatComponent(Player);
+
+	if (!IsValid(PlayerStat) || PlayerStat->IsHealthZero())
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<AActor> HitActor(OtherActor);
+
+	if (HitActors.Contains(HitActor))
+	{
+		return;
+	}
+
+	HitActors.Add(HitActor);
+
+	UE_LOG(LogTemp, Warning, TEXT("공격 판정: %s → %s"),
+		*GetNameSafe(ActiveAttackHitbox.Get()),
+		*GetNameSafe(OtherActor));
+
+	// Todo: 실제 피해 적용 
 }
