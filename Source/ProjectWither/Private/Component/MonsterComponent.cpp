@@ -285,7 +285,7 @@ void UMonsterComponent::ApplyAttackDamage()
 
 void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox)
 {
-	if (HitboxName.IsNone() || IsValid(Hitbox))
+	if (HitboxName.IsNone() || !IsValid(Hitbox))
 	{
 		return;
 	}
