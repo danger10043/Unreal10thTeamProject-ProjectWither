@@ -211,11 +211,16 @@ bool UMonsterComponent::CanAttack()
 {
 	if (bIsDead || !bCanAttack)
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("공격 불가: 사망=%d, 공격허용=%d"),
+			bIsDead, bCanAttack);
 		return false;
 	}
 
 	if (!IsValid(StatComponent) || StatComponent->IsHealthZero())
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("공격 불가: 스탯 없음 또는 체력 0"));
 		return false;
 	}
 
@@ -223,10 +228,24 @@ bool UMonsterComponent::CanAttack()
 		MonsterState == EMonsterState::Hit ||
 		MonsterState == EMonsterState::Dead)
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("공격 불가: 상태=%d"),
+			static_cast<int32>(MonsterState));
 		return false;
 	}
 
-	return IsInAttackRange();
+	const bool bInRange = IsInAttackRange();
+
+	if (!bInRange)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("공격 불가: 타겟=%s, 거리=%.1f, 공격범위=%.1f"),
+			*GetNameSafe(GetTargetActor()),
+			GetDistanceToTarget(),
+			AttackRange);
+	}
+
+	return bInRange;
 }
 
 void UMonsterComponent::Attack()
@@ -263,6 +282,15 @@ void UMonsterComponent::Attack()
 		return;
 	}
 
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(
+		this,
+		&UMonsterComponent::OnAttackMontageEnded);
+
+	AnimInstance->Montage_SetEndDelegate(
+		EndDelegate,
+		AttackMontage);
+
 	AnimInstance->Montage_JumpToSection(
 		SelectedSection, AttackMontage);
 
@@ -273,6 +301,41 @@ void UMonsterComponent::Attack()
 
 void UMonsterComponent::FinishAttack()
 {
+	DisableAllAttackHitboxes();
+
+	if (bIsDead) return;
+
+	// Hit 등 다른 상태로 전환됐다면 유지
+	if (MonsterState == EMonsterState::Attack)
+	{
+		SetMonsterState(
+			IsValid(GetTargetActor())
+			? EMonsterState::Chase
+			: EMonsterState::Idle);
+	}
+
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	// 중복 종료 호출로 쿨타임이 계속 연장되지 않게 방지
+	if (bCanAttack ||
+		World->GetTimerManager().IsTimerActive(AttackCooldownTimerHandle))
+	{
+		return;
+	}
+
+	if (AttackCooldown <= 0.0f)
+	{
+		ResetAttackCooldown();
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		AttackCooldownTimerHandle,
+		this,
+		&UMonsterComponent::ResetAttackCooldown,
+		AttackCooldown,
+		false);
 }
 
 void UMonsterComponent::ResetAttackCooldown()
@@ -482,4 +545,11 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 		*GetNameSafe(OtherActor));
 
 	// Todo: 실제 피해 적용 
+}
+
+void UMonsterComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != AttackMontage) return;
+
+	FinishAttack();
 }

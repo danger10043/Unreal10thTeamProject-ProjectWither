@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "CommonHeader/MonsterStateEnums.h"
+#include "TimerManager.h"
 #include "MonsterComponent.generated.h"
 
 class UStatComponent;
@@ -118,8 +119,9 @@ private:
 		bool bFromSweep,
 		const FHitResult& SweepResult);
 
-	void ProcessAttackOverlap(AActor* OtherActor);
+	void ProcessAttackOverlap(AActor* OtherActor); // 실제 오버랩 구현
 
+	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);	// 몽타주 종료 후
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	int32 MonsterId = 0; // 몬스터 고유 ID
@@ -191,5 +193,5 @@ private:
 
 	TSet<TWeakObjectPtr<AActor>> HitActors; 	// 같은 타격 구간에서 중복 처리 방지
 
-
+	FTimerHandle AttackCooldownTimerHandle;		// 공격 쿨타임 타이머핸들
 };
