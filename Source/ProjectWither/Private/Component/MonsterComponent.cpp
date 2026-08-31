@@ -402,6 +402,16 @@ FName UMonsterComponent::SelectAttackSection() const
 
 void UMonsterComponent::DisableAllAttackHitboxes()
 {
+	ActiveAttackHitbox = nullptr;
+	HitActors.Reset();
+
+	for (const auto& Entry : AttackHitboxes)
+	{
+		if (IsValid(Entry.Value.Get()))
+		{
+			Entry.Value->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
+	}
 }
 
 void UMonsterComponent::OnAttackHitboxOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
