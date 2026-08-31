@@ -2,14 +2,20 @@
 
 
 #include "Component/MonsterComponent.h"
+#include "Component/StatComponent.h"
 #include "Data/ItemDropTable.h"
 #include "Item/PickupItem.h"
-#include "Component/StatComponent.h"
+#include "Monster/MonsterAIController.h"
+#include "Player/PlayerCharacter.h"
+#include "Interface/StatComponentUserInterface.h"
+
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "GameFramework/Pawn.h"
-#include "Monster/MonsterAIController.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/AnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Components/PrimitiveComponent.h"
 
 UMonsterComponent::UMonsterComponent()
 {
@@ -263,6 +269,44 @@ void UMonsterComponent::ApplyAttackDamage()
 
 void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox)
 {
+	if (HitboxName.IsNone() || IsValid(Hitbox))
+	{
+		return;
+	}
+
+	if (Hitbox->GetOwner() != GetOwner())
+	{
+		return;
+	}
+
+	if (AttackHitboxes.Contains(HitboxName))
+	{
+		return;
+	}
+
+	// 같은 콜리전을 다른 이름으로 중복 등록 방지
+	for (const auto& Entry : AttackHitboxes)
+	{
+		if (Entry.Value.Get() == Hitbox)
+		{
+			return;
+		}
+	}
+
+	Hitbox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Hitbox->SetGenerateOverlapEvents(true);
+	Hitbox->SetCollisionObjectType(ECC_WorldDynamic);
+	Hitbox->SetCollisionResponseToAllChannels(ECR_Ignore);
+	Hitbox->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+
+	Hitbox->OnComponentBeginOverlap.AddUniqueDynamic(
+		this,
+		&UMonsterComponent::OnAttackHitboxOverlap);
+
+	AttackHitboxes.Add(HitboxName, Hitbox);
+
+	UE_LOG(LogTemp, Log, TEXT("공격 콜리전 등록: %s"),
+		*HitboxName.ToString());
 }
 
 void UMonsterComponent::BeginAttackHitWindow(FName HitboxName)
@@ -308,5 +352,13 @@ FName UMonsterComponent::SelectAttackSection() const
 }
 
 void UMonsterComponent::DisableAllAttackHitboxes()
+{
+}
+
+void UMonsterComponent::OnAttackHitboxOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+}
+
+void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 {
 }

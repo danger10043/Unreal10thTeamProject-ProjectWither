@@ -102,9 +102,23 @@ public:
 	void EndAttackHitWindow(FName HitboxName);		// 공격 종료, 히트 끔
 
 private:
+	UFUNCTION()
+	void HandleDeath();
+
 	FName SelectAttackSection() const;	// 공격 애니메이션 섹션 랜덤 선택 함수
 
 	void DisableAllAttackHitboxes();	// 모든 공격 히트 박스 비활성화
+
+	UFUNCTION()	// 공격 히트박스 오버랩
+	void OnAttackHitboxOverlap(
+		UPrimitiveComponent* OverlappedComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComp,
+		int32 OtherBodyIndex,
+		bool bFromSweep,
+		const FHitResult& SweepResult);
+
+	void ProcessAttackOverlap(AActor* OtherActor);
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
@@ -162,12 +176,15 @@ protected:
 	FName LastAttackSection = NAME_None;
 
 private:
-	UFUNCTION()
-	void HandleDeath();
+
 
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들
 
 	UPROPERTY(Transient)
-	TMap<FName, TObjectPtr<UPrimitiveComponent>> AttackHitboxes; // 공격 히트 박스 
+	TMap<FName, TObjectPtr<UPrimitiveComponent>> AttackHitboxes; // 현재 활성화한 공격 콜리전
+
+	TSet<TWeakObjectPtr<AActor>> HitActors; 	// 같은 타격 구간에서 중복 처리 방지
+
+
 };
