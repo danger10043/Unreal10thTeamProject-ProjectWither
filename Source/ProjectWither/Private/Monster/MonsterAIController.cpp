@@ -32,21 +32,30 @@ AMonsterAIController::AMonsterAIController()
 void AMonsterAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
-	if (IsValidTarget(InPawn))
+
+	SetMonsterComponent(InPawn);
+
+	if (!IsValid(MonsterComponent) || MonsterComponent->IsDead())
 	{
-		SetMonsterComponent(InPawn);
+		return;
 	}
-	if (BehaviorTree)
+
+	if (IsValid(BehaviorTree))
 	{
 		UBlackboardComponent* BlackboardComp = nullptr;
-		UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp);
-		RunBehaviorTree(BehaviorTree);
+
+		if (UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp))
+		{
+			RunBehaviorTree(BehaviorTree);
+		}
 	}
 }
 
 void AMonsterAIController::SetMonsterComponent(APawn* InPawn)
 {
-	MonsterComponent = InPawn->FindComponentByClass<UMonsterComponent>();
+	MonsterComponent = IsValid(InPawn)
+		? InPawn->FindComponentByClass<UMonsterComponent>()
+		: nullptr;
 }
 
 void AMonsterAIController::SetTargetActor(AActor* NewTarget)
