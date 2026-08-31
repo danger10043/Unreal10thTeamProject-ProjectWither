@@ -28,8 +28,9 @@ public:
 	void SetMonsterComponent(APawn* InPawn);
 	void SetTargetActor(AActor* NewTarget);
 	void ClearTargetActor();
+	void StopAI();
 
-	
+	bool IsValidTarget(AActor* InActor);
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "AI")
