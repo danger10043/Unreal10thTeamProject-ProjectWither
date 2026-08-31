@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Monster/MonsterAIController.h"
+#include "Component/MonsterComponent.h"
+
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Perception/AIPerceptionComponent.h"
@@ -30,10 +32,16 @@ void AMonsterAIController::OnPossess(APawn* InPawn)
 
 	if (BehaviorTree)
 	{
+		SetMonsterComponent(InPawn);
 		UBlackboardComponent* BlackboardComp = nullptr;
 		UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp);
 		RunBehaviorTree(BehaviorTree);
 	}
+}
+
+void AMonsterAIController::SetMonsterComponent(APawn* InPawn)
+{
+	MonsterComponent = InPawn->FindComponentByClass<UMonsterComponent>();
 }
 
 void AMonsterAIController::SetTargetActor(AActor* NewTarget)
@@ -42,6 +50,10 @@ void AMonsterAIController::SetTargetActor(AActor* NewTarget)
 	{
 		BB->SetValueAsObject(TEXT("TargetActor"), NewTarget);
 		BB->SetValueAsBool(TEXT("bHasTarget"), NewTarget != nullptr);
+	}
+	if (MonsterComponent)
+	{
+		MonsterComponent->SetTarget(NewTarget);
 	}
 }
 
