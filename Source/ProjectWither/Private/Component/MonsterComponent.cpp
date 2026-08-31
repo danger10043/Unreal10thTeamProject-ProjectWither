@@ -220,16 +220,11 @@ bool UMonsterComponent::CanAttack()
 {
 	if (bIsDead || !bCanAttack)
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("공격 불가: 사망=%d, 공격허용=%d"),
-			bIsDead, bCanAttack);
 		return false;
 	}
 
 	if (!IsValid(StatComponent) || StatComponent->IsHealthZero())
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("공격 불가: 스탯 없음 또는 체력 0"));
 		return false;
 	}
 
@@ -237,24 +232,10 @@ bool UMonsterComponent::CanAttack()
 		MonsterState == EMonsterState::Hit ||
 		MonsterState == EMonsterState::Dead)
 	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("공격 불가: 상태=%d"),
-			static_cast<int32>(MonsterState));
 		return false;
 	}
 
-	const bool bInRange = IsInAttackRange();
-
-	if (!bInRange)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("공격 불가: 타겟=%s, 거리=%.1f, 공격범위=%.1f"),
-			*GetNameSafe(GetTargetActor()),
-			GetDistanceToTarget(),
-			AttackRange);
-	}
-
-	return bInRange;
+	return IsInAttackRange();
 }
 
 void UMonsterComponent::Attack()
@@ -282,6 +263,7 @@ void UMonsterComponent::Attack()
 
 	const float PlayedLength =
 		AnimInstance->Montage_Play(AttackMontage);
+
 
 	if (PlayedLength <= 0.0f)
 	{
@@ -353,7 +335,6 @@ void UMonsterComponent::ResetAttackCooldown()
 
 	bCanAttack = true;
 
-	UE_LOG(LogTemp, Log, TEXT("공격 쿨타임 종료"));
 }
 
 void UMonsterComponent::ApplyAttackDamage()
@@ -398,8 +379,6 @@ void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveCompone
 
 	AttackHitboxes.Add(HitboxName, Hitbox);
 
-	UE_LOG(LogTemp, Log, TEXT("공격 콜리전 등록: %s"),
-		*HitboxName.ToString());
 }
 
 void UMonsterComponent::BeginAttackHitWindow(FName HitboxName)
@@ -554,9 +533,6 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 
 	HitActors.Add(HitActor);
 
-	UE_LOG(LogTemp, Warning, TEXT("공격 판정: %s → %s"),
-		*GetNameSafe(ActiveAttackHitbox.Get()),
-		*GetNameSafe(OtherActor));
 
 	// Todo: 실제 피해 적용
 	ApplyAttackDamage();

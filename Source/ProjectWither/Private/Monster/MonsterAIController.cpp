@@ -185,7 +185,6 @@ void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulu
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Perception: %s, Sensed: %d"), *GetNameSafe(InActor), Stimulus.WasSuccessfullySensed());
 
 	if (Stimulus.WasSuccessfullySensed())
 	{
