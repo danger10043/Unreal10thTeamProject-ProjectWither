@@ -497,6 +497,14 @@ void UMonsterComponent::CancelAttack()
 	}
 }
 
+void UMonsterComponent::PlayHitReaction()
+{
+}
+
+void UMonsterComponent::HandleParried()
+{
+}
+
 FName UMonsterComponent::SelectAttackSection() const
 {
 	if (!IsValid(AttackMontage))
@@ -635,4 +643,12 @@ void UMonsterComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterr
 
 	FinishAttack();
 	OnMonsterAttackFinished.Broadcast(bInterrupted);
+}
+
+void UMonsterComponent::PlayReactionMontage(UAnimMontage* Montage)
+{
+}
+
+void UMonsterComponent::OnReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
 }

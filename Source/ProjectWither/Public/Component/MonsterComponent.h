@@ -109,6 +109,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
 	void CancelAttack();							// 공격 취소
 
+	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
+	void PlayHitReaction();							// 피격 애니메이션 재생
+
+	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
+	void HandleParried();							// 패링 처리
+
 private:
 	UFUNCTION()
 	void HandleDeath();
@@ -128,7 +134,15 @@ private:
 
 	void ProcessAttackOverlap(AActor* OtherActor); // 실제 오버랩 구현
 
-	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);	// 몽타주 종료 후
+	// 공격 몽타주 종료 후
+	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	// 피격 몽타주 재생
+	void PlayReactionMontage(UAnimMontage* Montage);
+
+	// 피격 몽타주 종료 후
+	void OnReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	int32 MonsterId = 0; // 몬스터 고유 ID
@@ -180,6 +194,7 @@ protected:
 	// -------------------------------------------------------------------------
 
 protected:
+	// Montage -----------------------------------------------------------------
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	TObjectPtr<UAnimMontage> AttackMontage = nullptr;	// 공격 몽타주
 
@@ -188,6 +203,16 @@ protected:
 
 	UPROPERTY(Transient)
 	FName LastAttackSection = NAME_None;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Montage")
+	TObjectPtr<UAnimMontage> HitReactMontage = nullptr;	// 피격 몽타주
+
+	UPROPERTY(EditDefaultsOnly, Category = "Montage")
+	TObjectPtr<UAnimMontage> ParriedMontage = nullptr;	// 패링 반응 몽타주
+
+	UPROPERTY(EditDefaultsOnly, Category = "Montage")
+	TObjectPtr<UAnimMontage> DeathMontage = nullptr;	// 사망 몽타주
+	// -------------------------------------------------------------------------
 
 private:
 	UPROPERTY(Transient)
