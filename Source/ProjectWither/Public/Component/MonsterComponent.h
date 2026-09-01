@@ -91,7 +91,7 @@ public:
 	void ResetAttackCooldown();	// 쿨타임 종료 처리
 
 	UFUNCTION(BlueprintCallable)
-	void ApplyAttackDamage(AActor* HitTarget);	// 실제 타격 판정, 피해 적용
+	void ApplyAttackDamage(AActor* HitTarget, float AttackMultiplier = 1.0f);	// 실제 타격 판정, 피해 적용
 
 	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
 	void RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox);	// 공격 히트 박스 등록
@@ -148,7 +148,7 @@ protected:
 	float AllowRange = 100.0f;	// 플레이어에게 최대한 접근할 수 있는 거리
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
-	float AttackRange = 300.0f;	// 공격 범위
+	float AttackRange = 400.0f;	// 공격 범위
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	float AttackCooldown = 1.0f;	// 공격 간격
@@ -178,8 +178,6 @@ protected:
 	FName LastAttackSection = NAME_None;
 
 private:
-
-
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들
 
@@ -191,7 +189,12 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPrimitiveComponent> ActiveAttackHitbox = nullptr;
 
+	UPROPERTY(Transient)
+	FName ActiveHitboxName = NAME_None;			// 현재 활성화된 공격 콜리전 이름
+
 	TSet<TWeakObjectPtr<AActor>> HitActors; 	// 같은 타격 구간에서 중복 처리 방지
 
 	FTimerHandle AttackCooldownTimerHandle;		// 공격 쿨타임 타이머핸들
+
+	float DefencePowerValue = 100.0f;	// 방어 배율 변수
 };

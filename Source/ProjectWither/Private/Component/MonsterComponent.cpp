@@ -337,8 +337,41 @@ void UMonsterComponent::ResetAttackCooldown()
 
 }
 
-void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget)
+void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultiplier)
 {
+	if (bIsDead || !IsValid(HitTarget) || !IsValid(StatComponent))
+	{
+		return;
+	}
+
+	if (!HitTarget->Implements<UStatComponentUserInterface>())
+	{
+		return;
+	}
+
+	UStatComponent* TargetStat = IStatComponentUserInterface::Execute_GetStatComponent(HitTarget);
+
+	if (!IsValid(TargetStat) || TargetStat->IsHealthZero())
+	{
+		return;
+	}
+
+	const float MinPower = FMath::Max(0.0f, StatComponent->GetMinAttackPower());
+
+	const float MaxPower = FMath::Max(MinPower, StatComponent->GetMaxAttackPower());
+
+	const float BaseDamage = FMath::FRandRange(MinPower, MaxPower);
+
+	const float Defense = FMath::Max(0.0f, TargetStat->GetDefensePower());
+
+	const float DefenseMultiplier = DefencePowerValue / (DefencePowerValue + Defense);
+
+	const float FinalDamage = FMath::Max(1.0f, 
+		BaseDamage *
+		FMath::Max(0.0f, AttackMultiplier) *
+		DefenseMultiplier);
+
+	TargetStat->ApplyDamage(FinalDamage);
 }
 
 void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox)
@@ -403,6 +436,7 @@ void UMonsterComponent::BeginAttackHitWindow(FName HitboxName)
 
 	// 활성화 순간 Overlap이 발생할 수 있으므로 먼저 기록
 	HitActors.Reset();
+	ActiveHitboxName = HitboxName;
 	ActiveAttackHitbox = Hitbox;
 
 	Hitbox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
@@ -432,6 +466,7 @@ void UMonsterComponent::EndAttackHitWindow(FName HitboxName)
 	if (ActiveAttackHitbox.Get() == Hitbox)
 	{
 		ActiveAttackHitbox = nullptr;
+		ActiveHitboxName = NAME_None;
 		HitActors.Reset();
 	}
 
@@ -475,6 +510,7 @@ FName UMonsterComponent::SelectAttackSection() const
 void UMonsterComponent::DisableAllAttackHitboxes()
 {
 	ActiveAttackHitbox = nullptr;
+	ActiveHitboxName = NAME_None;
 	HitActors.Reset();
 
 	for (const auto& Entry : AttackHitboxes)
@@ -516,8 +552,7 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 		return;
 	}
 
-	UStatComponent* PlayerStat =
-		IStatComponentUserInterface::Execute_GetStatComponent(Player);
+	UStatComponent* PlayerStat = IStatComponentUserInterface::Execute_GetStatComponent(Player);
 
 	if (!IsValid(PlayerStat) || PlayerStat->IsHealthZero())
 	{
@@ -533,9 +568,22 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 
 	HitActors.Add(HitActor);
 
+	float AttackMultiplier = 1.0f;
 
-	// Todo: 실제 피해 적용
-	ApplyAttackDamage(Player);
+	if (ActiveHitboxName == TEXT("Mouth"))
+	{
+		AttackMultiplier = 1.2f;
+	}
+	else if (ActiveHitboxName == TEXT("LeftFoot"))
+	{
+		AttackMultiplier = 1.0f;
+	}
+	else if (ActiveHitboxName == TEXT("RightFoot"))
+	{
+		AttackMultiplier = 1.0f;
+	}
+
+	ApplyAttackDamage(OtherActor, AttackMultiplier);
 }
 
 void UMonsterComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
