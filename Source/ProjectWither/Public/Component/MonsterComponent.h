@@ -116,6 +116,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
 	void HandleParried();							// 패링 처리
 
+	UFUNCTION(BlueprintCallable, Category = "Monster|Pool")
+	void ActivateFromPool();						// 풀에서 소환
+
+	UFUNCTION(BlueprintCallable, Category = "Monster|Pool")
+	void DeactivateForPool();						// 풀로 되돌리기
+
+	UFUNCTION(BlueprintCallable, Category = "Monster|Pool")
+	void ResetForReuse(const FVector& NewSpawnLocation);	// 오브젝트풀위한 재사용함수
+
 private:
 	UFUNCTION()
 	void HandleDeath();
@@ -144,14 +153,22 @@ private:
 	// 피격 몽타주 종료 후
 	void OnReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
-	// 사망 몽타주 재생
-	void PlayDeathMontage();
+	void PlayDeathMontage(); 	// 사망 몽타주 재생
 
 	// 사망 몽타주 종료 후
 	void OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted);	
 
-	// 사망 후처리
-	void FinishDeath();
+	void FinishDeath(); 	// 사망 후처리
+
+	void ScheduleFinishDeath();	// FinishDeath 타이머걸기
+
+	void ClearRuntimeTimers();	// 타이머 초기화
+	void ResetRuntimeState();	// 변수들 초기화
+	void StopAllMontages();		// 몽타주 정지
+	void CachePawnCollisionResponses();	// 공격 콜리전 캐싱
+	void SetDeadCollision(bool bDeadCollision);	// 공격 콜리전 비활성화
+	void RestartAI();			// AI 재시작
+	void ResetAnimation();		// 애니메이션 초기화
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
@@ -170,7 +187,7 @@ protected:
 	EMonsterDespawnPolicy DespawnPolicy = EMonsterDespawnPolicy::Destroy;	// 몬스터 디스폰 정책
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster|Death",
-		meta = (ClampMin = "0.0", Units = "s"))
+		meta = (ClampMin = "0.0"))
 	float DespawnDelay = 5.0f;	// 디스폰 딜레이 시간
 
 	// Drop --------------------------------------------------------------------
@@ -247,6 +264,9 @@ private:
 	FName ActiveHitboxName = NAME_None;			// 현재 활성화된 공격 콜리전 이름
 
 	TSet<TWeakObjectPtr<AActor>> HitActors; 	// 같은 타격 구간에서 중복 처리 방지
+
+	TMap<TWeakObjectPtr<UPrimitiveComponent>, ECollisionResponse>
+		OriginalPawnCollisionResponses;
 
 	FTimerHandle AttackCooldownTimerHandle;		// 공격 쿨타임 타이머핸들
 
