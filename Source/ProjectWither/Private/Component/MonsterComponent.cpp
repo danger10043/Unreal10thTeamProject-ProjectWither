@@ -76,6 +76,9 @@ void UMonsterComponent::HandleDeath()
 {
     if (bIsDead) return;
     bIsDead = true;
+
+	CancelAttack();
+
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(AttackCooldownTimerHandle);
@@ -472,6 +475,26 @@ void UMonsterComponent::EndAttackHitWindow(FName HitboxName)
 	}
 
 	Hitbox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+void UMonsterComponent::CancelAttack()
+{
+	DisableAllAttackHitboxes();
+
+	if (AActor* Owner = GetOwner())
+	{
+		if (USkeletalMeshComponent* Mesh =
+			Owner->FindComponentByClass<USkeletalMeshComponent>())
+		{
+			if (UAnimInstance* AnimInstance = Mesh->GetAnimInstance())
+			{
+				if (AnimInstance->Montage_IsPlaying(AttackMontage))
+				{
+					AnimInstance->Montage_Stop(0.15f, AttackMontage);
+				}
+			}
+		}
+	}
 }
 
 FName UMonsterComponent::SelectAttackSection() const

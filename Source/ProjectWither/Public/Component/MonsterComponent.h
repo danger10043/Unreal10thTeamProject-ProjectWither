@@ -106,6 +106,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
 	void EndAttackHitWindow(FName HitboxName);		// 공격 종료, 히트 끔
 
+	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
+	void CancelAttack();							// 공격 취소
+
 private:
 	UFUNCTION()
 	void HandleDeath();
