@@ -1,4 +1,4 @@
-#pragma once
+ #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
@@ -7,6 +7,7 @@
 #include "WeaponComponent.generated.h"
 
 class AActor;
+class UInventoryComponent;
 class UStatComponent;
 class UWeaponDataAsset;
 
@@ -51,6 +52,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Gun")
 	bool FireGun();
 
+	UFUNCTION(BlueprintNativeEvent, Category = "Weapon|Gun")
+	bool PerformGunFire(AActor* CurrentWeaponActor);
+
+	virtual bool PerformGunFire_Implementation(AActor* CurrentWeaponActor);
+
 	bool ConsumeAmmo();
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Gun")
@@ -60,16 +66,21 @@ public:
 	int32 GetCurrentAmmo() const;
 
 private:
+	bool SaveCurrentWeaponToInventory();
+
+	AActor* SpawnWeaponActor(const UWeaponDataAsset* WeaponData) const;
+	
 	void DestroyWeaponActor();
 
 private:
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Weapon",
-		meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
 	FItemInstance CurrentWeapon;
 
-	// UInventoryComponent 구현 후 추가할 멤버:
-	// UPROPERTY(Transient)
-	// TObjectPtr<UInventoryComponent> InventoryComponent;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Weapon", meta = (AllowPrivateAccess = "true"))
+	int32 CurrentWeaponSlot = INDEX_NONE;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInventoryComponent> InventoryComponent = nullptr;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStatComponent> StatComponent = nullptr;
