@@ -499,6 +499,25 @@ FName UMonsterComponent::SelectAttackSection() const
 		Candidates.Add(SectionName);
 	}
 
+	// 공격 섹션이 하나일 경우
+	if (Candidates.IsEmpty())
+	{
+		for (int32 Index = 0;
+			Index < AttackMontage->GetNumSections();
+			++Index)
+		{
+			const FName SectionName =
+				AttackMontage->GetSectionName(Index);
+
+			if (SectionName.ToString().StartsWith(
+				AttackSectionPrefix))
+			{
+				Candidates.Add(SectionName);
+			}
+		}
+	}
+
+	// 그래도 비었으면
 	if (Candidates.IsEmpty())
 	{
 		return NAME_None;
