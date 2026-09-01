@@ -144,6 +144,42 @@ void AMonsterAIController::StopAI()
 	ClearTargetActor();
 }
 
+void AMonsterAIController::RestartAI()
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn))
+	{
+		return;
+	}
+
+	SetMonsterComponent(ControlledPawn);
+	ClearTargetActor();
+
+	if (IsValid(AIPerceptionComponent))
+	{
+		AIPerceptionComponent->ForgetAll();
+		AIPerceptionComponent->SetSenseEnabled(
+			UAISense_Sight::StaticClass(), true);
+	}
+
+	if (UBlackboardComponent* BB = GetBlackboardComponent())
+	{
+		BB->SetValueAsObject(TEXT("SelfActor"), ControlledPawn);
+		BB->SetValueAsVector(
+			TEXT("SpawnLocation"),
+			ControlledPawn->GetActorLocation());
+	}
+
+	if (UBrainComponent* Brain = GetBrainComponent())
+	{
+		Brain->RestartLogic();
+	}
+	else if (IsValid(BehaviorTree))
+	{
+		RunBehaviorTree(BehaviorTree);
+	}
+}
+
 bool AMonsterAIController::IsValidTarget(AActor* InActor)
 {
 	// 파괴되었거나 없는 액터는 제외

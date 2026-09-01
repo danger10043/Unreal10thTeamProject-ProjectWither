@@ -30,6 +30,7 @@ public:
 	void SetTargetActor(AActor* NewTarget);
 	void ClearTargetActor();
 	void StopAI();
+	void RestartAI();
 
 	bool IsValidTarget(AActor* InActor);
 
