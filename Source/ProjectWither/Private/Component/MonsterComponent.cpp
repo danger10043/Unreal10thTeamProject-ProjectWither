@@ -270,7 +270,7 @@ bool UMonsterComponent::Attack()
 		// 재생 실패 시 공격 잠금 복구
 		bCanAttack = true;
 		SetMonsterState(PreviousState);
-		return;
+		return false;
 	}
 
 	FOnMontageEnded EndDelegate;
@@ -611,4 +611,5 @@ void UMonsterComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterr
 	if (Montage != AttackMontage) return;
 
 	FinishAttack();
+	OnMonsterAttackFinished.Broadcast(bInterrupted);
 }

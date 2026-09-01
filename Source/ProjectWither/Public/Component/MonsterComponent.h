@@ -16,6 +16,7 @@ class APickupItem;
 class UPrimitiveComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterDied);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterAttackFinished, bool, bInterrupted);
 
 UCLASS(ClassGroup=(Monster), meta=(BlueprintSpawnableComponent))
 class PROJECTWITHER_API UMonsterComponent : public UActorComponent
@@ -53,6 +54,9 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category = "Monster")
     FOnMonsterDied OnMonsterDied;
+
+	UPROPERTY(BlueprintAssignable, Category = "Monster|Combat")
+	FOnMonsterAttackFinished OnMonsterAttackFinished;
 
 	UFUNCTION(BlueprintCallable)
 	void SetMonsterState(EMonsterState NewState); // 몬스터 상태 변경
