@@ -35,6 +35,9 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
+	UFUNCTION(BlueprintCallable, Category = "Stat")
+	void ResetStat();
+
 	/*
 	*	Amount 만큼 체력을 회복합니다.
 	*	@return 실제로 회복된 체력

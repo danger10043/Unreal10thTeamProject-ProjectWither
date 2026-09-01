@@ -34,6 +34,32 @@ void UStatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+void UStatComponent::ResetStat()
+{
+	if (UWorld* World = GetWorld())
+	{
+		FTimerManager& TimerManager = World->GetTimerManager();
+		TimerManager.ClearTimer(StaminaRecoveryDelayTimerHandle);
+		TimerManager.ClearTimer(StaminaRecoveryTimerHandle);
+	}
+
+	const float PreviousHealth = CurrentHealth;
+	const float PreviousStamina = CurrentStamina;
+
+	CurrentHealth = MaxHealth;
+	CurrentStamina = MaxStamina;
+
+	OnHealthChanged.Broadcast(
+		CurrentHealth,
+		MaxHealth,
+		CurrentHealth - PreviousHealth);
+
+	OnStaminaChanged.Broadcast(
+		CurrentStamina,
+		MaxStamina,
+		CurrentStamina - PreviousStamina);
+}
+
 float UStatComponent::RecoverHealth(float Amount)
 {
 	if (Amount <= 0.0f || IsHealthZero()) return 0.0f;
