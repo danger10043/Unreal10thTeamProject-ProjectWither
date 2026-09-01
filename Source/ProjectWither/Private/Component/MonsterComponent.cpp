@@ -85,57 +85,68 @@ float UMonsterComponent::ApplyMonsterDamage(float Damage)
 
 void UMonsterComponent::HandleDeath()
 {
-	if (bIsDead) 
+	if (bIsDead)
 	{
 		return;
 	}
-    
+
 	bIsDead = true;
 
 	CancelAttack();
-    MonsterState = EMonsterState::Dead;
-    ClearTarget();
 
-	if (USkeletalMeshComponent* Mesh =
-		GetOwner()->FindComponentByClass<USkeletalMeshComponent>())
-	{
-		if (UAnimInstance* AnimInstance = Mesh->GetAnimInstance())
-		{
-			if (IsValid(DeathMontage))
-			{
-				AnimInstance->Montage_Play(DeathMontage);
-			}
-		}
-	}
+	MonsterState = EMonsterState::Dead;
+	ClearTarget();
 
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(AttackCooldownTimerHandle);
+		World->GetTimerManager().ClearTimer(
+			AttackCooldownTimerHandle);
 	}
+
 	DisableAllAttackHitboxes();
 
 	if (APawn* Pawn = Cast<APawn>(GetOwner()))
 	{
-		if (AMonsterAIController* MonsterAI =
-			Cast<AMonsterAIController>(Pawn->GetController()))
-		{
-			MonsterAI->StopAI();
-		}
-		else if (AAIController* AI =
+		if (AAIController* AIController =
 			Cast<AAIController>(Pawn->GetController()))
 		{
-			// 다른 AIController를 사용하는 경우의 기본 처리
-			if (UBrainComponent* Brain = AI->GetBrainComponent())
+			AIController->StopMovement();
+
+			if (UBrainComponent* Brain =
+				AIController->GetBrainComponent())
 			{
 				Brain->StopLogic(TEXT("Monster died"));
 			}
-
-			AI->StopMovement();
 		}
 	}
-    CalculateDrops();
-    DropItems();
-    OnMonsterDied.Broadcast();
+
+	// 시체가 플레이어의 이동을 막지 않도록 함
+	if (AActor* Owner = GetOwner())
+	{
+		TArray<UPrimitiveComponent*> PrimitiveComponents;
+		Owner->GetComponents<UPrimitiveComponent>(
+			PrimitiveComponents);
+
+		for (UPrimitiveComponent* Component :
+			PrimitiveComponents)
+		{
+			if (!IsValid(Component))
+			{
+				continue;
+			}
+
+			Component->SetCollisionResponseToChannel(
+				ECC_Pawn,
+				ECR_Ignore);
+		}
+	}
+
+	CalculateDrops();
+	DropItems();
+
+	OnMonsterDied.Broadcast();
+
+	PlayDeathMontage();
 }
 
 void UMonsterComponent::SetMonsterState(EMonsterState NewState)
@@ -740,4 +751,65 @@ void UMonsterComponent::OnReactionMontageEnded(UAnimMontage* Montage, bool bInte
 		SetMonsterState(IsValid(GetTargetActor()) ? 
 			EMonsterState::Chase : EMonsterState::Idle);
 	}
+}
+
+void UMonsterComponent::PlayDeathMontage()
+{
+	if (!IsValid(GetOwner()) || !IsValid(DeathMontage))
+	{
+		FinishDeath();
+		return;
+	}
+
+	USkeletalMeshComponent* Mesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+
+	if (!IsValid(AnimInstance))
+	{
+		FinishDeath();
+		return;
+	}
+
+	const float PlayedLength = AnimInstance->Montage_Play(DeathMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		FinishDeath();
+		return;
+	}
+
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(
+		this,
+		&UMonsterComponent::OnDeathMontageEnded);
+
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, DeathMontage);
+}
+
+void UMonsterComponent::OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != DeathMontage)
+	{
+		return;
+	}
+
+	FinishDeath();
+}
+
+void UMonsterComponent::FinishDeath()
+{
+	AActor* Owner = GetOwner();
+	if (!IsValid(Owner))
+	{
+		return;
+	}
+
+	if (CorpseLifeTime <= 0.0f)
+	{
+		// 오브젝트 풀 리턴
+		return;
+	}
+
+	Owner->SetLifeSpan(CorpseLifeTime);
 }

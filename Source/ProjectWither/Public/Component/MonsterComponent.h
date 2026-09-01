@@ -143,6 +143,15 @@ private:
 	// 피격 몽타주 종료 후
 	void OnReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
+	// 사망 몽타주 재생
+	void PlayDeathMontage();
+
+	// 사망 몽타주 종료 후
+	void OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted);	
+
+	// 사망 후처리
+	void FinishDeath();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	int32 MonsterId = 0; // 몬스터 고유 ID
@@ -156,6 +165,8 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
 	FVector SpawnLocation = FVector(0, 0, 0); // 최초 생성 위치
 
+	UPROPERTY(EditDefaultsOnly, Category = "Monster|Death", meta = (ClampMin = "0.0", Units = "s"))
+	float CorpseLifeTime = 5.0f;		// 사망 후 시체 남는 시간
 	// Drop --------------------------------------------------------------------
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Drop")
 	TObjectPtr<UDataTable> ItemDropTable = nullptr;	// 몬스터 드랍 테이블
