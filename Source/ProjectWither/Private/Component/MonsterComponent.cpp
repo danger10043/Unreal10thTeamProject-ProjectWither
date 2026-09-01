@@ -8,6 +8,7 @@
 #include "Monster/MonsterAIController.h"
 #include "Player/PlayerCharacter.h"
 #include "Interface/StatComponentUserInterface.h"
+#include "Framework/SubSystem/ObjectPoolSubsystem.h"
 
 #include "AIController.h"
 #include "BrainComponent.h"
@@ -797,6 +798,7 @@ void UMonsterComponent::OnDeathMontageEnded(UAnimMontage* Montage, bool bInterru
 	FinishDeath();
 }
 
+
 void UMonsterComponent::FinishDeath()
 {
 	AActor* Owner = GetOwner();
@@ -805,11 +807,35 @@ void UMonsterComponent::FinishDeath()
 		return;
 	}
 
-	if (CorpseLifeTime <= 0.0f)
+	switch (DespawnPolicy)
 	{
-		// 오브젝트 풀 리턴
-		return;
+	case EMonsterDespawnPolicy::ReturnToPool:
+	{
+		UWorld* World = GetWorld();
+		UObjectPoolSubsystem* PoolSubsystem =
+			IsValid(World)
+			? World->GetSubsystem<UObjectPoolSubsystem>()
+			: nullptr;
+
+		if (!IsValid(PoolSubsystem) ||
+			!PoolSubsystem->ReturnPool(Owner))
+		{
+			// 풀에서 생성되지 않은 몬스터에 대한 안전 처리
+			Owner->Destroy();
+		}
+
+		break;
 	}
 
-	Owner->SetLifeSpan(CorpseLifeTime);
+	case EMonsterDespawnPolicy::Destroy:
+		Owner->Destroy();
+		break;
+
+	case EMonsterDespawnPolicy::KeepCorpse:
+		// 보스 시체나 연출용 몬스터
+		break;
+
+	default:
+		break;
+	}
 }

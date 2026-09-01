@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "CommonHeader/MonsterStateEnums.h"
+#include "CommonHeader/MonsterDespawnEnums.h"
 #include "TimerManager.h"
 #include "MonsterComponent.generated.h"
 
@@ -165,8 +166,13 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
 	FVector SpawnLocation = FVector(0, 0, 0); // 최초 생성 위치
 
-	UPROPERTY(EditDefaultsOnly, Category = "Monster|Death", meta = (ClampMin = "0.0", Units = "s"))
-	float CorpseLifeTime = 5.0f;		// 사망 후 시체 남는 시간
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster|Death")
+	EMonsterDespawnPolicy DespawnPolicy = EMonsterDespawnPolicy::Destroy;	// 몬스터 디스폰 정책
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster|Death",
+		meta = (ClampMin = "0.0", Units = "s"))
+	float DespawnDelay = 5.0f;	// 디스폰 딜레이 시간
+
 	// Drop --------------------------------------------------------------------
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Drop")
 	TObjectPtr<UDataTable> ItemDropTable = nullptr;	// 몬스터 드랍 테이블
@@ -243,4 +249,6 @@ private:
 	TSet<TWeakObjectPtr<AActor>> HitActors; 	// 같은 타격 구간에서 중복 처리 방지
 
 	FTimerHandle AttackCooldownTimerHandle;		// 공격 쿨타임 타이머핸들
+
+	FTimerHandle DespawnTimerHandle;			// 디스폰 타이머핸들
 };
