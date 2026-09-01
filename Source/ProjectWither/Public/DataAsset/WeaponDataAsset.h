@@ -34,6 +34,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (ClampMin = "0.0"))	// 무기 공격력
 	float WeaponPower = 0.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Actor")
+	TSubclassOf<AActor> WeaponActorClass = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Actor")
+	FName AttachSocketName = TEXT("WeaponSocket");
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Effect")	// 검 공격 적중시 이펙트
 	TObjectPtr<UNiagaraSystem> WeaponHitEffect = nullptr;
 
@@ -61,6 +67,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	float GetWeaponPower() const;
+
+	UFUNCTION(BlueprintPure, Category = "Weapon|Actor")
+	TSubclassOf<AActor> GetWeaponActorClass() const;
+
+	UFUNCTION(BlueprintPure, Category = "Weapon|Actor")
+	FName GetAttachSocketName() const;
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UNiagaraSystem* GetWeaponHitEffect() const;

@@ -9,6 +9,7 @@
 #include "Interface/StatComponentUserInterface.h"
 #include "Interface/WeaponComponentUserInterface.h"
 #include "Interface/CombatComponentUserInterface.h"
+#include "Interface/PlayerInterface.h"
 #include "PlayerCharacter.generated.h"
 
 class UCameraComponent;
@@ -17,13 +18,16 @@ class UInputAction;
 class UInputMappingContext;
 class UStatComponent;
 class UWeaponComponent;
-//
+class UInventoryComponent;
+class UWeaponDataAsset;
+
 UCLASS()
 class PROJECTWITHER_API APlayerCharacter : 
 	public ACharacter,
 	public IStatComponentUserInterface,
 	public ICombatComponentUserInterface,
-	public IWeaponComponentUserInterface
+	public IWeaponComponentUserInterface,
+	public IPlayerInterface
 {
 	GENERATED_BODY()
 
@@ -74,15 +78,35 @@ private:
 	void StartBlockInput();
 	void StopBlockInput();
 
+	void SwapWeaponInput();
+
+	void AddDefaultTestWeapons();
+
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStatComponent> StatComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCombatComponent> CombatComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UWeaponComponent> WeaponComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInventoryComponent> InventoryComponent;
+
+	/*
+	*  테스트용 시작 무기.
+	* PlayerCharacter Blueprint의 디폴트 창에서 지정.
+	*/
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Test", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UWeaponDataAsset> TestSwordData;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Test", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UWeaponDataAsset> TestGunData;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Test", meta = (AllowPrivateAccess = "true"))
+	bool bEquipTestWeapon = true;
 
 	// 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Camera", meta = (AllowPrivateAccess = "true"))
@@ -109,6 +133,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> BlockAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> SwapWeaponAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
