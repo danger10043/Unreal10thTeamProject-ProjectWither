@@ -530,11 +530,28 @@ void UMonsterComponent::CancelAttack()
 
 void UMonsterComponent::PlayHitReaction()
 {
+	if (bIsDead)
+	{
+		return;
+	}
+
+	// 공격 중에는 체력만 감소하고 공격은 유지
+	if (MonsterState == EMonsterState::Attack)
+	{
+		return;
+	}
+
 	PlayReactionMontage(HitReactMontage);
 }
 
 void UMonsterComponent::HandleParried()
 {
+	if (bIsDead)
+	{
+		return;
+	}
+
+	CancelAttack();
 	PlayReactionMontage(ParriedMontage);
 }
 
@@ -694,8 +711,21 @@ void UMonsterComponent::PlayReactionMontage(UAnimMontage* Montage)
 		return;
 	}
 
-	SetMonsterState(EMonsterState::Hit);
+	const float PlayedLength = AnimInstance->Montage_Play(Montage);
 
+	if (PlayedLength <= 0.0f)
+	{
+		return;
+	}
+
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(
+		this,
+		&UMonsterComponent::OnReactionMontageEnded);
+
+	AnimInstance->Montage_SetEndDelegate(
+		EndDelegate,
+		Montage);
 }
 
 void UMonsterComponent::OnReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
