@@ -2,6 +2,7 @@
 #include "Component/InventoryComponent.h"
 #include "Component/StatComponent.h"
 
+#include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "GameFramework/Actor.h"
@@ -290,6 +291,20 @@ AActor* UWeaponComponent::SpawnWeaponActor(const UWeaponDataAsset* WeaponData) c
 	{
 		NewWeaponActor->Destroy();
 		return nullptr;
+	}
+
+	TArray<UCapsuleComponent*> CapsuleComponents;
+	NewWeaponActor->GetComponents<UCapsuleComponent>(CapsuleComponents);
+
+	for (UCapsuleComponent* CapsuleComponent : CapsuleComponents)
+	{
+		if (!IsValid(CapsuleComponent) || !CapsuleComponent->ComponentHasTag(TEXT("SwordHitCollision")))
+		{
+			continue;
+		}
+
+		CapsuleComponent->SetGenerateOverlapEvents(true);
+		CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
 	return NewWeaponActor;

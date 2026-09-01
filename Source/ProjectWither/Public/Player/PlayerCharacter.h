@@ -9,6 +9,7 @@
 #include "Interface/StatComponentUserInterface.h"
 #include "Interface/WeaponComponentUserInterface.h"
 #include "Interface/CombatComponentUserInterface.h"
+#include "Interface/PlayerInterface.h"
 #include "PlayerCharacter.generated.h"
 
 class UCameraComponent;
@@ -25,7 +26,8 @@ class PROJECTWITHER_API APlayerCharacter :
 	public ACharacter,
 	public IStatComponentUserInterface,
 	public ICombatComponentUserInterface,
-	public IWeaponComponentUserInterface
+	public IWeaponComponentUserInterface,
+	public IPlayerInterface
 {
 	GENERATED_BODY()
 
@@ -81,10 +83,10 @@ private:
 	void AddDefaultTestWeapons();
 
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStatComponent> StatComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCombatComponent> CombatComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))

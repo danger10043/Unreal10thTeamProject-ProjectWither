@@ -41,6 +41,9 @@ public:
 	UWeaponDataAsset* GetCurrentWeaponData() const;
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
+	AActor* GetWeaponActor() const { return IsValid(WeaponActor) ? WeaponActor.Get() : nullptr; }
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
 	EWeaponType GetWeaponType() const;
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")

@@ -126,6 +126,7 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
     EnhancedInput->BindAction(RollAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRoll);
 
+	EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &APlayerCharacter::AttackInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Started, this, &APlayerCharacter::StartBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
@@ -259,7 +260,12 @@ void APlayerCharacter::StartRoll()
 
 void APlayerCharacter::AttackInput()
 {
-    if (!IsValid(CombatComponent)) { return; }
+	UE_LOG(LogTemp, Log, TEXT("APlayerCharacter::AttackInput - 플레이어 공격 입력"));
+    if (!IsValid(CombatComponent))
+    {
+		UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::AttackInput - CombatComponent가 유효하지 않습니다."));
+        return; 
+    }
     CombatComponent->Attack();
 }
 
