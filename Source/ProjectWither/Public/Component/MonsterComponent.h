@@ -82,7 +82,7 @@ public:
 	bool CanAttack();			// 생존·타겟·거리·쿨타임을 검사
 
 	UFUNCTION(BlueprintCallable)
-	void Attack();				// 공격
+	bool Attack();				// 공격
 
 	UFUNCTION(BlueprintCallable)
 	void FinishAttack();		// 공격 종료 상태 처리
@@ -135,6 +135,21 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
 	FVector SpawnLocation = FVector(0, 0, 0); // 최초 생성 위치
 
+	// Drop --------------------------------------------------------------------
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Drop")
+	TObjectPtr<UDataTable> ItemDropTable = nullptr;	// 몬스터 드랍 테이블
+
+	UPROPERTY(EditDefaultsOnly, Category = "Drop")
+	TSubclassOf<APickupItem> ItemPickupClass;	// 아이템 픽업 클래스
+
+	UPROPERTY(EditDefaultsOnly, Category = "Drop")
+	float DropRange = 100.0f;		// 드랍 아이템 랜덤 범위 (X, Y)
+
+	UPROPERTY(EditDefaultsOnly, Category = "Drop")
+	float DropHeight = 20.0f;		// 드랍 아이템 랜덤 높이 (Z)
+	// -------------------------------------------------------------------------
+
+	// Combat ------------------------------------------------------------------
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Base")
 	TObjectPtr<AActor> TargetActor = nullptr; // 현재 추적 또는 공격 대상
 
@@ -153,18 +168,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	float AttackCooldown = 1.0f;	// 공격 간격
 
-	// Drop --------------------------------------------------------------------
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Drop")
-	TObjectPtr<UDataTable> ItemDropTable = nullptr;	// 몬스터 드랍 테이블
-
-	UPROPERTY(EditDefaultsOnly, Category = "Drop")
-	TSubclassOf<APickupItem> ItemPickupClass;	// 아이템 픽업 클래스
-
-	UPROPERTY(EditDefaultsOnly, Category = "Drop")
-	float DropRange = 100.0f;		// 드랍 아이템 랜덤 범위 (X, Y)
-
-	UPROPERTY(EditDefaultsOnly, Category = "Drop")
-	float DropHeight = 20.0f;		// 드랍 아이템 랜덤 높이 (Z)
+	UPROPERTY(EditDefaultsOnly, Category = "Combat", meta = (ClampMin = "1.0"))
+	float DefenseScalingConstant = 100.0f;
 	// -------------------------------------------------------------------------
 
 protected:
@@ -195,6 +200,4 @@ private:
 	TSet<TWeakObjectPtr<AActor>> HitActors; 	// 같은 타격 구간에서 중복 처리 방지
 
 	FTimerHandle AttackCooldownTimerHandle;		// 공격 쿨타임 타이머핸들
-
-	float DefencePowerValue = 100.0f;	// 방어 배율 변수
 };

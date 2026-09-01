@@ -238,11 +238,11 @@ bool UMonsterComponent::CanAttack()
 	return IsInAttackRange();
 }
 
-void UMonsterComponent::Attack()
+bool UMonsterComponent::Attack()
 {
 	if (!CanAttack() || !IsValid(AttackMontage))
 	{
-		return;
+		return false;
 	}
 
 	USkeletalMeshComponent* Mesh =
@@ -251,10 +251,10 @@ void UMonsterComponent::Attack()
 	UAnimInstance* AnimInstance =
 		IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
 
-	if (!IsValid(AnimInstance)) return;
+	if (!IsValid(AnimInstance)) return false;
 
 	const FName SelectedSection = SelectAttackSection();
-	if (SelectedSection.IsNone()) return;
+	if (SelectedSection.IsNone()) return false;
 
 	const EMonsterState PreviousState = MonsterState;
 
@@ -288,6 +288,7 @@ void UMonsterComponent::Attack()
 	// 재생에 성공한 경우에만 직전 공격으로 기록
 	LastAttackSection = SelectedSection;
 
+	return true;
 }
 
 void UMonsterComponent::FinishAttack()
@@ -364,7 +365,7 @@ void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultipl
 
 	const float Defense = FMath::Max(0.0f, TargetStat->GetDefensePower());
 
-	const float DefenseMultiplier = DefencePowerValue / (DefencePowerValue + Defense);
+	const float DefenseMultiplier = DefenseScalingConstant / (DefenseScalingConstant + Defense);
 
 	const float FinalDamage = FMath::Max(1.0f, 
 		BaseDamage *
