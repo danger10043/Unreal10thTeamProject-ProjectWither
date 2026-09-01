@@ -5,6 +5,7 @@
 #include "Component/StatComponent.h"
 #include "Component/WeaponComponent.h"
 #include "Component/CombatComponent.h"
+#include "Component/InventoryComponent.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -45,6 +46,7 @@ APlayerCharacter::APlayerCharacter()
     StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
     CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
+    InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
 }
 
 void APlayerCharacter::SetCanMove(bool bNewCanMove)

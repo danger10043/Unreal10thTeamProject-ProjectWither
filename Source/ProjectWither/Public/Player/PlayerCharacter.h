@@ -17,6 +17,7 @@ class UInputAction;
 class UInputMappingContext;
 class UStatComponent;
 class UWeaponComponent;
+class UInventoryComponent;
 //
 UCLASS()
 class PROJECTWITHER_API APlayerCharacter : 
@@ -83,6 +84,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UWeaponComponent> WeaponComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInventoryComponent> InventoryComponent;
 
 	// 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Camera", meta = (AllowPrivateAccess = "true"))
