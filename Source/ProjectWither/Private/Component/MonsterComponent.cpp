@@ -16,6 +16,8 @@
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/DamageType.h"
 
 UMonsterComponent::UMonsterComponent()
 {
@@ -66,27 +68,51 @@ void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 float UMonsterComponent::ApplyMonsterDamage(float Damage)
 {
-    if (bIsDead || !IsValid(StatComponent)) return 0.0f;
-    const float AppliedDamage = StatComponent->ApplyDamage(Damage);
-    if (StatComponent->IsHealthZero()) HandleDeath();
+	if (bIsDead || !IsValid(StatComponent))
+	{
+		return 0.0f;
+	}
+    
+	const float AppliedDamage = StatComponent->ApplyDamage(Damage);
+    
+	if (!bIsDead && AppliedDamage > 0.0f)
+	{
+		PlayHitReaction();
+	}
+	
     return AppliedDamage;
 }
 
 void UMonsterComponent::HandleDeath()
 {
-    if (bIsDead) return;
-    bIsDead = true;
+	if (bIsDead) 
+	{
+		return;
+	}
+    
+	bIsDead = true;
 
 	CancelAttack();
+    MonsterState = EMonsterState::Dead;
+    ClearTarget();
+
+	if (USkeletalMeshComponent* Mesh =
+		GetOwner()->FindComponentByClass<USkeletalMeshComponent>())
+	{
+		if (UAnimInstance* AnimInstance = Mesh->GetAnimInstance())
+		{
+			if (IsValid(DeathMontage))
+			{
+				AnimInstance->Montage_Play(DeathMontage);
+			}
+		}
+	}
 
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(AttackCooldownTimerHandle);
 	}
 	DisableAllAttackHitboxes();
-
-    MonsterState = EMonsterState::Dead;
-    ClearTarget();
 
 	if (APawn* Pawn = Cast<APawn>(GetOwner()))
 	{
@@ -375,7 +401,12 @@ void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultipl
 		FMath::Max(0.0f, AttackMultiplier) *
 		DefenseMultiplier);
 
-	TargetStat->ApplyDamage(FinalDamage);
+	UGameplayStatics::ApplyDamage(
+		HitTarget,
+		FinalDamage,
+		GetOwner()->GetInstigatorController(),
+		GetOwner(),
+		UDamageType::StaticClass());
 }
 
 void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox)
@@ -499,10 +530,12 @@ void UMonsterComponent::CancelAttack()
 
 void UMonsterComponent::PlayHitReaction()
 {
+	PlayReactionMontage(HitReactMontage);
 }
 
 void UMonsterComponent::HandleParried()
 {
+	PlayReactionMontage(ParriedMontage);
 }
 
 FName UMonsterComponent::SelectAttackSection() const
@@ -647,8 +680,34 @@ void UMonsterComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterr
 
 void UMonsterComponent::PlayReactionMontage(UAnimMontage* Montage)
 {
+	if (bIsDead || !IsValid(Montage) || !IsValid(GetOwner()))
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* Mesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+
+	if (!IsValid(AnimInstance))
+	{
+		return;
+	}
+
+	SetMonsterState(EMonsterState::Hit);
+
 }
 
 void UMonsterComponent::OnReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
+	if (bIsDead)
+	{
+		return;
+	}
+
+	if (MonsterState == EMonsterState::Hit)
+	{
+		SetMonsterState(IsValid(GetTargetActor()) ? 
+			EMonsterState::Chase : EMonsterState::Idle);
+	}
 }
