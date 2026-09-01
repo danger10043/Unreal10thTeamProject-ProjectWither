@@ -164,6 +164,28 @@ bool UInventoryComponent::RemoveItemAtSlot(int32 SlotIndex, int32 RemoveQuantity
 	return true;
 }
 
+bool UInventoryComponent::SwapItems(int32 FromSlotIndex, int32 ToSlotIndex)
+{
+	if (!InventoryItems.IsValidIndex(FromSlotIndex) || !InventoryItems.IsValidIndex(ToSlotIndex))	// 슬롯 번호가 잘못되었으면 실패 처리
+	{
+		return false;
+	}
+
+	if (FromSlotIndex == ToSlotIndex)																// 같은 슬롯이면 변경할 내용이 없다.
+	{
+		return false;
+	}
+
+	if (InventoryItems[FromSlotIndex].ItemData == nullptr)											// 비어있는 슬롯에서는 아이템 이동을 시작할 수 없다.
+	{
+		return false;
+	}
+
+	InventoryItems.Swap(FromSlotIndex, ToSlotIndex);												// 대상 슬롯이 비어 있으면 이동, 아이템이 있으면 서로 교환
+	OnInventoryChanged.Broadcast();																	// 인벤토리 아이템 목록 변경 이벤트 호출
+	return true;
+}
+
 bool UInventoryComponent::UseItem(int32 ItemId)
 {
 	return false;

@@ -43,6 +43,9 @@ public:
 	bool RemoveItemAtSlot(int32 SlotIndex, int32 RemoveQuantity);									// 지정한 슬롯에서만 아이템 수량 제거 (아이템 장착, 아이템을 버릴 때 등)
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool SwapItems(int32 FromSlotIndex, int32 ToSlotIndex);										// 두 슬롯의 아이템 위치를 교환
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool UseItem(int32 ItemId);																		// 지정한 아이템을 사용
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
