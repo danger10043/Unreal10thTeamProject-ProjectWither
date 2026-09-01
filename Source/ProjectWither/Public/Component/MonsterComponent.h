@@ -137,7 +137,7 @@ private:
 	// 공격 몽타주 종료 후
 	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
-	// 피격 몽타주 재생
+	// 반응 몽타주 재생
 	void PlayReactionMontage(UAnimMontage* Montage);
 
 	// 피격 몽타주 종료 후
