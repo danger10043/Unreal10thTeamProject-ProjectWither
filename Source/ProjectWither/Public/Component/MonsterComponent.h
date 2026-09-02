@@ -15,6 +15,7 @@ class UAnimMontage;
 class UDataTable;
 class APickupItem;
 class UPrimitiveComponent;
+class UPawnMovementComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterDied);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterAttackFinished, bool, bInterrupted);
@@ -182,6 +183,8 @@ private:
 	void SetDeadCollision(bool bDeadCollision);	// 공격 콜리전 비활성화
 	void RestartAI();			// AI 재시작
 	void ResetAnimation();		// 애니메이션 초기화
+	void LockMovementForAttack();
+	void UnlockMovementAfterAttack();
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
@@ -265,6 +268,11 @@ protected:
 	// -------------------------------------------------------------------------
 
 private:
+	UPROPERTY(Transient)
+	TObjectPtr<UPawnMovementComponent> LockedAttackMovement = nullptr;
+
+	bool bAttackMovementWasActive = false;
+
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들
 

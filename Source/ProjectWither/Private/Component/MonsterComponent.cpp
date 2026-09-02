@@ -278,20 +278,7 @@ bool UMonsterComponent::Attack()
 
 	bCanAttack = false;
 	SetMonsterState(EMonsterState::Attack);
-
-	// Move To가 남긴 경로와 속도를 제거해 공격 몽타주 중 미끄러지지 않게 한다.
-	if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
-	{
-		if (AAIController* AIController = Cast<AAIController>(OwnerPawn->GetController()))
-		{
-			AIController->StopMovement();
-		}
-
-		if (UPawnMovementComponent* MovementComponent = OwnerPawn->GetMovementComponent())
-		{
-			MovementComponent->StopMovementImmediately();
-		}
-	}
+	LockMovementForAttack();
 
 	const float PlayedLength =
 		AnimInstance->Montage_Play(AttackMontage);
@@ -300,6 +287,7 @@ bool UMonsterComponent::Attack()
 	if (PlayedLength <= 0.0f)
 	{
 		// 재생 실패 시 공격 잠금 복구
+		UnlockMovementAfterAttack();
 		bCanAttack = true;
 		SetMonsterState(PreviousState);
 		return false;
@@ -326,6 +314,7 @@ bool UMonsterComponent::Attack()
 void UMonsterComponent::FinishAttack()
 {
 	DisableAllAttackHitboxes();
+	UnlockMovementAfterAttack();
 
 	if (bIsDead) return;
 
@@ -1131,4 +1120,36 @@ void UMonsterComponent::ResetAnimation()
 
 	// AnimBP 상태 머신을 Entry 상태부터 다시 시작
 	Mesh->InitAnim(true);
+}
+
+void UMonsterComponent::LockMovementForAttack()
+{
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!IsValid(OwnerPawn)) return;
+
+	if (AAIController* AIController = Cast<AAIController>(OwnerPawn->GetController()))
+	{
+		AIController->StopMovement();
+	}
+
+	LockedAttackMovement = OwnerPawn->GetMovementComponent();
+	if (IsValid(LockedAttackMovement))
+	{
+		bAttackMovementWasActive = LockedAttackMovement->IsActive();
+		LockedAttackMovement->StopMovementImmediately();
+		LockedAttackMovement->Deactivate();
+	}
+
+	OwnerPawn->ConsumeMovementInputVector();
+}
+
+void UMonsterComponent::UnlockMovementAfterAttack()
+{
+	if (IsValid(LockedAttackMovement) && bAttackMovementWasActive)
+	{
+		LockedAttackMovement->Activate(true);
+	}
+
+	LockedAttackMovement = nullptr;
+	bAttackMovementWasActive = false;
 }

@@ -38,6 +38,8 @@ protected:
 	UFUNCTION()
 	void OnTargetDied();
 
+	void ForgetTargetAfterSightLoss();
+
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "AI")
 	TObjectPtr<UAIPerceptionComponent> AIPerceptionComponent;
@@ -56,4 +58,10 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStatComponent> TargetStat = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category = "AI|Perception", meta = (ClampMin = "0.0"))
+	float TargetForgetDelay = 2.0f;
+
+	FTimerHandle TargetForgetTimerHandle;
+	bool bCurrentTargetSensed = false;
 };
