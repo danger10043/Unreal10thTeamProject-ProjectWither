@@ -235,6 +235,11 @@ void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulu
 		return;
 	}
 
+	if (!IsValidTarget(InActor))
+	{
+		return;
+	}
+
 	UBlackboardComponent* BB = GetBlackboardComponent();
 
 	if (Stimulus.WasSuccessfullySensed())
