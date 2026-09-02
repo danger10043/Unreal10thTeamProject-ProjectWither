@@ -221,15 +221,27 @@ void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulu
 		return;
 	}
 
+	UBlackboardComponent* BB = GetBlackboardComponent();
 
 	if (Stimulus.WasSuccessfullySensed())
 	{
+		if (IsValid(BB) && IsValid(InActor))
+		{
+			BB->SetValueAsVector(TEXT("LastKnownLocation"),
+				InActor->GetActorLocation());
+		}
+
 		SetTargetActor(InActor);
 	}
 	else
 	{
 		if (InActor == MonsterComponent->GetTargetActor())
 		{
+			if (IsValid(BB) && IsValid(InActor))
+			{
+				BB->SetValueAsVector(TEXT("LastKnownLocation"),
+					InActor->GetActorLocation());
+			}
 			ClearTargetActor();
 		}
 	}
