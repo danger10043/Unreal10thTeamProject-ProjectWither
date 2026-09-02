@@ -426,18 +426,23 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 		StopBlock();
 	}
 
-	if (DamageAmount > 0.0f)
+	const float AppliedDamage =
+		StatComponent->ApplyDamage(DamageAmount);
+
+	if (AppliedDamage <= 0.0f)
 	{
-		// 치명타가 아니라 살아 있는 경우 피격 반응을 실행합니다.
-		if (IsOwnerAlive())
-		{
-			StartHitReaction();
-		}
-		OnHitReceived();
+		return 0.0f;
 	}
 
+	// 대미지를 받고도 살아 있다면 피격 반응
+	if (IsOwnerAlive())
+	{
+		StartHitReaction();
+	}
 
-	return DamageAmount;
+	OnHitReceived();
+
+	return AppliedDamage;
 }
 
 void UCombatComponent::Die()
