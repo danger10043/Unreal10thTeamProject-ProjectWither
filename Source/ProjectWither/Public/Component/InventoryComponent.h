@@ -74,6 +74,8 @@ public:
 
 	int32 FindWeaponSlotByType(EWeaponType WeaponType) const;
 
+	bool SetItemAtSlot(int32 SlotIndex, const FItemInstance& NewItemInstance);						// 지정한 슬롯의 아이템 정보를 그대로 교체
+
 	bool UpdataItemAtSlot(int32 SlotIndex, const FItemInstance& NewItemInstance);
 
 	int32 ConsumeAmmoByType(EAmmoType AmmoType, int32 RequestedQuantity);
