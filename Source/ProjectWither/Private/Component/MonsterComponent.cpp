@@ -13,6 +13,7 @@
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -277,6 +278,7 @@ bool UMonsterComponent::Attack()
 
 	bCanAttack = false;
 	SetMonsterState(EMonsterState::Attack);
+	LockMovementForAttack();
 
 	const float PlayedLength =
 		AnimInstance->Montage_Play(AttackMontage);
@@ -285,6 +287,7 @@ bool UMonsterComponent::Attack()
 	if (PlayedLength <= 0.0f)
 	{
 		// 재생 실패 시 공격 잠금 복구
+		UnlockMovementAfterAttack();
 		bCanAttack = true;
 		SetMonsterState(PreviousState);
 		return false;
@@ -311,6 +314,7 @@ bool UMonsterComponent::Attack()
 void UMonsterComponent::FinishAttack()
 {
 	DisableAllAttackHitboxes();
+	UnlockMovementAfterAttack();
 
 	if (bIsDead) return;
 
@@ -585,6 +589,74 @@ void UMonsterComponent::ResetForReuse(const FVector& NewSpawnLocation)
 	RestartAI();
 }
 
+bool UMonsterComponent::PlaySearchAnimation()
+{
+	if (bIsDead || !IsValid(SearchMontage) || !IsValid(GetOwner()))
+	{
+		return false;
+	}
+
+	if (MonsterState == EMonsterState::Attack ||
+		MonsterState == EMonsterState::Hit ||
+		MonsterState == EMonsterState::Dead)
+	{
+		return false;
+	}
+
+	USkeletalMeshComponent* Mesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+
+	if (!IsValid(AnimInstance))
+	{
+		return false;
+	}
+
+	const EMonsterState PreviousState = MonsterState;
+	SetMonsterState(EMonsterState::Search);
+
+	const float PlayedLength = AnimInstance->Montage_Play(SearchMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		SetMonsterState(PreviousState);
+		return false;
+	}
+
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(
+		this,
+		&UMonsterComponent::OnSearchMontageEnded);
+
+	AnimInstance->Montage_SetEndDelegate(
+		EndDelegate,
+		SearchMontage);
+
+	return true;
+}
+
+void UMonsterComponent::CancelSearch()
+{
+	if (!IsValid(GetOwner()) || !IsValid(SearchMontage))
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* Mesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+
+	if (IsValid(AnimInstance) && AnimInstance->Montage_IsPlaying(SearchMontage))
+	{
+		AnimInstance->Montage_Stop(0.15f, SearchMontage);
+	}
+
+	if (!bIsDead && MonsterState == EMonsterState::Search)
+	{
+		SetMonsterState(IsValid(GetTargetActor()) ? EMonsterState::Chase : EMonsterState::Idle);
+	}
+}
+
 void UMonsterComponent::ScheduleFinishDeath()
 {
 	if (DespawnPolicy == EMonsterDespawnPolicy::KeepCorpse)
@@ -841,6 +913,21 @@ void UMonsterComponent::OnDeathMontageEnded(UAnimMontage* Montage, bool bInterru
 	ScheduleFinishDeath();
 }
 
+void UMonsterComponent::OnSearchMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != SearchMontage)
+	{
+		return;
+	}
+
+	if (!bIsDead && MonsterState == EMonsterState::Search)
+	{
+		SetMonsterState(IsValid(GetTargetActor()) ? EMonsterState::Chase : EMonsterState::Idle);
+	}
+
+	OnMonsterSearchFinished.Broadcast(bInterrupted);
+}
+
 void UMonsterComponent::FinishDeath()
 {
 	AActor* Owner = GetOwner();
@@ -1033,4 +1120,36 @@ void UMonsterComponent::ResetAnimation()
 
 	// AnimBP 상태 머신을 Entry 상태부터 다시 시작
 	Mesh->InitAnim(true);
+}
+
+void UMonsterComponent::LockMovementForAttack()
+{
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!IsValid(OwnerPawn)) return;
+
+	if (AAIController* AIController = Cast<AAIController>(OwnerPawn->GetController()))
+	{
+		AIController->StopMovement();
+	}
+
+	LockedAttackMovement = OwnerPawn->GetMovementComponent();
+	if (IsValid(LockedAttackMovement))
+	{
+		bAttackMovementWasActive = LockedAttackMovement->IsActive();
+		LockedAttackMovement->StopMovementImmediately();
+		LockedAttackMovement->Deactivate();
+	}
+
+	OwnerPawn->ConsumeMovementInputVector();
+}
+
+void UMonsterComponent::UnlockMovementAfterAttack()
+{
+	if (IsValid(LockedAttackMovement) && bAttackMovementWasActive)
+	{
+		LockedAttackMovement->Activate(true);
+	}
+
+	LockedAttackMovement = nullptr;
+	bAttackMovementWasActive = false;
 }

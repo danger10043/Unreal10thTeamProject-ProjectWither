@@ -67,6 +67,9 @@ EBTNodeResult::Type UBTTask_MonsterAttack::AbortTask(UBehaviorTreeComponent& Own
 			this,
 			&UBTTask_MonsterAttack::HandleAttackFinished
 		);
+
+		// 태스크만 끝내고 몽타주를 남기면 다음 Move To와 공격이 동시에 재생된다.
+		CachedMonsterComponent->CancelAttack();
 	}
 
 	CachedOwnerComp = nullptr;
