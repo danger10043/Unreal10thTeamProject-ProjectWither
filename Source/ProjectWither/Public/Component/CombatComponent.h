@@ -152,6 +152,13 @@ private:
 
 	void ConsumeBlockStamina();
 
+	void StartHitReaction();
+
+	void OnHitReactMontageEnded(
+		UAnimMontage* Montage,
+		bool bInterrupted
+	);
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<APlayerCharacter> OwnerPlayer;
@@ -173,6 +180,14 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimMontage> SwordAttackMontage;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Combat|HitReact",
+		meta = (AllowPrivateAccess = "true")
+	)
+	TObjectPtr<UAnimMontage> HitReactMontage;
 
 	/*
 	* 하나의 SwordAttackAnimNotifyState 구간에서 이미 피해를 받은 적
