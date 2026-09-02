@@ -80,6 +80,9 @@ void AMonsterAIController::SetTargetActor(AActor* NewTarget)
 		return;
 	}
 
+	GetWorldTimerManager().ClearTimer(TargetForgetTimerHandle);
+	bCurrentTargetSensed = true;
+
 	// 이전 타겟의 이벤트 구독 해제
 	if (IsValid(TargetStat))
 	{
@@ -103,6 +106,9 @@ void AMonsterAIController::SetTargetActor(AActor* NewTarget)
 
 void AMonsterAIController::ClearTargetActor()
 {
+	GetWorldTimerManager().ClearTimer(TargetForgetTimerHandle);
+	bCurrentTargetSensed = false;
+
 	// 타겟을 잡은 적이 없어도 안전하게 해제
 	if (IsValid(TargetStat))
 	{
@@ -214,6 +220,14 @@ void AMonsterAIController::OnTargetDied()
 	ClearTargetActor();
 }
 
+void AMonsterAIController::ForgetTargetAfterSightLoss()
+{
+	if (!bCurrentTargetSensed)
+	{
+		ClearTargetActor();
+	}
+}
+
 void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulus Stimulus)
 {
 	if (!IsValid(MonsterComponent) || MonsterComponent->IsDead())
@@ -225,6 +239,9 @@ void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulu
 
 	if (Stimulus.WasSuccessfullySensed())
 	{
+		bCurrentTargetSensed = true;
+		GetWorldTimerManager().ClearTimer(TargetForgetTimerHandle);
+
 		if (IsValid(BB) && IsValid(InActor))
 		{
 			BB->SetValueAsVector(TEXT("LastKnownLocation"),
@@ -237,12 +254,27 @@ void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulu
 	{
 		if (InActor == MonsterComponent->GetTargetActor())
 		{
+			bCurrentTargetSensed = false;
+
 			if (IsValid(BB) && IsValid(InActor))
 			{
 				BB->SetValueAsVector(TEXT("LastKnownLocation"),
-					Stimulus.StimulusLocation);
+					InActor->GetActorLocation());
 			}
-			ClearTargetActor();
+
+			if (TargetForgetDelay <= 0.0f)
+			{
+				ClearTargetActor();
+			}
+			else
+			{
+				GetWorldTimerManager().SetTimer(
+					TargetForgetTimerHandle,
+					this,
+					&AMonsterAIController::ForgetTargetAfterSightLoss,
+					TargetForgetDelay,
+					false);
+			}
 		}
 	}
 }
