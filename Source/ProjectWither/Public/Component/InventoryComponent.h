@@ -46,6 +46,9 @@ public:
 	bool SwapItems(int32 FromSlotIndex, int32 ToSlotIndex);										// 두 슬롯의 아이템 위치를 교환
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool UseItemAtSlot(int32 SlotIndex);															// 지정한 슬롯의 아이템을 사용
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool UseItem(int32 ItemId);																		// 지정한 아이템을 사용
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
