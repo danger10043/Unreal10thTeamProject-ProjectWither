@@ -6,6 +6,7 @@
 #include "Component/WeaponComponent.h"
 #include "Component/CombatComponent.h"
 #include "Component/InventoryComponent.h"
+#include "DataAsset/WeaponDataAsset.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -79,6 +80,8 @@ void APlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	
+    AddDefaultTestWeapons();
+
     const APlayerController* PlayerController = Cast<APlayerController>(GetController());
 
     if (!PlayerController || !DefaultMappingContext) { return; }
@@ -123,9 +126,11 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
     EnhancedInput->BindAction(RollAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRoll);
 
+	EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &APlayerCharacter::AttackInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Started, this, &APlayerCharacter::StartBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
+    EnhancedInput->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &APlayerCharacter::SwapWeaponInput);
 }
 
 float APlayerCharacter::TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -255,7 +260,12 @@ void APlayerCharacter::StartRoll()
 
 void APlayerCharacter::AttackInput()
 {
-    if (!IsValid(CombatComponent)) { return; }
+	UE_LOG(LogTemp, Log, TEXT("APlayerCharacter::AttackInput - 플레이어 공격 입력"));
+    if (!IsValid(CombatComponent))
+    {
+		UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::AttackInput - CombatComponent가 유효하지 않습니다."));
+        return; 
+    }
     CombatComponent->Attack();
 }
 
@@ -269,5 +279,56 @@ void APlayerCharacter::StopBlockInput()
 {
     if (!IsValid(CombatComponent)) { return; }
     CombatComponent->StopBlock();
+}
+
+void APlayerCharacter::SwapWeaponInput()
+{
+    if (!IsValid(WeaponComponent)) return;
+
+    if (!WeaponComponent->SwapWeapon())
+    {
+		UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::SwapWeaponInput - 무기 교체에 실패했습니다."));
+    }
+}
+
+void APlayerCharacter::AddDefaultTestWeapons()
+{
+    if (!IsValid(InventoryComponent))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::AddDefaultTestWeapons - InventoryComponent가 유효하지 않습니다."));
+        return;
+    }
+
+    if (IsValid(TestSwordData))
+    {
+        if (TestSwordData->GetWeaponType() != EWeaponType::Sword)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("DefaultTestSword에 검이 아닌 WeaponDataAsset이 지정되어 있습니다."));
+        }
+        else if (!InventoryComponent->HasItem(TestSwordData->GetItemId()))
+        {
+            InventoryComponent->AddItem(TestSwordData, 1);
+        }
+    }
+
+    if (IsValid(TestGunData))
+    {
+        if (TestGunData->GetWeaponType() != EWeaponType::Gun)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("DefaultTestGun에 총이 아닌 WeaponDataAsset이 지정되어 있습니다."));
+        }
+        else if (!InventoryComponent->HasItem(TestGunData->GetItemId()))
+        {
+            InventoryComponent->AddItem(TestGunData, 1);
+        }
+	}
+
+    if (bEquipTestWeapon && IsValid(TestSwordData) && IsValid(WeaponComponent))
+    {
+        if (!WeaponComponent->EquipWeapon(TestSwordData))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("기본 테스트 검 자동 장착에 실패했습니다."));
+        }
+    }
 }
 

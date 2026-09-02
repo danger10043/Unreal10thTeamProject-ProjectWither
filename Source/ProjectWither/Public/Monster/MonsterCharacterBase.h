@@ -4,13 +4,14 @@
 #include "GameFramework/Character.h"
 #include "CommonHeader/MonsterStateEnums.h"
 #include "Interface/StatComponentUserInterface.h"
+#include "Interface/PoolableInterface.h"
 #include "MonsterCharacterBase.generated.h"
 
 class UMonsterComponent;
 class UStatComponent;
 
 UCLASS()
-class PROJECTWITHER_API AMonsterCharacterBase : public ACharacter, public IStatComponentUserInterface
+class PROJECTWITHER_API AMonsterCharacterBase : public ACharacter, public IStatComponentUserInterface, public IPoolableInterface
 {
     GENERATED_BODY()
 
@@ -19,6 +20,8 @@ public:
     virtual float TakeDamage(float Damage, const FDamageEvent& DamageEvent,
         AController* EventInstigator, AActor* DamageCauser) override;
     virtual UStatComponent* GetStatComponent_Implementation() const override;
+    virtual void OnSpawnFromPool_Implementation() override;
+    virtual void OnReturnToPool_Implementation() override;
 
     UFUNCTION(BlueprintPure, Category = "Monster")
     UMonsterComponent* GetMonsterComponent() const { return MonsterComponent; }

@@ -22,6 +22,22 @@ UStatComponent* AMonsterCharacterBase::GetStatComponent_Implementation() const
     return StatComponent;
 }
 
+void AMonsterCharacterBase::OnSpawnFromPool_Implementation()
+{
+    if (IsValid(MonsterComponent))
+    {
+        MonsterComponent->ActivateFromPool();
+    }
+}
+
+void AMonsterCharacterBase::OnReturnToPool_Implementation()
+{
+    if (IsValid(MonsterComponent))
+    {
+        MonsterComponent->DeactivateForPool();
+    }
+}
+
 void AMonsterCharacterBase::SetMonsterState(EMonsterState NewState)
 {
     MonsterComponent->SetMonsterState(NewState);

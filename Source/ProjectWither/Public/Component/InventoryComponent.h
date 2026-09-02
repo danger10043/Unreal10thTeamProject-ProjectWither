@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Item/ItemInstance.h"
+#include "CommonHeader/AmmoTypeEnums.h"
+#include "CommonHeader/WeaponTypeEnums.h"
 #include "InventoryComponent.generated.h"
 
 class UItemDataAsset;
@@ -67,6 +69,14 @@ public:
 	FORCEINLINE int32 GetMaxInventorySlot() const { return MaxInventorySlot; }						// 최대 인벤토리 슬롯 수 반환
 
 	const FItemInstance* FindItem(int32 ItemId) const;												// 지정한 아이템 정보를 찾아 C++ 전용 읽기 포인터 반환
+
+	int32 FindItemSlot(int32 ItemId) const;
+
+	int32 FindWeaponSlotByType(EWeaponType WeaponType) const;
+
+	bool UpdataItemAtSlot(int32 SlotIndex, const FItemInstance& NewItemInstance);
+
+	int32 ConsumeAmmoByType(EAmmoType AmmoType, int32 RequestedQuantity);
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	bool CanAddItem(UItemDataAsset* Item, int32 AddQuantity) const;									// 지정된 수량을 인벤토리에 모두 추가할 수 있는지 확인

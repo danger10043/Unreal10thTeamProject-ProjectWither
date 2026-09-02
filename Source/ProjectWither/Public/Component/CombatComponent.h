@@ -22,6 +22,8 @@ class UStatComponent;
 class UWeaponComponent;
 class UAnimMontage;
 class UCurveFloat;
+class UCapsuleComponent;
+class UPrimitiveComponent;
 
 UCLASS( ClassGroup=(Custom), Blueprintable, meta=(BlueprintSpawnableComponent))
 class PROJECTWITHER_API UCombatComponent : public UActorComponent
@@ -42,6 +44,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void SwordAttack();
+
+	UFUNCTION(BlueprintCallable, Category = "Combat|Sword")
+	void BeginSwordDamageWindow();
+	
+	UFUNCTION(BlueprintCallable, Category = "Combat|Sword")
+	void EndSwordDamageWindow();
 
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void GunAttack();
@@ -119,12 +127,30 @@ private:
 
 	void CloseParryWindow();
 
+	void EndParryCooldown();
+
 	void OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
+	UFUNCTION()
+	void HandleSwordCollisionBeginOverlap(
+		UPrimitiveComponent* OverlappedComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComponent,
+		int32 OtherBodyIndex,
+		bool bFromSweep,
+		const FHitResult& SweepResult
+	);
+
+	UCapsuleComponent* FindSwordCollision() const;
+
+	float CalculateSwordDamage() const;
+
 	// 외부에서 행동 검사 없이 상태를 바꾸지 못하도록 제한
 	void SetActionState(EPlayerActionState State);
+
+	void ConsumeBlockStamina();
 
 private:
 	UPROPERTY(Transient)
@@ -148,6 +174,17 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimMontage> SwordAttackMontage;
 
+	/*
+	* 하나의 SwordAttackAnimNotifyState 구간에서 이미 피해를 받은 적
+	* NotifyBegin에서 초기화되고 NotifyEnd에서 다시 비워짐.
+	*/
+	UPROPERTY(Transient)
+	TSet<TObjectPtr<AActor>> SwordHitActors;
+
+	// 공격 도중 무기가 교체되어도 원래 활성화했던 캡슐을 비활성화 하기 위해 저장.
+	UPROPERTY(Transient)
+	TObjectPtr<UCapsuleComponent> ActiveSwordCollision = nullptr;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Roll", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float RollDistance = 500.0f;
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.0"))
@@ -161,7 +198,24 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Parry", meta = (ClampMin = "0.0", Units = "s"))
 	float ParryWindow = 0.5f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Parry", meta = (ClampMin = "0.0", Units = "s"))
+	float ParryCooldown = 1.0f;
+
+	// 가드 유지 스태미나 소모 주기
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.01", Units = "s"))
+	float BlockHoldStaminaInterval = 0.2f;
+	
+	// 가드를 유지하면서 한 번에 소모하는 스태미나
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.0"))
+	float BlockHoldStaminaCost = 1.0f;
+
 	bool bParryWindowOpen = false;
 
+	bool bParryOnCooldown = false;
+
 	FTimerHandle ParryTimerHandle;
+
+	FTimerHandle ParryCooldownTimerHandle;
+
+	FTimerHandle BlockStaminaTimerHandle; 
 };

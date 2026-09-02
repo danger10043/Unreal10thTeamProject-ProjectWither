@@ -9,6 +9,7 @@
 
 class UAIPerceptionComponent;
 class UMonsterComponent;
+class UStatComponent;
 class UAISenseConfig_Sight;
 class UBehaviorTree;
 
@@ -29,8 +30,13 @@ public:
 	void SetTargetActor(AActor* NewTarget);
 	void ClearTargetActor();
 	void StopAI();
+	void RestartAI();
 
 	bool IsValidTarget(AActor* InActor);
+
+protected:
+	UFUNCTION()
+	void OnTargetDied();
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "AI")
@@ -47,4 +53,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "Component")
 	TObjectPtr<UMonsterComponent> MonsterComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStatComponent> TargetStat = nullptr;
 };

@@ -72,7 +72,27 @@ void AMonsterAIController::SetTargetActor(AActor* NewTarget)
 		return;
 	}
 
+	UStatComponent* NewTargetStat =
+		IStatComponentUserInterface::Execute_GetStatComponent(NewTarget);
+
+	if (!IsValid(NewTargetStat))
+	{
+		return;
+	}
+
+	// 이전 타겟의 이벤트 구독 해제
+	if (IsValid(TargetStat))
+	{
+		TargetStat->OnHealthZero.RemoveDynamic(
+			this, &AMonsterAIController::OnTargetDied);
+	}
+
+	// 멤버 변수에 저장
+	TargetStat = NewTargetStat;
 	MonsterComponent->SetTarget(NewTarget);
+
+	TargetStat->OnHealthZero.AddUniqueDynamic(
+		this, &AMonsterAIController::OnTargetDied);
 
 	if (UBlackboardComponent* BB = GetBlackboardComponent())
 	{
@@ -83,6 +103,15 @@ void AMonsterAIController::SetTargetActor(AActor* NewTarget)
 
 void AMonsterAIController::ClearTargetActor()
 {
+	// 타겟을 잡은 적이 없어도 안전하게 해제
+	if (IsValid(TargetStat))
+	{
+		TargetStat->OnHealthZero.RemoveDynamic(
+			this, &AMonsterAIController::OnTargetDied);
+	}
+
+	TargetStat = nullptr;
+
 	if (IsValid(MonsterComponent))
 	{
 		MonsterComponent->ClearTarget();
@@ -115,6 +144,42 @@ void AMonsterAIController::StopAI()
 	ClearTargetActor();
 }
 
+void AMonsterAIController::RestartAI()
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn))
+	{
+		return;
+	}
+
+	SetMonsterComponent(ControlledPawn);
+	ClearTargetActor();
+
+	if (IsValid(AIPerceptionComponent))
+	{
+		AIPerceptionComponent->ForgetAll();
+		AIPerceptionComponent->SetSenseEnabled(
+			UAISense_Sight::StaticClass(), true);
+	}
+
+	if (UBlackboardComponent* BB = GetBlackboardComponent())
+	{
+		BB->SetValueAsObject(TEXT("SelfActor"), ControlledPawn);
+		BB->SetValueAsVector(
+			TEXT("SpawnLocation"),
+			ControlledPawn->GetActorLocation());
+	}
+
+	if (UBrainComponent* Brain = GetBrainComponent())
+	{
+		Brain->RestartLogic();
+	}
+	else if (IsValid(BehaviorTree))
+	{
+		RunBehaviorTree(BehaviorTree);
+	}
+}
+
 bool AMonsterAIController::IsValidTarget(AActor* InActor)
 {
 	// 파괴되었거나 없는 액터는 제외
@@ -137,10 +202,16 @@ bool AMonsterAIController::IsValidTarget(AActor* InActor)
 	}
 
 	// 스탯 인터페이스를 통해 플레이어 체력 확인
-	UStatComponent* TargetStat =
+	UStatComponent* CandidateStat =
 		IStatComponentUserInterface::Execute_GetStatComponent(Player);
 
-	return IsValid(TargetStat) && !TargetStat->IsHealthZero();
+	return IsValid(CandidateStat) && !CandidateStat->IsHealthZero();
+}
+
+void AMonsterAIController::OnTargetDied()
+{
+	StopMovement();
+	ClearTargetActor();
 }
 
 void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulus Stimulus)
@@ -150,7 +221,6 @@ void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulu
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Perception: %s, Sensed: %d"), *GetNameSafe(InActor), Stimulus.WasSuccessfullySensed());
 
 	if (Stimulus.WasSuccessfullySensed())
 	{
