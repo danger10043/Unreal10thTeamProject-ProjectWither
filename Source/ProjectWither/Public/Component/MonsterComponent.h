@@ -18,7 +18,7 @@ class UPrimitiveComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterDied);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterAttackFinished, bool, bInterrupted);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterSearchFinished);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterSearchFinished, bool, bInterrupted);
 
 UCLASS(ClassGroup=(Monster), meta=(BlueprintSpawnableComponent))
 class PROJECTWITHER_API UMonsterComponent : public UActorComponent
@@ -131,6 +131,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Monster|Search")
 	bool PlaySearchAnimation();						// 플레이어 찾기 애니메이션
+
+	UFUNCTION(BlueprintCallable, Category = "Monster|Search")
+	void CancelSearch();
 
 private:
 	UFUNCTION()
