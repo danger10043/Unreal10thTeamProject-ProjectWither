@@ -119,12 +119,16 @@ private:
 
 	void CloseParryWindow();
 
+	void EndParryCooldown();
+
 	void OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	// 외부에서 행동 검사 없이 상태를 바꾸지 못하도록 제한
 	void SetActionState(EPlayerActionState State);
+
+	void ConsumeBlockStamina();
 
 private:
 	UPROPERTY(Transient)
@@ -161,7 +165,24 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Parry", meta = (ClampMin = "0.0", Units = "s"))
 	float ParryWindow = 0.5f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Parry", meta = (ClampMin = "0.0", Units = "s"))
+	float ParryCooldown = 1.0f;
+
+	// 가드 유지 스태미나 소모 주기
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.01", Units = "s"))
+	float BlockHoldStaminaInterval = 0.2f;
+	
+	// 가드를 유지하면서 한 번에 소모하는 스태미나
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.0"))
+	float BlockHoldStaminaCost = 1.0f;
+
 	bool bParryWindowOpen = false;
 
+	bool bParryOnCooldown = false;
+
 	FTimerHandle ParryTimerHandle;
+
+	FTimerHandle ParryCooldownTimerHandle;
+
+	FTimerHandle BlockStaminaTimerHandle; 
 };

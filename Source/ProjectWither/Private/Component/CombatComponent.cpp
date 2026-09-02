@@ -66,6 +66,8 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(ParryTimerHandle);
+		World->GetTimerManager().ClearTimer(ParryCooldownTimerHandle);
+		World->GetTimerManager().ClearTimer(BlockStaminaTimerHandle);
 	}
 
 	if (IsValid(StatComponent))
@@ -217,8 +219,23 @@ void UCombatComponent::StartBlock()
 {
 	if (!CanBlock()) { return; }
 
+	OwnerPlayer->SetCanMove(false);
+
 	SetActionState(EPlayerActionState::Blocking);
 	OpenParryWindow();
+
+	UWorld* World = GetWorld();
+	if (IsValid(World))
+	{
+		World->GetTimerManager().SetTimer(
+			BlockStaminaTimerHandle,
+			this,
+			&UCombatComponent::ConsumeBlockStamina,
+			BlockHoldStaminaInterval,
+			true
+		);
+	}
+
 	// 가드 애니메이션 시작
 }
 
@@ -226,8 +243,19 @@ void UCombatComponent::StopBlock()
 {
 	if (ActionState != EPlayerActionState::Blocking) { return; }
 
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BlockStaminaTimerHandle);
+	}
+
 	CloseParryWindow();
 	FinishAction(EPlayerActionState::Blocking);
+
+	if (IsValid(OwnerPlayer))
+	{
+		OwnerPlayer->SetCanMove(true);
+	}
+
 	// 가드 애니메이션 종료
 }
 
@@ -237,20 +265,34 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 
 	if (ActionState == EPlayerActionState::Blocking)
 	{
-		if (bParryWindowOpen)
+		const bool bWasParry = bParryWindowOpen;
+
+		if (TrySpendStamina(BlockStaminaCost))
 		{
-			CloseParryWindow();
+			if (bWasParry)
+			{
+				CloseParryWindow();
 
-			OnParrySucceeded();
+				OnParrySucceeded();
 
-			// 공격한 적에게 패링 성공 전달
+				// 공격한 적에게 패링 성공 전달
+			}
+			else
+			{
+				OnBlockSucceeded();
+			}
+
+			// 공격은 막았지만 다음 공격 비용이 부족하면 가드 해제
+			if (!StatComponent->HasEnoughStamina(BlockStaminaCost))
+			{
+				StopBlock();
+			}
+
 			return 0.0f;
 		}
 
-		OnBlockSucceeded();
-
-		// 현재 기획에서는 모든 피해 방어
-		return 0.0f;
+		// 공격을 막을 비용이 부족하므로 가드 실패
+		StopBlock();
 	}
 
 	const float AppliedDamage = StatComponent->ApplyDamage(DamageAmount);
@@ -341,7 +383,11 @@ bool UCombatComponent::CanBlock() const
 {
 	if (!IsOwnerAlive()) { return false; }
 
+	if (!IsValid(OwnerPlayer) || !OwnerPlayer->CanMove()) { return false; }
+
 	if (ActionState != EPlayerActionState::None) { return false; }
+
+	if (!IsValid(StatComponent) || !StatComponent->HasEnoughStamina(BlockStaminaCost)) { return false; }
 
 	return true;
 }
@@ -436,11 +482,35 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 
 void UCombatComponent::OpenParryWindow()
 {
+	if (bParryOnCooldown) { return; }
+
+	UWorld* World = GetWorld();
+	if (!IsValid(World)) { return; }
+
 	bParryWindowOpen = true;
+	bParryOnCooldown = true;
 
-	GetWorld()->GetTimerManager().ClearTimer(ParryTimerHandle);
+	FTimerManager& TimerManager = World->GetTimerManager();
 
-	GetWorld()->GetTimerManager().SetTimer(ParryTimerHandle, this, &UCombatComponent::CloseParryWindow, ParryWindow, false);
+	// 패링 가능 시간 타이머
+	TimerManager.ClearTimer(ParryTimerHandle);
+	TimerManager.SetTimer(
+		ParryTimerHandle,
+		this,
+		&UCombatComponent::CloseParryWindow,
+		ParryWindow,
+		false
+	);
+
+	// 다음 패링 시도까지의 쿨타임
+	TimerManager.ClearTimer(ParryCooldownTimerHandle);
+	TimerManager.SetTimer(
+		ParryCooldownTimerHandle,
+		this,
+		&UCombatComponent::EndParryCooldown,
+		ParryCooldown,
+		false
+	);
 }
 
 void UCombatComponent::CloseParryWindow()
@@ -453,6 +523,11 @@ void UCombatComponent::CloseParryWindow()
 	}
 }
 
+void UCombatComponent::EndParryCooldown()
+{
+	bParryOnCooldown = false;
+}
+
 
 void UCombatComponent::SetActionState(EPlayerActionState State)
 {
@@ -462,4 +537,25 @@ void UCombatComponent::SetActionState(EPlayerActionState State)
 	ActionState = State;
 
 	OnActionStateChanged(PreviousState, ActionState);
+}
+
+void UCombatComponent::ConsumeBlockStamina()
+{
+	if (ActionState != EPlayerActionState::Blocking || !IsValid(StatComponent))
+	{
+		StopBlock();
+		return;
+	}
+
+	if (!TrySpendStamina(BlockHoldStaminaCost))
+	{
+		StopBlock();
+		return;
+	}
+
+	// 다음 공격을 막을 스태미나가 없으면 가드 자동 해제
+	if (!StatComponent->HasEnoughStamina(BlockStaminaCost))
+	{
+		StopBlock();
+	}
 }
