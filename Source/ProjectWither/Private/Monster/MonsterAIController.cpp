@@ -228,7 +228,7 @@ void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulu
 		if (IsValid(BB) && IsValid(InActor))
 		{
 			BB->SetValueAsVector(TEXT("LastKnownLocation"),
-				InActor->GetActorLocation());
+				Stimulus.StimulusLocation);
 		}
 
 		SetTargetActor(InActor);
@@ -240,7 +240,7 @@ void AMonsterAIController::OnTargetPerceptionUpdated(AActor* InActor, FAIStimulu
 			if (IsValid(BB) && IsValid(InActor))
 			{
 				BB->SetValueAsVector(TEXT("LastKnownLocation"),
-					InActor->GetActorLocation());
+					Stimulus.StimulusLocation);
 			}
 			ClearTargetActor();
 		}
