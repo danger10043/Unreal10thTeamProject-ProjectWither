@@ -17,6 +17,12 @@ enum class ECombatWeaponType : uint8
 	Gun
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnPlayerActionStateChangedDelegate,
+	EPlayerActionState, PreviousState,
+	EPlayerActionState, NewState
+);
+
 class APlayerCharacter;
 class UStatComponent;
 class UWeaponComponent;
@@ -84,6 +90,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	bool CanBlock() const;
+
+	UPROPERTY(BlueprintAssignable, Category = "Combat|Event")
+	FOnPlayerActionStateChangedDelegate OnActionStateChangedEvent;
 
 protected:
 	// WeaponComponent의 실제 API에 연결할 함수

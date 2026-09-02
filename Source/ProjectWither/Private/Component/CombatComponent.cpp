@@ -34,7 +34,8 @@ void UCombatComponent::BeginPlay()
 
 	if (!ensureMsgf(
 		IsValid(OwnerPlayer),
-		TEXT("CombatComponent의 PlayerCharacter가 유효하지 않습니다.")
+		TEXT("CombatComponent의 PlayerCharacter가 유효하지 않습니다. - 현재 OwnerPlayer : %s"),
+		*GetNameSafe(GetOwner())
 	))
 	{
 		return;
@@ -109,7 +110,7 @@ void UCombatComponent::Attack()
 
 void UCombatComponent::SwordAttack()
 {
-	StartAttack( ECombatWeaponType::Sword, EPlayerActionState::AttackingWithSword, SwordAttackStaminaCost);
+	StartAttack(ECombatWeaponType::Sword, EPlayerActionState::AttackingWithSword, SwordAttackStaminaCost);
 }
 
 void UCombatComponent::BeginSwordDamageWindow()
@@ -552,7 +553,8 @@ ECombatWeaponType UCombatComponent::ResolveWeaponType_Implementation() const
 bool UCombatComponent::IsOwnerAlive() const
 {
 	if (!IsValid(OwnerPlayer)) {
-		UE_LOG(LogTemp, Warning, TEXT("OwnerPlayer 가 유효하지 않습니다."));
+		UE_LOG(LogTemp, Warning, TEXT("OwnerPlayer 가 유효하지 않습니다. 현재 OwnerPlayer - %s"),
+			*GetNameSafe(GetOwner()));
 		return false;
 	}
 	if (!IsValid(StatComponent)) {
@@ -672,6 +674,8 @@ void UCombatComponent::SetActionState(EPlayerActionState State)
 
 	const EPlayerActionState PreviousState = ActionState;
 	ActionState = State;
+
+	OnActionStateChangedEvent.Broadcast(PreviousState, ActionState);
 
 	OnActionStateChanged(PreviousState, ActionState);
 }
