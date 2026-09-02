@@ -47,7 +47,7 @@ APlayerCharacter::APlayerCharacter()
     StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
     CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
-	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
+    InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
 }
 
 void APlayerCharacter::SetCanMove(bool bNewCanMove)

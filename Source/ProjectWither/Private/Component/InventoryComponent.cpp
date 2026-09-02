@@ -2,7 +2,11 @@
 
 
 #include "Component/InventoryComponent.h"
+#include "Component/StatComponent.h"
 #include "DataAsset/ItemDataAsset.h"
+#include "DataAsset/PotionDataAsset.h"
+#include "GameFramework/Actor.h"
+#include "Interface/StatComponentUserInterface.h"
 #include "DataAsset/AmmoDataAsset.h"
 #include "DataAsset/WeaponDataAsset.h"
 
@@ -164,6 +168,82 @@ bool UInventoryComponent::RemoveItemAtSlot(int32 SlotIndex, int32 RemoveQuantity
 
 	OnInventoryChanged.Broadcast();																	// 인벤토리 아이템 목록 변경 이벤트 호출
 	return true;
+}
+
+bool UInventoryComponent::SwapItems(int32 FromSlotIndex, int32 ToSlotIndex)
+{
+	if (!InventoryItems.IsValidIndex(FromSlotIndex) || !InventoryItems.IsValidIndex(ToSlotIndex))	// 슬롯 번호가 잘못되었으면 실패 처리
+	{
+		return false;
+	}
+
+	if (FromSlotIndex == ToSlotIndex)																// 같은 슬롯이면 변경할 내용이 없다.
+	{
+		return false;
+	}
+
+	if (InventoryItems[FromSlotIndex].ItemData == nullptr)											// 비어있는 슬롯에서는 아이템 이동을 시작할 수 없다.
+	{
+		return false;
+	}
+
+	InventoryItems.Swap(FromSlotIndex, ToSlotIndex);												// 대상 슬롯이 비어 있으면 이동, 아이템이 있으면 서로 교환
+	OnInventoryChanged.Broadcast();																	// 인벤토리 아이템 목록 변경 이벤트 호출
+	return true;
+}
+
+bool UInventoryComponent::UseItemAtSlot(int32 SlotIndex)
+{
+	if (!InventoryItems.IsValidIndex(SlotIndex))													// 슬롯 번호가 잘못되었으면 실패 처리
+	{
+		return false;
+	}
+
+	FItemInstance& InventoryItem = InventoryItems[SlotIndex];
+
+	if (InventoryItem.ItemData == nullptr || InventoryItem.Quantity <= 0)							// 빈 슬롯이거나 보유 수량이 없으면 실패 처리
+	{
+		return false;
+	}
+
+	switch (InventoryItem.ItemData->GetItemType())
+	{
+	case EItemType::Potion:
+	{
+		UPotionDataAsset* PotionData = Cast<UPotionDataAsset>(InventoryItem.ItemData.Get());
+
+		if (!IsValid(PotionData))																	// 아이템 타입은 Potion이지만 포션 데이터가 아니면 실패 처리
+		{
+			return false;
+		}
+
+		AActor* OwnerActor = GetOwner();
+
+		if (!IsValid(OwnerActor) ||
+			!OwnerActor->GetClass()->ImplementsInterface(UStatComponentUserInterface::StaticClass()))
+		{
+			return false;
+		}
+
+		UStatComponent* StatComponent = IStatComponentUserInterface::Execute_GetStatComponent(OwnerActor);
+
+		if (!IsValid(StatComponent))
+		{
+			return false;
+		}
+
+		const float RecoveredAmount = StatComponent->RecoverHealth(PotionData->GetHealAmount());
+
+		if (RecoveredAmount <= 0.0f)																// 실제 회복이 없으면 포션을 소비하지 않는다.
+		{
+			return false;
+		}
+
+		return RemoveItemAtSlot(SlotIndex, 1);														// 회복에 성공한 경우에만 포션 1개 소비
+	}
+	default:
+		return false;
+	}
 }
 
 bool UInventoryComponent::UseItem(int32 ItemId)
