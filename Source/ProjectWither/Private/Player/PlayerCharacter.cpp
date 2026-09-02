@@ -6,6 +6,7 @@
 #include "Component/WeaponComponent.h"
 #include "Component/CombatComponent.h"
 #include "Component/InventoryComponent.h"
+#include "Equipment/EquipmentComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
 
 #include "Camera/CameraComponent.h"
@@ -17,6 +18,7 @@
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "InputMappingContext.h"
+#include "Blueprint/UserWidget.h"
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -47,6 +49,7 @@ APlayerCharacter::APlayerCharacter()
     StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
     CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
+    EquipmentComponent = CreateDefaultSubobject<UEquipmentComponent>(TEXT("EquipmentComponent"));
     InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
 }
 
@@ -61,6 +64,77 @@ void APlayerCharacter::SetCanMove(bool bNewCanMove)
     }
 }
 
+void APlayerCharacter::ToggleInventory()
+{
+    if (bIsInventoryOpen)
+    {
+        CloseInventory();
+        return;
+    }
+
+    OpenInventory();
+}
+
+void APlayerCharacter::OpenInventory()
+{
+    if (bIsInventoryOpen || !IsValid(InventoryScreenClass))										// 이미 열려 있거나 생성할 인벤토리 UI 클래스가 없으면 처리하지 않는다.
+    {
+        return;
+    }
+
+    APlayerController* PlayerController = Cast<APlayerController>(GetController());					// 입력 모드와 마우스 커서를 제어할 PlayerController를 가져온다.
+
+    if (!IsValid(PlayerController))
+    {
+        return;
+    }
+
+    InventoryScreenWidget = CreateWidget<UUserWidget>(PlayerController, InventoryScreenClass);		// 지정된 인벤토리 UI 클래스로 위젯을 생성한다.
+
+    if (!IsValid(InventoryScreenWidget))
+    {
+        return;
+    }
+
+    InventoryScreenWidget->AddToViewport();														// 생성된 인벤토리 UI를 화면에 표시한다.
+    bIsInventoryOpen = true;																		// 인벤토리가 열려 있는 상태로 갱신한다.
+
+    PlayerController->bShowMouseCursor = true;														// 인벤토리 조작을 위해 마우스 커서를 표시한다.
+
+    FInputModeUIOnly InputMode;																		// 인벤토리가 열려 있는 동안 UI 입력만 받을 수 있도록 설정한다.
+    InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);							// 마우스가 뷰포트 안에 강제로 잠기지 않도록 한다.
+    InputMode.SetWidgetToFocus(InventoryScreenWidget->TakeWidget());								// 인벤토리 UI가 키보드/마우스 포커스를 받도록 한다.
+    PlayerController->SetInputMode(InputMode);														// 설정한 입력 모드를 PlayerController에 적용한다.
+}
+
+void APlayerCharacter::CloseInventory()
+{
+    if (!bIsInventoryOpen)																			// 인벤토리가 열려 있지 않으면 처리하지 않는다.
+    {
+        return;
+    }
+
+    if (IsValid(InventoryScreenWidget))
+    {
+        InventoryScreenWidget->RemoveFromParent();													// 화면에 표시된 인벤토리 UI를 제거한다.
+        InventoryScreenWidget = nullptr;															// 제거된 위젯 참조를 비운다.
+    }
+
+    bIsInventoryOpen = false;																		// 인벤토리가 닫힌 상태로 갱신한다.
+
+    APlayerController* PlayerController = Cast<APlayerController>(GetController());					// 게임 입력 모드를 복구할 PlayerController를 가져온다.
+
+    if (!IsValid(PlayerController))
+    {
+        return;
+    }
+
+    PlayerController->bShowMouseCursor = false;														// 게임 조작 상태로 돌아가면서 마우스 커서를 숨긴다.
+
+    FInputModeGameOnly InputMode;																	// 게임 입력만 받는 입력 모드로 복구한다.
+    PlayerController->SetInputMode(InputMode);														// 설정한 입력 모드를 PlayerController에 적용한다.
+}
+
 UStatComponent* APlayerCharacter::GetStatComponent_Implementation() const
 {
     return StatComponent;
@@ -69,6 +143,11 @@ UStatComponent* APlayerCharacter::GetStatComponent_Implementation() const
 UWeaponComponent* APlayerCharacter::GetWeaponComponent_Implementation() const
 {
     return WeaponComponent;
+}
+
+UEquipmentComponent* APlayerCharacter::GetEquipmentComponent_Implementation() const
+{
+    return EquipmentComponent;
 }
 
 UCombatComponent* APlayerCharacter::GetCombatComponent_Implementation() const
@@ -131,6 +210,7 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &APlayerCharacter::SwapWeaponInput);
+    EnhancedInput->BindAction(InventoryAction, ETriggerEvent::Started, this, &APlayerCharacter::ToggleInventory);
 }
 
 float APlayerCharacter::TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)

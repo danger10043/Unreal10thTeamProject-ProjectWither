@@ -9,6 +9,7 @@
 #include "Interface/StatComponentUserInterface.h"
 #include "Interface/WeaponComponentUserInterface.h"
 #include "Interface/CombatComponentUserInterface.h"
+#include "Interface/EquipmentComponentUserInterface.h"
 #include "Interface/PlayerInterface.h"
 #include "PlayerCharacter.generated.h"
 
@@ -18,14 +19,17 @@ class UInputAction;
 class UInputMappingContext;
 class UStatComponent;
 class UWeaponComponent;
+class UEquipmentComponent;
 class UInventoryComponent;
 class UWeaponDataAsset;
+class UUserWidget;
 
 UCLASS()
 class PROJECTWITHER_API APlayerCharacter : 
 	public ACharacter,
 	public IStatComponentUserInterface,
 	public ICombatComponentUserInterface,
+	public IEquipmentComponentUserInterface,
 	public IWeaponComponentUserInterface,
 	public IPlayerInterface
 {
@@ -43,9 +47,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|Movement")
 	bool IsRunning() const { return bIsRunning; }
 
+
+	//Inventory 관련 함수
+	UFUNCTION(BlueprintCallable, Category = "Player|Inventory")
+	void ToggleInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Player|Inventory")
+	void OpenInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Player|Inventory")
+	void CloseInventory();
+
+	UFUNCTION(BlueprintPure, Category = "Player|Inventory")
+	bool IsInventoryOpen() const { return bIsInventoryOpen; }
+
 	virtual UStatComponent* GetStatComponent_Implementation() const override;
 
 	virtual UWeaponComponent* GetWeaponComponent_Implementation() const override;
+
+	virtual UEquipmentComponent* GetEquipmentComponent_Implementation() const override;
 
 	virtual UCombatComponent* GetCombatComponent_Implementation() const override;
 
@@ -93,6 +113,9 @@ private:
 	TObjectPtr<UWeaponComponent> WeaponComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEquipmentComponent> EquipmentComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInventoryComponent> InventoryComponent;
 
 	/*
@@ -107,6 +130,12 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Test", meta = (AllowPrivateAccess = "true"))
 	bool bEquipTestWeapon = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|UI", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UUserWidget> InventoryScreenClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> InventoryScreenWidget;
 
 	// 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Camera", meta = (AllowPrivateAccess = "true"))
@@ -136,6 +165,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> SwapWeaponAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> InventoryAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -169,5 +201,9 @@ private:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true"))
 	bool bCanMove = true;
+
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Player|UI", meta = (AllowPrivateAccess = "true"))
+	bool bIsInventoryOpen = false;
 
 };

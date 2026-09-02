@@ -2,10 +2,12 @@
 
 
 #include "Component/InventoryComponent.h"
+#include "Equipment/EquipmentComponent.h"
 #include "Component/StatComponent.h"
 #include "DataAsset/ItemDataAsset.h"
 #include "DataAsset/PotionDataAsset.h"
 #include "GameFramework/Actor.h"
+#include "Interface/EquipmentComponentUserInterface.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "DataAsset/AmmoDataAsset.h"
 #include "DataAsset/WeaponDataAsset.h"
@@ -232,14 +234,28 @@ bool UInventoryComponent::UseItemAtSlot(int32 SlotIndex)
 			return false;
 		}
 
-		const float RecoveredAmount = StatComponent->RecoverHealth(PotionData->GetHealAmount());
+		StatComponent->RecoverHealth(PotionData->GetHealAmount());									// 현재 체력 상태와 관계없이 포션 효과를 적용한다.
+		return RemoveItemAtSlot(SlotIndex, 1);														// 포션 사용 처리가 끝나면 포션 1개를 소비한다.
+	}
+	case EItemType::Weapon:
+	case EItemType::Armor:
+	{
+		AActor* OwnerActor = GetOwner();
 
-		if (RecoveredAmount <= 0.0f)																// 실제 회복이 없으면 포션을 소비하지 않는다.
+		if (!IsValid(OwnerActor) ||
+			!OwnerActor->GetClass()->ImplementsInterface(UEquipmentComponentUserInterface::StaticClass()))
 		{
 			return false;
 		}
 
-		return RemoveItemAtSlot(SlotIndex, 1);														// 회복에 성공한 경우에만 포션 1개 소비
+		UEquipmentComponent* EquipmentComponent = IEquipmentComponentUserInterface::Execute_GetEquipmentComponent(OwnerActor);
+
+		if (!IsValid(EquipmentComponent))
+		{
+			return false;
+		}
+
+		return EquipmentComponent->EquipItemFromInventorySlot(SlotIndex);
 	}
 	default:
 		return false;
@@ -347,6 +363,25 @@ bool UInventoryComponent::UpdataItemAtSlot(int32 SlotIndex, const FItemInstance&
 	if (InventoryItem.ItemData->GetItemId() != NewItemInstance.ItemData->GetItemId()) return false;
 
 	InventoryItem = NewItemInstance;
+	OnInventoryChanged.Broadcast();
+	return true;
+}
+
+bool UInventoryComponent::SetItemAtSlot(int32 SlotIndex, const FItemInstance& NewItemInstance)
+{
+	if (!InventoryItems.IsValidIndex(SlotIndex)) return false;
+
+	FItemInstance& InventoryItem = InventoryItems[SlotIndex];
+
+	if (!IsValid(NewItemInstance.ItemData) || NewItemInstance.Quantity <= 0)
+	{
+		ClearSlotData(InventoryItem);																// 빈 아이템 정보가 들어오면 해당 슬롯을 비운다.
+	}
+	else
+	{
+		InventoryItem = NewItemInstance;															// 유효한 아이템 정보가 들어오면 해당 슬롯을 새 아이템으로 교체한다.
+	}
+
 	OnInventoryChanged.Broadcast();
 	return true;
 }
