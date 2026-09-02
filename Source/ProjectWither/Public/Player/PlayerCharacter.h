@@ -23,6 +23,7 @@ class UEquipmentComponent;
 class UInventoryComponent;
 class UWeaponDataAsset;
 class UUserWidget;
+class UTestMainUIWidget;
 
 UCLASS()
 class PROJECTWITHER_API APlayerCharacter : 
@@ -103,10 +104,10 @@ private:
 	void AddDefaultTestWeapons();
 
 private:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStatComponent> StatComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCombatComponent> CombatComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
@@ -136,6 +137,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> InventoryScreenWidget;
+	// 플레이어 UI
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|UI", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UTestMainUIWidget> TestMainUIClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTestMainUIWidget> TestMainUIInstance;
 
 	// 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Camera", meta = (AllowPrivateAccess = "true"))

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "PlayerActionStateEnums.generated.h"
 
 UENUM(BlueprintType)
 enum class EPlayerActionState : uint8

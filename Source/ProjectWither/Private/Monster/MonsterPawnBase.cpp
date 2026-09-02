@@ -39,6 +39,29 @@ void AMonsterPawnBase::OnReturnToPool_Implementation()
     }
 }
 
+void AMonsterPawnBase::FaceRotation(FRotator NewControlRotation, float DeltaTime)
+{
+	if (DeltaTime <= 0.0f)
+	{
+		return;
+	}
+
+	const FRotator CurrentRotation = GetActorRotation();
+
+	const FRotator TargetRotation(
+		0.0f,
+		NewControlRotation.Yaw,
+		0.0f);
+
+	const FRotator NewRotation = FMath::RInterpTo(
+		CurrentRotation,
+		TargetRotation,
+		DeltaTime,
+		RotationInterpSpeed);
+
+	SetActorRotation(NewRotation);
+}
+
 void AMonsterPawnBase::SetMonsterState(EMonsterState NewState)
 {
     MonsterComponent->SetMonsterState(NewState);

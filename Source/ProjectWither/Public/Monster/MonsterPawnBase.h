@@ -5,13 +5,18 @@
 #include "CommonHeader/MonsterStateEnums.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Interface/PoolableInterface.h"
+#include "Interface/EnemyInterface.h"
 #include "MonsterPawnBase.generated.h"
 
 class UMonsterComponent;
 class UStatComponent;
 
 UCLASS()
-class PROJECTWITHER_API AMonsterPawnBase : public APawn, public IStatComponentUserInterface, public IPoolableInterface
+class PROJECTWITHER_API AMonsterPawnBase :
+    public APawn, 
+    public IStatComponentUserInterface, 
+    public IPoolableInterface,
+	public IEnemyInterface
 {
     GENERATED_BODY()
 
@@ -22,6 +27,7 @@ public:
     virtual UStatComponent* GetStatComponent_Implementation() const override;
     virtual void OnSpawnFromPool_Implementation() override;
     virtual void OnReturnToPool_Implementation() override;
+    virtual void FaceRotation(FRotator NewControlRotation, float DeltaTime = 0.0f) override;
 
     UFUNCTION(BlueprintPure, Category = "Monster")
     UMonsterComponent* GetMonsterComponent() const { return MonsterComponent; }

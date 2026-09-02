@@ -17,6 +17,12 @@ enum class ECombatWeaponType : uint8
 	Gun
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnPlayerActionStateChangedDelegate,
+	EPlayerActionState, PreviousState,
+	EPlayerActionState, NewState
+);
+
 class APlayerCharacter;
 class UStatComponent;
 class UWeaponComponent;
@@ -85,6 +91,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	bool CanBlock() const;
 
+	UPROPERTY(BlueprintAssignable, Category = "Combat|Event")
+	FOnPlayerActionStateChangedDelegate OnActionStateChangedEvent;
+
 protected:
 	// WeaponComponent의 실제 API에 연결할 함수
 	UFUNCTION(BlueprintNativeEvent, Category = "Combat|Weapon")
@@ -152,6 +161,13 @@ private:
 
 	void ConsumeBlockStamina();
 
+	void StartHitReaction();
+
+	void OnHitReactMontageEnded(
+		UAnimMontage* Montage,
+		bool bInterrupted
+	);
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<APlayerCharacter> OwnerPlayer;
@@ -173,6 +189,14 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimMontage> SwordAttackMontage;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Combat|HitReact",
+		meta = (AllowPrivateAccess = "true")
+	)
+	TObjectPtr<UAnimMontage> HitReactMontage;
 
 	/*
 	* 하나의 SwordAttackAnimNotifyState 구간에서 이미 피해를 받은 적

@@ -110,7 +110,6 @@ float UStatComponent::RecoverStamina(float Amount)
 
 	if (RecoveredAmount > 0.0f)
 	{
-		UE_LOG(LogTemp, Log, TEXT("스태미나 회복 : %.1f / %.1f (+%1.f)"), CurrentStamina, MaxStamina, RecoveredAmount);
 		OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina, RecoveredAmount);
 	}
 
@@ -123,7 +122,6 @@ float UStatComponent::UseStamina(float Amount)
 
 	CurrentStamina -= Amount;
 
-	UE_LOG(LogTemp, Log, TEXT("스태미나 소모 : %.1f / %.1f (-%.1f"), CurrentStamina, MaxStamina, Amount);
 	OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina, -Amount);
 
 	RestartStaminaRecoveryDelay();

@@ -8,6 +8,7 @@
 #include "Component/InventoryComponent.h"
 #include "Equipment/EquipmentComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
+#include "Widget/TestMainUIWidget.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -161,6 +162,25 @@ void APlayerCharacter::BeginPlay()
 	
     AddDefaultTestWeapons();
 
+    if (IsLocallyControlled() && IsValid(TestMainUIClass))
+    {
+        APlayerController* PlayerController =
+            Cast<APlayerController>(GetController());
+
+        if (IsValid(PlayerController))
+        {
+            TestMainUIInstance = CreateWidget<UTestMainUIWidget>(
+                PlayerController,
+                TestMainUIClass
+            );
+
+            if (IsValid(TestMainUIInstance))
+            {
+                TestMainUIInstance->AddToViewport();
+            }
+        }
+    }
+
     const APlayerController* PlayerController = Cast<APlayerController>(GetController());
 
     if (!PlayerController || !DefaultMappingContext) { return; }
@@ -179,13 +199,18 @@ void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     GetWorldTimerManager().ClearTimer(RunStaminaTimerHandle);
 
+    if (IsValid(TestMainUIInstance))
+    {
+        TestMainUIInstance->RemoveFromParent();
+        TestMainUIInstance = nullptr;
+    }
+
     Super::EndPlay(EndPlayReason);
 }
 
 void APlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 }
 
 void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

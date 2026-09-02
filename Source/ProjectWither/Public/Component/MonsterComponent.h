@@ -15,9 +15,11 @@ class UAnimMontage;
 class UDataTable;
 class APickupItem;
 class UPrimitiveComponent;
+class UPawnMovementComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterDied);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterAttackFinished, bool, bInterrupted);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterSearchFinished, bool, bInterrupted);
 
 UCLASS(ClassGroup=(Monster), meta=(BlueprintSpawnableComponent))
 class PROJECTWITHER_API UMonsterComponent : public UActorComponent
@@ -58,6 +60,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Monster|Combat")
 	FOnMonsterAttackFinished OnMonsterAttackFinished;
+
+	UPROPERTY(BlueprintAssignable, Category = "Monster|Search")
+	FOnMonsterSearchFinished OnMonsterSearchFinished;
 
 	UFUNCTION(BlueprintCallable)
 	void SetMonsterState(EMonsterState NewState); // 몬스터 상태 변경
@@ -125,6 +130,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Monster|Pool")
 	void ResetForReuse(const FVector& NewSpawnLocation);	// 오브젝트풀위한 재사용함수
 
+	UFUNCTION(BlueprintCallable, Category = "Monster|Search")
+	bool PlaySearchAnimation();						// 플레이어 찾기 애니메이션
+
+	UFUNCTION(BlueprintCallable, Category = "Monster|Search")
+	void CancelSearch();
+
 private:
 	UFUNCTION()
 	void HandleDeath();
@@ -158,6 +169,9 @@ private:
 	// 사망 몽타주 종료 후
 	void OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted);	
 
+	// 플레이어 찾는 몽타주 종료 후
+	void OnSearchMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
 	void FinishDeath(); 	// 사망 후처리
 
 	void ScheduleFinishDeath();	// FinishDeath 타이머걸기
@@ -169,6 +183,8 @@ private:
 	void SetDeadCollision(bool bDeadCollision);	// 공격 콜리전 비활성화
 	void RestartAI();			// AI 재시작
 	void ResetAnimation();		// 애니메이션 초기화
+	void LockMovementForAttack();
+	void UnlockMovementAfterAttack();
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
@@ -246,9 +262,17 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	TObjectPtr<UAnimMontage> DeathMontage = nullptr;	// 사망 몽타주
+
+	UPROPERTY(EditDefaultsOnly, Category = "Montage")
+	TObjectPtr<UAnimMontage> SearchMontage = nullptr;	// 플레이어 찾는 몽타주
 	// -------------------------------------------------------------------------
 
 private:
+	UPROPERTY(Transient)
+	TObjectPtr<UPawnMovementComponent> LockedAttackMovement = nullptr;
+
+	bool bAttackMovementWasActive = false;
+
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들
 
