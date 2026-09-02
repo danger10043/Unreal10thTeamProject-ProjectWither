@@ -18,6 +18,7 @@ class UPrimitiveComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterDied);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterAttackFinished, bool, bInterrupted);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterSearchFinished);
 
 UCLASS(ClassGroup=(Monster), meta=(BlueprintSpawnableComponent))
 class PROJECTWITHER_API UMonsterComponent : public UActorComponent
@@ -58,6 +59,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Monster|Combat")
 	FOnMonsterAttackFinished OnMonsterAttackFinished;
+
+	UPROPERTY(BlueprintAssignable, Category = "Monster|Search")
+	FOnMonsterSearchFinished OnMonsterSearchFinished;
 
 	UFUNCTION(BlueprintCallable)
 	void SetMonsterState(EMonsterState NewState); // 몬스터 상태 변경
@@ -125,6 +129,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Monster|Pool")
 	void ResetForReuse(const FVector& NewSpawnLocation);	// 오브젝트풀위한 재사용함수
 
+	UFUNCTION(BlueprintCallable, Category = "Monster|Search")
+	bool PlaySearchAnimation();						// 플레이어 찾기 애니메이션
+
 private:
 	UFUNCTION()
 	void HandleDeath();
@@ -157,6 +164,9 @@ private:
 
 	// 사망 몽타주 종료 후
 	void OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted);	
+
+	// 플레이어 찾는 몽타주 종료 후
+	void OnSearchMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	void FinishDeath(); 	// 사망 후처리
 
@@ -246,6 +256,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	TObjectPtr<UAnimMontage> DeathMontage = nullptr;	// 사망 몽타주
+
+	UPROPERTY(EditDefaultsOnly, Category = "Montage")
+	TObjectPtr<UAnimMontage> SearchMontage = nullptr;	// 플레이어 찾는 몽타주
 	// -------------------------------------------------------------------------
 
 private:

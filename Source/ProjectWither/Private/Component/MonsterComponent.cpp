@@ -585,6 +585,44 @@ void UMonsterComponent::ResetForReuse(const FVector& NewSpawnLocation)
 	RestartAI();
 }
 
+bool UMonsterComponent::PlaySearchAnimation()
+{
+	if (bIsDead || !IsValid(SearchMontage) || !IsValid(GetOwner()))
+	{
+		return false;
+	}
+
+	USkeletalMeshComponent* Mesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+
+	if (!IsValid(AnimInstance))
+	{
+		return false;
+	}
+
+	SetMonsterState(EMonsterState::Search);
+
+	const float PlayedLength = AnimInstance->Montage_Play(SearchMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		SetMonsterState(EMonsterState::Idle);
+		return false;
+	}
+
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(
+		this,
+		&UMonsterComponent::OnSearchMontageEnded);
+
+	AnimInstance->Montage_SetEndDelegate(
+		EndDelegate,
+		SearchMontage);
+
+	return true;
+}
+
 void UMonsterComponent::ScheduleFinishDeath()
 {
 	if (DespawnPolicy == EMonsterDespawnPolicy::KeepCorpse)
@@ -839,6 +877,21 @@ void UMonsterComponent::OnDeathMontageEnded(UAnimMontage* Montage, bool bInterru
 	}
 
 	ScheduleFinishDeath();
+}
+
+void UMonsterComponent::OnSearchMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != SearchMontage)
+	{
+		return;
+	}
+
+	if (!bIsDead && MonsterState == EMonsterState::Search)
+	{
+		SetMonsterState(EMonsterState::Idle);
+	}
+
+	OnMonsterSearchFinished.Broadcast();
 }
 
 void UMonsterComponent::FinishDeath()
