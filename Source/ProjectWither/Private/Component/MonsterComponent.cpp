@@ -13,6 +13,7 @@
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -277,6 +278,20 @@ bool UMonsterComponent::Attack()
 
 	bCanAttack = false;
 	SetMonsterState(EMonsterState::Attack);
+
+	// Move To가 남긴 경로와 속도를 제거해 공격 몽타주 중 미끄러지지 않게 한다.
+	if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+	{
+		if (AAIController* AIController = Cast<AAIController>(OwnerPawn->GetController()))
+		{
+			AIController->StopMovement();
+		}
+
+		if (UPawnMovementComponent* MovementComponent = OwnerPawn->GetMovementComponent())
+		{
+			MovementComponent->StopMovementImmediately();
+		}
+	}
 
 	const float PlayedLength =
 		AnimInstance->Montage_Play(AttackMontage);
