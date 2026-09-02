@@ -23,6 +23,22 @@ UStatComponent* AMonsterPawnBase::GetStatComponent_Implementation() const
     return StatComponent;
 }
 
+void AMonsterPawnBase::OnSpawnFromPool_Implementation()
+{
+    if (IsValid(MonsterComponent))
+    {
+        MonsterComponent->ActivateFromPool();
+    }
+}
+
+void AMonsterPawnBase::OnReturnToPool_Implementation()
+{
+    if (IsValid(MonsterComponent))
+    {
+        MonsterComponent->DeactivateForPool();
+    }
+}
+
 void AMonsterPawnBase::SetMonsterState(EMonsterState NewState)
 {
     MonsterComponent->SetMonsterState(NewState);

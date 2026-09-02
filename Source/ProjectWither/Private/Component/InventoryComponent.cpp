@@ -3,6 +3,8 @@
 
 #include "Component/InventoryComponent.h"
 #include "DataAsset/ItemDataAsset.h"
+#include "DataAsset/AmmoDataAsset.h"
+#include "DataAsset/WeaponDataAsset.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -218,6 +220,98 @@ const FItemInstance* UInventoryComponent::FindItem(int32 ItemId) const
 		return &InventoryItem;																		// 같은 아이템이 있으면 해당 슬롯의 아이템 정보 반환 (같은 아이템이 여러 슬롯에 있을 경우 가장 먼저 발견한 아이템의 정보만 반환)
 	}
 	return nullptr;
+}
+
+int32 UInventoryComponent::FindItemSlot(int32 ItemId) const
+{
+	for (int32 SlotIndex = 0; SlotIndex < InventoryItems.Num(); ++SlotIndex)
+	{
+		const FItemInstance& InventoryItem = InventoryItems[SlotIndex];
+
+		if (IsValid(InventoryItem.ItemData) &&
+			InventoryItem.Quantity > 0 &&
+			InventoryItem.ItemData->GetItemId() == ItemId)
+		{
+			return SlotIndex;
+		}
+	}
+
+	return INDEX_NONE;
+}
+
+int32 UInventoryComponent::FindWeaponSlotByType(EWeaponType WeaponType) const
+{
+	for (int32 SlotIndex = 0; SlotIndex < InventoryItems.Num(); ++SlotIndex)
+	{
+		const FItemInstance& InventoryItem = InventoryItems[SlotIndex];
+
+		if (InventoryItem.Quantity <= 0) continue;
+
+		const UWeaponDataAsset* WeaponData = Cast<UWeaponDataAsset>(InventoryItem.ItemData.Get());
+		
+		if (IsValid(WeaponData) && WeaponData->GetWeaponType() == WeaponType) return SlotIndex;
+	}
+
+	return INDEX_NONE;
+}
+
+bool UInventoryComponent::UpdataItemAtSlot(int32 SlotIndex, const FItemInstance& NewItemInstance)
+{
+	if (!InventoryItems.IsValidIndex(SlotIndex)) return false;
+	if (!IsValid(NewItemInstance.ItemData)) return false;
+	if (NewItemInstance.Quantity <= 0) return false;
+
+	FItemInstance& InventoryItem = InventoryItems[SlotIndex];
+
+	if (!IsValid(InventoryItem.ItemData)) return false;
+	if (InventoryItem.ItemData->GetItemId() != NewItemInstance.ItemData->GetItemId()) return false;
+
+	InventoryItem = NewItemInstance;
+	OnInventoryChanged.Broadcast();
+	return true;
+}
+
+int32 UInventoryComponent::ConsumeAmmoByType(EAmmoType AmmoType, int32 RequestedQuantity)
+{
+	if (RequestedQuantity <= 0) return 0;
+
+	int32 RemainingQuantity = RequestedQuantity;
+	int32 ConsumedQuantity = 0;
+
+	for (FItemInstance& InventoryItem : InventoryItems)
+	{
+		UAmmoDataAsset* AmmoData = Cast<UAmmoDataAsset>(InventoryItem.ItemData.Get());
+
+		if (!IsValid(AmmoData) ||
+			AmmoData->GetAmmoType() != AmmoType ||
+			InventoryItem.Quantity <= 0)
+		{
+			continue;
+		}
+
+		const int32 QuantityFromSlot = FMath::Min(InventoryItem.Quantity, RemainingQuantity);
+
+		InventoryItem.Quantity -= QuantityFromSlot;
+		RemainingQuantity -= QuantityFromSlot;
+		ConsumedQuantity += QuantityFromSlot;
+
+		if (InventoryItem.Quantity <= 0)
+		{
+			ClearSlotData(InventoryItem);
+		}
+
+		if (RemainingQuantity <= 0)
+		{
+			break;
+		}
+	}
+
+	if (ConsumedQuantity > 0)
+	{
+		OnInventoryChanged.Broadcast();
+	}
+
+	return ConsumedQuantity;
 }
 
 bool UInventoryComponent::CanAddItem(UItemDataAsset* Item, int32 AddQuantity) const

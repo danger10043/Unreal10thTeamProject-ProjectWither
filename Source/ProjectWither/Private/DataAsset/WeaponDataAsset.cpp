@@ -31,6 +31,16 @@ float UWeaponDataAsset::GetWeaponPower() const
 	return WeaponPower;
 }
 
+TSubclassOf<AActor> UWeaponDataAsset::GetWeaponActorClass() const
+{
+	return WeaponActorClass;
+}
+
+FName UWeaponDataAsset::GetAttachSocketName() const
+{
+	return AttachSocketName;
+}
+
 UNiagaraSystem* UWeaponDataAsset::GetWeaponHitEffect() const
 {
 	return WeaponHitEffect;
