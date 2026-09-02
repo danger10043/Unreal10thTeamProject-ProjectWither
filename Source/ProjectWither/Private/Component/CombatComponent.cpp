@@ -8,6 +8,7 @@
 #include "Interface/StatComponentUserInterface.h"
 #include "Interface/WeaponComponentUserInterface.h"
 #include "Component/WeaponComponent.h"
+#include "Component/MonsterComponent.h"
 #include "Engine/World.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -73,6 +74,8 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(ParryTimerHandle);
+		World->GetTimerManager().ClearTimer(ParryCooldownTimerHandle);
+		World->GetTimerManager().ClearTimer(BlockStaminaTimerHandle);
 	}
 
 	if (IsValid(StatComponent))
@@ -338,8 +341,23 @@ void UCombatComponent::StartBlock()
 {
 	if (!CanBlock()) { return; }
 
+	OwnerPlayer->SetCanMove(false);
+
 	SetActionState(EPlayerActionState::Blocking);
 	OpenParryWindow();
+
+	UWorld* World = GetWorld();
+	if (IsValid(World))
+	{
+		World->GetTimerManager().SetTimer(
+			BlockStaminaTimerHandle,
+			this,
+			&UCombatComponent::ConsumeBlockStamina,
+			BlockHoldStaminaInterval,
+			true
+		);
+	}
+
 	// 가드 애니메이션 시작
 }
 
@@ -347,8 +365,19 @@ void UCombatComponent::StopBlock()
 {
 	if (ActionState != EPlayerActionState::Blocking) { return; }
 
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BlockStaminaTimerHandle);
+	}
+
 	CloseParryWindow();
 	FinishAction(EPlayerActionState::Blocking);
+
+	if (IsValid(OwnerPlayer))
+	{
+		OwnerPlayer->SetCanMove(true);
+	}
+
 	// 가드 애니메이션 종료
 }
 
@@ -358,27 +387,57 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 
 	if (ActionState == EPlayerActionState::Blocking)
 	{
-		if (bParryWindowOpen)
+		const bool bWasParry = bParryWindowOpen;
+
+		if (TrySpendStamina(BlockStaminaCost))
 		{
-			CloseParryWindow();
+			if (bWasParry)
+			{
+				CloseParryWindow();
 
-			OnParrySucceeded();
+				OnParrySucceeded();
 
-			// 공격한 적에게 패링 성공 전달
+				// 공격한 적에게 패링 성공 전달
+				if (IsValid(DamageCauser))
+				{
+					UMonsterComponent* MonsterComponent = DamageCauser->FindComponentByClass<UMonsterComponent>();
+
+					if (IsValid(MonsterComponent))
+					{
+						MonsterComponent->HandleParried();
+					}
+				}
+			}
+			else
+			{
+				OnBlockSucceeded();
+			}
+
+			// 공격은 막았지만 다음 공격 비용이 부족하면 가드 해제
+			if (!StatComponent->HasEnoughStamina(BlockStaminaCost))
+			{
+				StopBlock();
+			}
+
 			return 0.0f;
 		}
 
-		OnBlockSucceeded();
-
-		// 현재 기획에서는 모든 피해 방어
-		return 0.0f;
+		// 공격을 막을 비용이 부족하므로 가드 실패
+		StopBlock();
 	}
 
-	const float AppliedDamage = StatComponent->ApplyDamage(DamageAmount);
+	if (DamageAmount > 0.0f)
+	{
+		// 치명타가 아니라 살아 있는 경우 피격 반응을 실행합니다.
+		if (IsOwnerAlive())
+		{
+			StartHitReaction();
+		}
+		OnHitReceived();
+	}
 
-	OnHitReceived();
 
-	return AppliedDamage;
+	return DamageAmount;
 }
 
 void UCombatComponent::Die()
@@ -462,7 +521,11 @@ bool UCombatComponent::CanBlock() const
 {
 	if (!IsOwnerAlive()) { return false; }
 
+	if (!IsValid(OwnerPlayer) || !OwnerPlayer->CanMove()) { return false; }
+
 	if (ActionState != EPlayerActionState::None) { return false; }
+
+	if (!IsValid(StatComponent) || !StatComponent->HasEnoughStamina(BlockStaminaCost)) { return false; }
 
 	return true;
 }
@@ -558,11 +621,35 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 
 void UCombatComponent::OpenParryWindow()
 {
+	if (bParryOnCooldown) { return; }
+
+	UWorld* World = GetWorld();
+	if (!IsValid(World)) { return; }
+
 	bParryWindowOpen = true;
+	bParryOnCooldown = true;
 
-	GetWorld()->GetTimerManager().ClearTimer(ParryTimerHandle);
+	FTimerManager& TimerManager = World->GetTimerManager();
 
-	GetWorld()->GetTimerManager().SetTimer(ParryTimerHandle, this, &UCombatComponent::CloseParryWindow, ParryWindow, false);
+	// 패링 가능 시간 타이머
+	TimerManager.ClearTimer(ParryTimerHandle);
+	TimerManager.SetTimer(
+		ParryTimerHandle,
+		this,
+		&UCombatComponent::CloseParryWindow,
+		ParryWindow,
+		false
+	);
+
+	// 다음 패링 시도까지의 쿨타임
+	TimerManager.ClearTimer(ParryCooldownTimerHandle);
+	TimerManager.SetTimer(
+		ParryCooldownTimerHandle,
+		this,
+		&UCombatComponent::EndParryCooldown,
+		ParryCooldown,
+		false
+	);
 }
 
 void UCombatComponent::CloseParryWindow()
@@ -573,6 +660,11 @@ void UCombatComponent::CloseParryWindow()
 	{
 		World->GetTimerManager().ClearTimer(ParryTimerHandle);
 	}
+}
+
+void UCombatComponent::EndParryCooldown()
+{
+	bParryOnCooldown = false;
 }
 
 
@@ -586,4 +678,152 @@ void UCombatComponent::SetActionState(EPlayerActionState State)
 	OnActionStateChangedEvent.Broadcast(PreviousState, ActionState);
 
 	OnActionStateChanged(PreviousState, ActionState);
+}
+
+void UCombatComponent::ConsumeBlockStamina()
+{
+	if (ActionState != EPlayerActionState::Blocking || !IsValid(StatComponent))
+	{
+		StopBlock();
+		return;
+	}
+
+	if (!TrySpendStamina(BlockHoldStaminaCost))
+	{
+		StopBlock();
+		return;
+	}
+
+	// 다음 공격을 막을 스태미나가 없으면 가드 자동 해제
+	if (!StatComponent->HasEnoughStamina(BlockStaminaCost))
+	{
+		StopBlock();
+	}
+}
+
+void UCombatComponent::StartHitReaction()
+{
+	if (!IsOwnerAlive() || !IsValid(OwnerPlayer))
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance =
+		OwnerPlayer->GetMesh()
+		? OwnerPlayer->GetMesh()->GetAnimInstance()
+		: nullptr;
+
+	if (!IsValid(AnimInstance))
+	{
+		return;
+	}
+
+	// 피해를 받기 전 행동을 저장합니다.
+	const EPlayerActionState PreviousState = ActionState;
+
+	// 가드 중이었다면 가드 타이머와 패링 창을 정리합니다.
+	if (PreviousState == EPlayerActionState::Blocking)
+	{
+		StopBlock();
+	}
+
+	// 공격 중이었다면 검의 피해 판정을 즉시 종료합니다.
+	if (PreviousState == EPlayerActionState::AttackingWithSword)
+	{
+		EndSwordDamageWindow();
+	}
+
+	// 구르기 중이었다면 구르기 이동을 즉시 제거합니다.
+	if (PreviousState == EPlayerActionState::Rolling)
+	{
+		if (UCharacterMovementComponent* Movement =
+			OwnerPlayer->GetCharacterMovement())
+		{
+			Movement->RemoveRootMotionSource(
+				RollRootMotionSourceName
+			);
+		}
+	}
+
+	// 기존 몽타주 종료 콜백이 이동을 다시 켜지 못하도록
+	// 먼저 상태를 HitReact로 변경합니다.
+	OwnerPlayer->SetCanMove(false);
+	SetActionState(EPlayerActionState::HitReact);
+
+	// 현재 재생 중인 행동 몽타주를 정지합니다.
+	if (PreviousState == EPlayerActionState::AttackingWithSword &&
+		IsValid(SwordAttackMontage) &&
+		AnimInstance->Montage_IsPlaying(SwordAttackMontage))
+	{
+		AnimInstance->Montage_Stop(
+			0.1f,
+			SwordAttackMontage
+		);
+	}
+
+	if (PreviousState == EPlayerActionState::Rolling &&
+		IsValid(RollMontage) &&
+		AnimInstance->Montage_IsPlaying(RollMontage))
+	{
+		AnimInstance->Montage_Stop(
+			0.1f,
+			RollMontage
+		);
+	}
+
+	// 피격 몽타주가 없으면 상태가 잠기지 않도록 복구합니다.
+	if (!IsValid(HitReactMontage))
+	{
+		OwnerPlayer->SetCanMove(true);
+		FinishAction(EPlayerActionState::HitReact);
+		return;
+	}
+
+	const float PlayedLength =
+		OwnerPlayer->PlayAnimMontage(HitReactMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		OwnerPlayer->SetCanMove(true);
+		FinishAction(EPlayerActionState::HitReact);
+		return;
+	}
+
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(
+		this,
+		&UCombatComponent::OnHitReactMontageEnded
+	);
+
+	AnimInstance->Montage_SetEndDelegate(
+		EndDelegate,
+		HitReactMontage
+	);
+}
+
+void UCombatComponent::OnHitReactMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != HitReactMontage)
+	{
+		return;
+	}
+
+	// 다른 피격이나 사망으로 몽타주가 교체됐다면
+	// 여기서 이동을 다시 허용하지 않습니다.
+	if (bInterrupted)
+	{
+		return;
+	}
+
+	if (ActionState != EPlayerActionState::HitReact)
+	{
+		return;
+	}
+
+	if (IsValid(OwnerPlayer))
+	{
+		OwnerPlayer->SetCanMove(true);
+	}
+
+	FinishAction(EPlayerActionState::HitReact);
 }
