@@ -353,7 +353,6 @@ void APlayerCharacter::UpdateMovementSpeed()
 
 void APlayerCharacter::StartRoll()
 {
-    UE_LOG(LogTemp, Log, TEXT("APlayerCharacter::StartRoll - 호출됨"));
 
     if (!IsValid(CombatComponent))
     {
@@ -365,7 +364,6 @@ void APlayerCharacter::StartRoll()
 
 void APlayerCharacter::AttackInput()
 {
-	UE_LOG(LogTemp, Log, TEXT("APlayerCharacter::AttackInput - 플레이어 공격 입력"));
     if (!IsValid(CombatComponent))
     {
 		UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::AttackInput - CombatComponent가 유효하지 않습니다."));
@@ -424,7 +422,20 @@ void APlayerCharacter::AddDefaultTestWeapons()
         }
         else if (!InventoryComponent->HasItem(TestGunData->GetItemId()))
         {
-            InventoryComponent->AddItem(TestGunData, 1);
+            const int32 AddedQuantity = InventoryComponent->AddItem(TestGunData, 1);
+
+            if (AddedQuantity > 0)
+            {
+                const int32 GunSlot = InventoryComponent->FindItemSlot(TestGunData->GetItemId());
+
+                FItemInstance TestGunInstance;
+
+                if (GunSlot != INDEX_NONE && InventoryComponent->GetItemAtSlot(GunSlot, TestGunInstance))
+                {
+                    TestGunInstance.CurrentAmmo = FMath::Max(0, TestGunData->GetMaxAmmo());
+                    InventoryComponent->UpdataItemAtSlot(GunSlot, TestGunInstance);
+                }
+            }
         }
 	}
 
