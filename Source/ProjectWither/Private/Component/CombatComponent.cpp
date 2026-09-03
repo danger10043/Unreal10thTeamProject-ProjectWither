@@ -91,7 +91,6 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void UCombatComponent::Attack()
 {
-	UE_LOG(LogTemp, Log, TEXT("CombatComponent::Attack - 플레이어 공격 호출"));
 	switch (ResolveWeaponType())
 	{
 	case ECombatWeaponType::Sword:
@@ -103,7 +102,7 @@ void UCombatComponent::Attack()
 		break;
 
 	default:
-		UE_LOG( LogTemp, Warning, TEXT("장착된 무기가 없어 공격할 수 없습니다."));
+		UE_LOG(LogTemp, Warning, TEXT("UCombatComponent::Attack - 장착된 무기가 없어 공격할 수 없습니다."));
 		break;
 	}
 }
@@ -158,6 +157,47 @@ void UCombatComponent::EndSwordDamageWindow()
 
 void UCombatComponent::GunAttack()
 {
+	if (!CanAttack())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - 현재 공격할 수 없는 상태입니다.")
+		);
+		return;
+	}
+
+	if (!IsValid(WeaponComponent) || !WeaponComponent->IsGunEquipped())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - 총이 장착되어 있지 않습니다.")
+		);
+		return;
+	}
+
+	if (!TrySpendStamina(GunAttackStaminaCost))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - 스태미나가 부족합니다.")
+		);
+		return;
+	}
+
+	if (!WeaponComponent->FireGun())
+	{
+		StatComponent->RecoverStamina(GunAttackStaminaCost);
+
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - 총기 발사에 실패했습니다.")
+		);
+		return;
+	}
 }
 
 void UCombatComponent::Roll()
@@ -580,6 +620,8 @@ bool UCombatComponent::CanBlock() const
 	if (!IsValid(OwnerPlayer) || !OwnerPlayer->CanMove()) { return false; }
 
 	if (ActionState != EPlayerActionState::None) { return false; }
+
+	if (!IsValid(WeaponComponent) || !WeaponComponent->IsSwordEquipped()) { return false; }
 
 	if (!IsValid(StatComponent) || !StatComponent->HasEnoughStamina(BlockStaminaCost)) { return false; }
 
