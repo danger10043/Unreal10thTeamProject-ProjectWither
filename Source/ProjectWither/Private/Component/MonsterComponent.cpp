@@ -6,7 +6,7 @@
 #include "Data/ItemDropTable.h"
 #include "Item/PickupItem.h"
 #include "Monster/MonsterAIController.h"
-#include "Player/PlayerCharacter.h"
+#include "Interface/PlayerInterface.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Framework/SubSystem/ObjectPoolSubsystem.h"
 
@@ -781,13 +781,14 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 		return;
 	}
 
-	APlayerCharacter* Player = Cast<APlayerCharacter>(OtherActor);
-	if (!IsValid(Player))
+	if (!OtherActor->Implements<UPlayerInterface>() ||
+		!OtherActor->Implements<UStatComponentUserInterface>())
 	{
 		return;
 	}
 
-	UStatComponent* PlayerStat = IStatComponentUserInterface::Execute_GetStatComponent(Player);
+	UStatComponent* PlayerStat =
+		IStatComponentUserInterface::Execute_GetStatComponent(OtherActor);
 
 	if (!IsValid(PlayerStat) || PlayerStat->IsHealthZero())
 	{

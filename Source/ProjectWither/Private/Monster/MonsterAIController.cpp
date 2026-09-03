@@ -2,8 +2,8 @@
 
 #include "Monster/MonsterAIController.h"
 #include "Component/MonsterComponent.h"
-#include "Player/PlayerCharacter.h"
 #include "Component/StatComponent.h"
+#include "Interface/PlayerInterface.h"
 #include "Interface/StatComponentUserInterface.h"
 
 #include "BehaviorTree/BehaviorTree.h"
@@ -200,16 +200,16 @@ bool AMonsterAIController::IsValidTarget(AActor* InActor)
 		return false;
 	}
 
-	// 플레이어 캐릭터만 공격 대상으로 허용
-	APlayerCharacter* Player = Cast<APlayerCharacter>(InActor);
-	if (!IsValid(Player))
+	// 플레이어 인터페이스를 구현한 액터만 공격 대상으로 허용
+	if (!InActor->Implements<UPlayerInterface>() ||
+		!InActor->Implements<UStatComponentUserInterface>())
 	{
 		return false;
 	}
 
 	// 스탯 인터페이스를 통해 플레이어 체력 확인
 	UStatComponent* CandidateStat =
-		IStatComponentUserInterface::Execute_GetStatComponent(Player);
+		IStatComponentUserInterface::Execute_GetStatComponent(InActor);
 
 	return IsValid(CandidateStat) && !CandidateStat->IsHealthZero();
 }
