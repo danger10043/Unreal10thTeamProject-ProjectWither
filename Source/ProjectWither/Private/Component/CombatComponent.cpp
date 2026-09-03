@@ -621,6 +621,8 @@ bool UCombatComponent::CanBlock() const
 
 	if (ActionState != EPlayerActionState::None) { return false; }
 
+	if (!IsValid(WeaponComponent) || !WeaponComponent->IsSwordEquipped()) { return false; }
+
 	if (!IsValid(StatComponent) || !StatComponent->HasEnoughStamina(BlockStaminaCost)) { return false; }
 
 	return true;
