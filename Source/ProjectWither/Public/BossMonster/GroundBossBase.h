@@ -9,9 +9,20 @@
 /**
  * 
  */
+class UBossComponent;
+
 UCLASS()
 class PROJECTWITHER_API AGroundBossBase : public AMonsterCharacterBase
 {
-	GENERATED_BODY()
-	
+    GENERATED_BODY()
+
+public:
+    AGroundBossBase();
+
+    UFUNCTION(BlueprintPure, Category = "Boss")
+    UBossComponent* GetBossComponent() const { return BossComponent; }
+
+protected:
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss")
+    TObjectPtr<UBossComponent> BossComponent;
 };
