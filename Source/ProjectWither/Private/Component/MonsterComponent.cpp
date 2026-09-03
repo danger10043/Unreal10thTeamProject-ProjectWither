@@ -94,6 +94,7 @@ void UMonsterComponent::HandleDeath()
 	bIsDead = true;
 
 	CancelAttack();
+	LockMovementForMontage();
 
 	MonsterState = EMonsterState::Dead;
 	ClearTarget();
@@ -278,7 +279,7 @@ bool UMonsterComponent::Attack()
 
 	bCanAttack = false;
 	SetMonsterState(EMonsterState::Attack);
-	LockMovementForAttack();
+	LockMovementForMontage();
 
 	const float PlayedLength =
 		AnimInstance->Montage_Play(AttackMontage);
@@ -287,7 +288,7 @@ bool UMonsterComponent::Attack()
 	if (PlayedLength <= 0.0f)
 	{
 		// 재생 실패 시 공격 잠금 복구
-		UnlockMovementAfterAttack();
+		UnlockMovementAfterMontage();
 		bCanAttack = true;
 		SetMonsterState(PreviousState);
 		return false;
@@ -314,7 +315,10 @@ bool UMonsterComponent::Attack()
 void UMonsterComponent::FinishAttack()
 {
 	DisableAllAttackHitboxes();
-	UnlockMovementAfterAttack();
+	if (!bIsDead)
+	{
+		UnlockMovementAfterMontage();
+	}
 
 	if (bIsDead) return;
 
@@ -576,6 +580,7 @@ void UMonsterComponent::ResetForReuse(const FVector& NewSpawnLocation)
 {
 	ClearRuntimeTimers();
 	StopAllMontages();
+	UnlockMovementAfterMontage();
 
 	// 먼저 MonsterState를 Idle로 초기화
 	ResetRuntimeState();
@@ -622,6 +627,8 @@ bool UMonsterComponent::PlaySearchAnimation()
 		SetMonsterState(PreviousState);
 		return false;
 	}
+
+	LockMovementForMontage();
 
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(
@@ -846,6 +853,7 @@ void UMonsterComponent::PlayReactionMontage(UAnimMontage* Montage)
 	}
 
 	SetMonsterState(EMonsterState::Hit);
+	LockMovementForMontage();
 
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(
@@ -861,6 +869,8 @@ void UMonsterComponent::OnReactionMontageEnded(UAnimMontage* Montage, bool bInte
 	{
 		return;
 	}
+
+	UnlockMovementAfterMontage();
 
 	if (MonsterState == EMonsterState::Hit)
 	{
@@ -922,6 +932,7 @@ void UMonsterComponent::OnSearchMontageEnded(UAnimMontage* Montage, bool bInterr
 
 	if (!bIsDead && MonsterState == EMonsterState::Search)
 	{
+		UnlockMovementAfterMontage();
 		SetMonsterState(IsValid(GetTargetActor()) ? EMonsterState::Chase : EMonsterState::Idle);
 	}
 
@@ -1122,7 +1133,7 @@ void UMonsterComponent::ResetAnimation()
 	Mesh->InitAnim(true);
 }
 
-void UMonsterComponent::LockMovementForAttack()
+void UMonsterComponent::LockMovementForMontage()
 {
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (!IsValid(OwnerPawn)) return;
@@ -1132,24 +1143,28 @@ void UMonsterComponent::LockMovementForAttack()
 		AIController->StopMovement();
 	}
 
-	LockedAttackMovement = OwnerPawn->GetMovementComponent();
-	if (IsValid(LockedAttackMovement))
+	// 이미 잠겨 있다면 최초 활성 상태를 덮어쓰지 않는다.
+	if (!IsValid(LockedMontageMovement))
 	{
-		bAttackMovementWasActive = LockedAttackMovement->IsActive();
-		LockedAttackMovement->StopMovementImmediately();
-		LockedAttackMovement->Deactivate();
+		LockedMontageMovement = OwnerPawn->GetMovementComponent();
+		if (IsValid(LockedMontageMovement))
+		{
+			bMontageMovementWasActive = LockedMontageMovement->IsActive();
+			LockedMontageMovement->StopMovementImmediately();
+			LockedMontageMovement->Deactivate();
+		}
 	}
 
 	OwnerPawn->ConsumeMovementInputVector();
 }
 
-void UMonsterComponent::UnlockMovementAfterAttack()
+void UMonsterComponent::UnlockMovementAfterMontage()
 {
-	if (IsValid(LockedAttackMovement) && bAttackMovementWasActive)
+	if (IsValid(LockedMontageMovement) && bMontageMovementWasActive)
 	{
-		LockedAttackMovement->Activate(true);
+		LockedMontageMovement->Activate(true);
 	}
 
-	LockedAttackMovement = nullptr;
-	bAttackMovementWasActive = false;
+	LockedMontageMovement = nullptr;
+	bMontageMovementWasActive = false;
 }
