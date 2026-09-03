@@ -4,16 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "CommonHeader/BossPhaseEnums.h"
 #include "BossComponent.generated.h"
-
-UENUM(BlueprintType)
-enum class EBossPhase : uint8
-{
-    Phase1,
-    Transition,
-    Phase2,
-    Dead
-};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     FOnBossPhaseChanged,
