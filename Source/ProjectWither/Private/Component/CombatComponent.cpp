@@ -438,6 +438,7 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 	if (IsOwnerAlive())
 	{
 		StartHitReaction();
+		OnHitReceived();
 	}
 
 	OnHitReceived();
@@ -447,6 +448,56 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 
 void UCombatComponent::Die()
 {
+	if (ActionState == EPlayerActionState::Dead) return;
+
+	if (!IsValid(OwnerPlayer)) return;
+
+	UAnimInstance* AnimInstance = OwnerPlayer->GetMesh() ? OwnerPlayer->GetMesh()->GetAnimInstance() : nullptr;
+
+	if (UWorld* World = GetWorld())
+	{
+		FTimerManager& TimerManager = World->GetTimerManager();
+
+		TimerManager.ClearTimer(ParryTimerHandle);
+		TimerManager.ClearTimer(ParryCooldownTimerHandle);
+		TimerManager.ClearTimer(BlockStaminaTimerHandle);
+	}
+
+	bParryWindowOpen = false;
+	bParryOnCooldown = false;
+
+	EndSwordDamageWindow();
+
+	if (UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement())
+	{
+		Movement->RemoveRootMotionSource(RollRootMotionSourceName);
+		Movement->StopMovementImmediately();
+	}
+
+	// 기존 몽타주 종료 롤백이 이동이나 상태를 복구하지 못하도록 막기
+	OwnerPlayer->SetCanMove(false);
+	SetActionState(EPlayerActionState::Dead);
+
+	if (!IsValid(AnimInstance))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CombatComponent::Die - AnimInstance가 유효하지 않습니다."));
+		return;
+	}
+
+	// 다른 모든 몽타주 즉시 종료하고 사망 몽타주 재생하기
+	AnimInstance->StopAllMontages(0.0f);
+	if (!IsValid(DeathMontage))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CombatComponent::Die - Death Montage가 유효하지 않습니다."));
+		return;
+	}
+
+	const float PlayedLength = OwnerPlayer->PlayAnimMontage(DeathMontage);
+	if (PlayedLength <= 0.0f)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CombatComponent::Die - Death Montage 재생에 실패했습니다."));
+		return;
+	}
 }
 
 void UCombatComponent::FinishAction(EPlayerActionState ExpectedState)
