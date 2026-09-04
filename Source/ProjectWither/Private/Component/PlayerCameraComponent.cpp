@@ -1,5 +1,10 @@
 #include "Component/PlayerCameraComponent.h"
 
+#include "CollisionQueryParams.h"
+#include "Component/MonsterComponent.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
+
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Component/WeaponComponent.h"
@@ -173,24 +178,180 @@ void UPlayerCameraComponent::ChangeCameraState(EPlayerCameraState NewState)
 	switch (NewState)
 	{
 	case EPlayerCameraState::None:
+	{
+		LockonTarget = nullptr;
 		break;
+	}
 
 	case EPlayerCameraState::Zoom:
+	{
 		if (!CanZoom())
 		{
 			return;
 		}
-		break;
-	case EPlayerCameraState::LockOn:
-		// TODO : 락온 진입 조건과 대상 선택 구현
-		return;
 
+		LockonTarget = nullptr;
+		break;
+	}
+
+	case EPlayerCameraState::LockOn:
+	{
+		if (CameraState != EPlayerCameraState::None)
+		{
+			return;
+		}
+
+		AActor* NewTarget = FindLockOnTarget();
+		if (!IsValid(NewTarget))
+		{
+			return;
+		}
+
+		LockonTarget = NewTarget;
+		break;
+	}
 	default:
 		return;
 	}
 
-	LockonTarget = nullptr;
 	CameraState = NewState;
+}
+
+void UPlayerCameraComponent::ToggleLockOn()
+{
+	if (CameraState == EPlayerCameraState::LockOn)
+	{
+		ClearLockOn();
+		return;
+	}
+
+	if (CameraState != EPlayerCameraState::None)
+	{
+		return;
+	}
+
+	ChangeCameraState(EPlayerCameraState::LockOn);
+}
+
+AActor* UPlayerCameraComponent::FindLockOnTarget()
+{
+	if (!IsValid(OwnerPlayer))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::FindLockOnTarget - OwnerPlayer가 유효하지 않습니다.")
+		);
+		return nullptr;
+	}
+
+	if (!IsValid(CameraComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::FindLockOnTarget - CameraComponent가 유효하지 않습니다.")
+		);
+		return nullptr;
+	}
+
+	if (!IsValid(SpringArmComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::FindLockOnTarget - SpringArmComponent가 유효하지 않습니다.")
+		);
+		return nullptr;
+	}
+
+	if (!OwnerPlayer->IsLocallyControlled())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::FindLockOnTarget - OwnerPlayer가 로컬에서 조작되고 있지 않습니다.")
+		);
+		return nullptr;
+	}
+
+	if (OwnerPlayer->IsInventoryOpen())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::FindLockOnTarget - OwnerPlayer의 인벤토리가 열려 있어 락온을 실행할 수 없습니다.")
+		);
+		return nullptr;
+	}
+
+	if (LockOnRange <= 0.0f)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::FindLockOnTarget - 락온 사정거리가 유효하지 않습니다.")
+		);
+		return nullptr;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(OwnerPlayer->GetController());
+
+	UWorld* World = GetWorld();
+	if (!IsValid(PC) || !IsValid(World)) return nullptr;
+
+	FVector ViewLocation;
+	FRotator ViewRotation;
+	PC->GetPlayerViewPoint(ViewLocation, ViewRotation);
+
+	// 카메라가 플레이어 뒤에 떨어져 있는 거리까지 Trace 길이에 포함
+	const float CameraToPlayerDistance = FVector::Distance(
+		ViewLocation,
+		OwnerPlayer->GetActorLocation()
+	);
+
+	const FVector TraceEnd =
+		ViewLocation + ViewRotation.Vector() * (LockOnRange + CameraToPlayerDistance);
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(OwnerPlayer.Get());
+
+	const UWeaponComponent* WeaponComponent =
+		IWeaponComponentUserInterface::Execute_GetWeaponComponent(OwnerPlayer.Get());
+
+	if (IsValid(WeaponComponent))
+	{
+		AActor* WeaponActor = WeaponComponent->GetWeaponActor();
+		if (IsValid(WeaponActor))
+		{
+			QueryParams.AddIgnoredActor(WeaponActor);
+		}
+	}
+
+	FHitResult Hit;
+	if (!World->LineTraceSingleByChannel(
+		Hit,
+		ViewLocation,
+		TraceEnd,
+		ECC_Visibility,
+		QueryParams
+	))
+	{
+		return nullptr;
+	}
+
+	AActor* HitActor = Hit.GetActor();
+	return IsValidLockOnTarget(HitActor) ? HitActor : nullptr;
+}
+
+void UPlayerCameraComponent::ClearLockOn()
+{
+	LockonTarget = nullptr;
+
+	if (CameraState == EPlayerCameraState::LockOn)
+	{
+		ChangeCameraState(EPlayerCameraState::None);
+	}
 }
 
 void UPlayerCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -237,8 +398,32 @@ void UPlayerCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 		return;
 	}
 
+	if (CameraState == EPlayerCameraState::LockOn &&
+		(OwnerPlayer->IsInventoryOpen() || !IsValidLockOnTarget(LockonTarget.Get())))
+	{
+		ClearLockOn();
+	}
+
 	UpdateCameraPlacement(DeltaTime);
 	UpdateCameraFOV(DeltaTime);
+
+	//if (CameraState == EPlayerCameraState::LockOn && IsValidLockOnTarget(LockonTarget.Get()))
+	//{
+	//	UE_LOG(
+	//		LogTemp,
+	//		Log,
+	//		TEXT("PlayerCameraComponent::TickComponent - 락온 On, 락온 대상 { %s }"),
+	//		*LockonTarget->GetName()
+	//	);
+	//}
+	//else
+	//{
+	//	UE_LOG(
+	//		LogTemp,
+	//		Log,
+	//		TEXT("PlayerCameraComponent::TickComponent - 락온 Off")
+	//	);
+	//}
 }
 
 void UPlayerCameraComponent::UpdateCameraPlacement(float DeltaTime)
@@ -358,4 +543,34 @@ bool UPlayerCameraComponent::CanZoom() const
 		IWeaponComponentUserInterface::Execute_GetWeaponComponent(OwnerPlayer.Get());
 
 	return IsValid(WeaponComponent) && WeaponComponent->IsGunEquipped();
+}
+
+bool UPlayerCameraComponent::IsValidLockOnTarget(AActor* Target) const
+{
+	if (!IsValid(OwnerPlayer) || !IsValid(Target) || Target == OwnerPlayer.Get())
+	{
+		return false;
+	}
+
+	if (Target->IsHidden() || !Target->GetActorEnableCollision())
+	{
+		return false;
+	}
+
+	const UMonsterComponent* MonsterComponent =
+		Target->FindComponentByClass<UMonsterComponent>();
+
+	if (!IsValid(MonsterComponent) || MonsterComponent->IsDead())
+	{
+		return false;
+	}
+
+	if (LockOnRange <= 0.0f)
+	{
+		return false;
+	}
+
+	return
+		FVector::DistSquared(OwnerPlayer->GetActorLocation(), Target->GetActorLocation()) <=
+		FMath::Square(LockOnRange);
 }

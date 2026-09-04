@@ -246,6 +246,8 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Started, this, &APlayerCharacter::StartZoomInput);
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopZoomInput);
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopZoomInput);
+    EnhancedInput->BindAction(LockOnAction, ETriggerEvent::Started, this, &APlayerCharacter::LockOnInput);
+    
 }
 
 float APlayerCharacter::TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -460,6 +462,13 @@ void APlayerCharacter::StopZoomInput()
     }
 
     PlayerCameraComponent->StopZoom();
+}
+
+void APlayerCharacter::LockOnInput()
+{
+    if (!IsValid(PlayerCameraComponent)) return;
+
+    PlayerCameraComponent->ToggleLockOn();
 }
 
 void APlayerCharacter::SwapWeaponInput()

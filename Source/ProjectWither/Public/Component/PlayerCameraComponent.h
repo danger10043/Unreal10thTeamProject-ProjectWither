@@ -35,6 +35,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
 	void ChangeCameraState(EPlayerCameraState NewState);
 
+	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
+	void ToggleLockOn();
+
+	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
+	AActor* FindLockOnTarget();
+
+	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
+	void ClearLockOn();
+
 protected:
 	virtual void TickComponent(
 		float DeltaTime,
@@ -46,6 +55,8 @@ private:
 	void UpdateCameraPlacement(float DeltaTime);
 	void UpdateCameraFOV(float DeltaTime);
 	bool CanZoom() const;
+
+	bool IsValidLockOnTarget(AActor* Target) const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<APlayerCharacter> OwnerPlayer = nullptr;
@@ -64,7 +75,13 @@ private:
 	)
 	EPlayerCameraState CameraState = EPlayerCameraState::None;
 
-	UPROPERTY(Transient)
+	UPROPERTY(
+		Transient,
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera",
+		meta = (AllowPrivateAccess = "true")
+	)
 	TObjectPtr<AActor> LockonTarget = nullptr;
 	
 	// 초기화 시 실제 카메라의 FOV를 기본값으로 저장
