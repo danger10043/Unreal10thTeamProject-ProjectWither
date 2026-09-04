@@ -15,6 +15,7 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class UPlayerCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 class UStatComponent;
@@ -100,6 +101,11 @@ private:
 	void StartBlockInput();
 	void StopBlockInput();
 
+	void StartZoomInput();
+	void StopZoomInput();
+
+	void LockOnInput();
+
 	void SwapWeaponInput();
 
 	void AddDefaultTestWeapons();
@@ -124,6 +130,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInteractionComponent> InteractionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPlayerCameraComponent> PlayerCameraComponent;
 
 	/*
 	*  테스트용 시작 무기.
@@ -184,6 +193,12 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> InteractAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> ZoomAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> LockOnAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
