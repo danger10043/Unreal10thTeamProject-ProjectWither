@@ -386,6 +386,25 @@ bool UInventoryComponent::SetItemAtSlot(int32 SlotIndex, const FItemInstance& Ne
 	return true;
 }
 
+bool UInventoryComponent::AddItemInstanceToEmptySlot(const FItemInstance& NewItemInstance)
+{
+	if (!IsValid(NewItemInstance.ItemData) || NewItemInstance.Quantity <= 0) return false;
+
+	for (FItemInstance& InventoryItem : InventoryItems)											// 장비 해제 시 아이템 고유 상태를 유지한 채 빈 슬롯으로 되돌린다.
+	{
+		if (IsValid(InventoryItem.ItemData) && InventoryItem.Quantity > 0)
+		{
+			continue;
+		}
+
+		InventoryItem = NewItemInstance;
+		OnInventoryChanged.Broadcast();
+		return true;
+	}
+
+	return false;
+}
+
 int32 UInventoryComponent::ConsumeAmmoByType(EAmmoType AmmoType, int32 RequestedQuantity)
 {
 	if (RequestedQuantity <= 0) return 0;

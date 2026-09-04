@@ -136,6 +136,128 @@ bool UEquipmentComponent::EquipItemFromInventorySlot(int32 SlotIndex)
 	return true;
 }
 
+bool UEquipmentComponent::UnequipItem(const FItemInstance& EquipmentItem)
+{
+	AActor* OwnerActor = GetOwner();
+
+	if (!IsValid(OwnerActor))																		// 장비 컴포넌트를 소유한 액터가 없으면 해제할 수 없다.
+	{
+		return false;
+	}
+
+	if (!IsValid(EquipmentItem.ItemData) || EquipmentItem.Quantity <= 0)							// 빈 장비 슬롯은 해제하지 않는다.
+	{
+		return false;
+	}
+
+	switch (EquipmentItem.ItemData->GetItemType())
+	{
+	case EItemType::Weapon:
+	{
+		UWeaponDataAsset* WeaponData = Cast<UWeaponDataAsset>(EquipmentItem.ItemData.Get());
+
+		if (!IsValid(WeaponData))																	// 아이템 타입은 Weapon이지만 무기 데이터가 아니면 실패 처리
+		{
+			return false;
+		}
+
+		FItemInstance* TargetEquipmentSlot = GetWeaponEquipmentSlot(WeaponData->GetWeaponType());
+
+		if (TargetEquipmentSlot == nullptr ||
+			!IsValid(TargetEquipmentSlot->ItemData) ||
+			TargetEquipmentSlot->Quantity <= 0 ||
+			TargetEquipmentSlot->ItemData.Get() != EquipmentItem.ItemData.Get())
+		{
+			return false;
+		}
+
+		UWeaponComponent* WeaponComponent = OwnerActor->FindComponentByClass<UWeaponComponent>();
+
+		if (!IsValid(WeaponComponent))																// 실제 손에 든 무기 상태도 함께 정리해야 하므로 WeaponComponent가 필요하다.
+		{
+			return false;
+		}
+
+		if (WeaponComponent->GetWeaponType() == WeaponData->GetWeaponType())
+		{
+			WeaponComponent->UnequipWeapon();														// 현재 사용 중인 무기라면 실제 무기 액터도 해제한다.
+
+			if (WeaponComponent->GetWeaponType() == WeaponData->GetWeaponType())
+			{
+				return false;
+			}
+		}
+
+		*TargetEquipmentSlot = FItemInstance();														// 무기는 인벤토리에 남아 있으므로 장비 표시 슬롯만 비운다.
+		OnEquipmentChanged.Broadcast();
+		return true;
+	}
+	case EItemType::Armor:
+	{
+		UArmorDataAsset* ArmorData = Cast<UArmorDataAsset>(EquipmentItem.ItemData.Get());
+
+		if (!IsValid(ArmorData))																	// 아이템 타입은 Armor지만 방어구 데이터가 아니면 실패 처리
+		{
+			return false;
+		}
+
+		FItemInstance* TargetEquipmentSlot = GetArmorEquipmentSlot(ArmorData->GetArmorType());
+
+		if (TargetEquipmentSlot == nullptr ||
+			!IsValid(TargetEquipmentSlot->ItemData) ||
+			TargetEquipmentSlot->Quantity <= 0 ||
+			TargetEquipmentSlot->ItemData.Get() != EquipmentItem.ItemData.Get())
+		{
+			return false;
+		}
+
+		UInventoryComponent* InventoryComponent = OwnerActor->FindComponentByClass<UInventoryComponent>();
+
+		if (!IsValid(InventoryComponent) ||
+			!InventoryComponent->AddItemInstanceToEmptySlot(*TargetEquipmentSlot))					// 빈 인벤토리 슬롯이 없으면 장비 슬롯을 비우지 않는다.
+		{
+			return false;
+		}
+
+		*TargetEquipmentSlot = FItemInstance();
+		OnEquipmentChanged.Broadcast();
+		return true;
+	}
+	default:
+		return false;
+	}
+}
+
+FItemInstance* UEquipmentComponent::GetWeaponEquipmentSlot(EWeaponType WeaponType)
+{
+	switch (WeaponType)
+	{
+	case EWeaponType::Sword:
+		return &EquippedSword;
+	case EWeaponType::Gun:
+		return &EquippedGun;
+	default:
+		return nullptr;
+	}
+}
+
+FItemInstance* UEquipmentComponent::GetArmorEquipmentSlot(EArmorType ArmorType)
+{
+	switch (ArmorType)
+	{
+	case EArmorType::Helmet:
+		return &EquippedHelmet;
+	case EArmorType::Chestplate:
+		return &EquippedChestplate;
+	case EArmorType::Leggings:
+		return &EquippedLeggings;
+	case EArmorType::Boots:
+		return &EquippedBoots;
+	default:
+		return nullptr;
+	}
+}
+
 FItemInstance UEquipmentComponent::GetEquippedSword() const
 {
 	return EquippedSword;
