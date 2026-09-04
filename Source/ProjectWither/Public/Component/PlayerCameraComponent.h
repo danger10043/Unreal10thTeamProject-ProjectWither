@@ -44,6 +44,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
 	void ClearLockOn();
 
+	void UpdateLockOnRotation(float DeltaTime);
+
 protected:
 	virtual void TickComponent(
 		float DeltaTime,
@@ -57,6 +59,9 @@ private:
 	bool CanZoom() const;
 
 	bool IsValidLockOnTarget(AActor* Target) const;
+
+	void HandleLockOnLookInput(const FVector2D& Input);
+	void ResetLockOnLookInput();
 
 	UPROPERTY(Transient)
 	TObjectPtr<APlayerCharacter> OwnerPlayer = nullptr;
@@ -169,4 +174,57 @@ private:
 		)
 	)
 	float ZoomInterpSpeed = 10.0f;
+
+	// 대상의 Actor 위치를 기준으로 더할 월드 공간 오프셋
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera|LockOn",
+		meta = (AllowPrivateAccess = "true", Units = "cm")
+	)
+	FVector LockOnTargetOffset = FVector::ZeroVector;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera|LockOn",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.1")
+	)
+	float LockOnRotationInterpSpeed = 8.0;
+
+	// 마지막 마우스 입력 이후 자동 추적을 재개하기까지의 시간
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera|LockOn",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s")
+	)
+	float LockOnReturnDelay = 0.15f;
+
+	// 해제 판정에 사용할 최근 입력 구간
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera|LockOn",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.01", Units = "s")
+	)
+	float LockOnInputWindow = 0.25;
+
+	// 화면 픽셀이 아닌 LookAction 입력량 기준
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera|LockOn",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.1")
+	)
+	float LockOnBreakInputThreshold = 80.0f;
+
+	struct FLockOnMouseSample
+	{
+		double Time = 0.0;
+		FVector2D Delta = FVector2D::ZeroVector;
+	};
+
+	TArray<FLockOnMouseSample> LockOnMouseSamples;
+	double LastLockOnMouseInputTime = -1.0;
 };

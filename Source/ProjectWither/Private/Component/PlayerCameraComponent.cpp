@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 
 #include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Component/WeaponComponent.h"
 #include "Interface/WeaponComponentUserInterface.h"
@@ -15,6 +16,7 @@ UPlayerCameraComponent::UPlayerCameraComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
+	PrimaryComponentTick.TickGroup = TG_PostPhysics;
 }
 
 void UPlayerCameraComponent::InitializeCamera(UCameraComponent* InCameraComponent, USpringArmComponent* InSpringComponent)
@@ -92,6 +94,7 @@ void UPlayerCameraComponent::InitializeCamera(UCameraComponent* InCameraComponen
 	NormalFOV = CameraComponent->FieldOfView;
 	CameraState = EPlayerCameraState::None;
 	LockonTarget = nullptr;
+	ResetLockOnLookInput();
 
 	NormalSocketOffset = SpringArmComponent->SocketOffset;
 	NormalArmLength = SpringArmComponent->TargetArmLength;
@@ -152,6 +155,8 @@ void UPlayerCameraComponent::HandleLookInput(const FVector2D& Input)
 		);
 		return;
 	}
+
+	HandleLockOnLookInput(Input);
 
 	OwnerPlayer->AddControllerYawInput(Input.X);
 	OwnerPlayer->AddControllerPitchInput(Input.Y);
@@ -354,6 +359,94 @@ void UPlayerCameraComponent::ClearLockOn()
 	}
 }
 
+void UPlayerCameraComponent::UpdateLockOnRotation(float DeltaTime)
+{
+	if (CameraState != EPlayerCameraState::LockOn) return;
+
+	if (!IsValid(OwnerPlayer))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::UpdateLockOnRotation - OwnerPlayer가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	if (!IsValid(CameraComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::UpdateLockOnRotation - CameraComponent가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	if (!IsValid(SpringArmComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::UpdateLockOnRotation - SpringArmComponent가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	if (!IsValidLockOnTarget(LockonTarget.Get()))
+	{
+		ClearLockOn();
+		return;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(OwnerPlayer->GetController());
+	UWorld* World = GetWorld();
+
+	if (!IsValid(PC) || !IsValid(World) || !OwnerPlayer->IsLocallyControlled() || PC->IsLookInputIgnored())
+	{
+		return;
+	}
+
+	// 마우스 조작 직후에는 자동 회전을 잠시 유예
+	const double Now = World->GetTimeSeconds();
+	if (LastLockOnMouseInputTime >= 0.0 && Now - LastLockOnMouseInputTime < LockOnReturnDelay)
+	{
+		return;
+	}
+
+	const FVector TargetLocation =
+		LockonTarget->GetActorLocation() + LockOnTargetOffset;
+
+	const FVector ToTarget = TargetLocation - CameraComponent->GetComponentLocation();
+
+	if (ToTarget.IsNearlyZero())
+	{
+		return;
+	}
+
+	FRotator DesiredRotation = ToTarget.Rotation();
+	
+	APlayerCameraManager* CameraManager = PC->PlayerCameraManager;
+	if (IsValid(CameraManager))
+	{
+		CameraManager->LimitViewPitch(
+			DesiredRotation,
+			CameraManager->ViewPitchMin,
+			CameraManager->ViewPitchMax
+		);
+	}
+
+	FRotator NewRotation = FMath::RInterpTo(
+		PC->GetControlRotation(),
+		DesiredRotation,
+		DeltaTime,
+		LockOnRotationInterpSpeed
+	);
+
+	NewRotation.Roll = 0.0f;
+	PC->SetControlRotation(NewRotation);
+}
+
 void UPlayerCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -406,6 +499,11 @@ void UPlayerCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 
 	UpdateCameraPlacement(DeltaTime);
 	UpdateCameraFOV(DeltaTime);
+
+	if (CameraState == EPlayerCameraState::LockOn)
+	{
+		UpdateLockOnRotation(DeltaTime);
+	}
 
 	//if (CameraState == EPlayerCameraState::LockOn && IsValidLockOnTarget(LockonTarget.Get()))
 	//{
@@ -573,4 +671,57 @@ bool UPlayerCameraComponent::IsValidLockOnTarget(AActor* Target) const
 	return
 		FVector::DistSquared(OwnerPlayer->GetActorLocation(), Target->GetActorLocation()) <=
 		FMath::Square(LockOnRange);
+}
+
+void UPlayerCameraComponent::HandleLockOnLookInput(const FVector2D& Input)
+{
+	if (CameraState != EPlayerCameraState::LockOn || Input.IsNearlyZero())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!IsValid(World) || !IsValid(OwnerPlayer))
+	{
+		return;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(OwnerPlayer->GetController());
+	if (!IsValid(PC) || PC->IsLookInputIgnored())
+	{
+		return;
+	}
+
+	const double Now = World->GetTimeSeconds();
+	LastLockOnMouseInputTime = Now;
+
+	// 최근 입력 구간보다 오래된 기록 제거
+	LockOnMouseSamples.RemoveAll(
+		[Now, this](const FLockOnMouseSample& Sample)
+		{
+			return Now - Sample.Time > LockOnInputWindow;
+		}
+	);
+
+	FLockOnMouseSample NewSample;
+	NewSample.Time = Now;
+	NewSample.Delta = Input;
+	LockOnMouseSamples.Add(NewSample);
+
+	FVector2D Displacement = FVector2D::ZeroVector;
+	for (const FLockOnMouseSample& Sample : LockOnMouseSamples)
+	{
+		Displacement += Sample.Delta;
+	}
+
+	if (Displacement.SizeSquared() >= FMath::Square(LockOnBreakInputThreshold))
+	{
+		ClearLockOn();
+	}
+}
+
+void UPlayerCameraComponent::ResetLockOnLookInput()
+{
+	LockOnMouseSamples.Reset();
+	LastLockOnMouseInputTime = -1.0;
 }
