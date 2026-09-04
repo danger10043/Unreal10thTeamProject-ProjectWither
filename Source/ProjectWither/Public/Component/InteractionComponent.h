@@ -7,6 +7,7 @@
 #include "InteractionComponent.generated.h"
 
 class APlayerCharacter;
+class UUserWidget;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class PROJECTWITHER_API UInteractionComponent : public UActorComponent
@@ -27,9 +28,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	AActor* GetInteractionTarget() const;
 
+	// NPC가 사용할 상호작용 UI 열기
+	UFUNCTION(BlueprintCallable, Category = "Interaction|UI")
+	bool OpenInteractionUI(AActor* Target, TSubclassOf<UUserWidget> WidgetClass);
+
+	// 현재 상호작용 UI 닫기
+	UFUNCTION(BlueprintCallable, Category = "Interaction|UI")
+	void CloseInteractionUI();
+
+	UFUNCTION(BlueprintPure, Category = "Interaction|UI")
+	bool IsInteractionUIOpen() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	// 플레이어가 상호작용을 시작할 수 있는 상태인지 확인
@@ -49,5 +63,16 @@ private:
 	// 카메라에서 앞으로 검사할 길이
 	UPROPERTY(EditDefaultsOnly, Category = "Interaction", meta = (ClampMin = "0.0", Units = "cm"))
 	float TraceDistance = 1000.0f;
+
+	// 실제 체력이 감소하면 UI 종료
+	UFUNCTION()
+	void HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount);
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> InteractionWidget;
+
+	// 현재 대화 중인 NPC
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AActor> ActiveInteractionTarget;
 
 };

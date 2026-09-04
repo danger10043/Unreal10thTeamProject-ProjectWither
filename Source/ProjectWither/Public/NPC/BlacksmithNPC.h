@@ -6,6 +6,8 @@
 #include "NPC/NPCBase.h"
 #include "BlacksmithNPC.generated.h"
 
+class UUserWidget;
+
 /**
  * 
  */
@@ -19,4 +21,9 @@ public:
 
 protected:
 	virtual void HandleInteraction(AActor* Interactor) override;
+
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "NPC|UI")
+	TSubclassOf<UUserWidget> BlacksmithWidgetClass;
+
 };

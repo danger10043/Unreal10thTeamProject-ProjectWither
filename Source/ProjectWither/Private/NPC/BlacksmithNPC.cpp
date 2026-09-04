@@ -2,6 +2,8 @@
 
 
 #include "NPC/BlacksmithNPC.h"
+#include "Component/InteractionComponent.h"
+#include "Blueprint/UserWidget.h"
 
 ABlacksmithNPC::ABlacksmithNPC()
 {
@@ -10,7 +12,14 @@ ABlacksmithNPC::ABlacksmithNPC()
 
 void ABlacksmithNPC::HandleInteraction(AActor* Interactor)
 {
-	UE_LOG(LogTemp, Log, TEXT("%s: %s와 상호작용 시작"), *NPCName.ToString(), *GetNameSafe(Interactor));
+	if (!IsValid(Interactor)) { return; }
 
-	// 다음 단계에서 대장장이 UI 열기 요청 연결
+	UInteractionComponent* Interaction = Interactor->FindComponentByClass<UInteractionComponent>();
+
+	if (!IsValid(Interaction)) { return; }
+
+	if (Interaction->OpenInteractionUI(this, BlacksmithWidgetClass))
+	{
+		UE_LOG(LogTemp, Log, TEXT("대장장이 UI 열기 성공"));
+	}
 }

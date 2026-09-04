@@ -80,6 +80,11 @@ void APlayerCharacter::ToggleInventory()
 
 void APlayerCharacter::OpenInventory()
 {
+    if (IsValid(InteractionComponent) && InteractionComponent->IsInteractionUIOpen())
+    {
+        return;
+    }
+
     if (bIsInventoryOpen || !IsValid(InventoryScreenClass))										// 이미 열려 있거나 생성할 인벤토리 UI 클래스가 없으면 처리하지 않는다.
     {
         return;
