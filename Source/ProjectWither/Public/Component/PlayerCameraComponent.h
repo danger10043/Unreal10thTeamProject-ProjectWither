@@ -60,6 +60,10 @@ private:
 
 	bool IsValidLockOnTarget(AActor* Target) const;
 
+	bool IsOwnerAlive() const;
+	bool HasLockOnLineOfSight() const;
+	void UpdateLockOnValidity(float DeltaTime);
+
 	void HandleLockOnLookInput(const FVector2D& Input);
 	void ResetLockOnLookInput();
 
@@ -227,4 +231,14 @@ private:
 
 	TArray<FLockOnMouseSample> LockOnMouseSamples;
 	double LastLockOnMouseInputTime = -1.0;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera|LockOn",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s")
+	)
+	float LockOnOcclusionGraceTime = 1.0f;
+
+	float LockOnOccludedTime = 0.0f;
 };

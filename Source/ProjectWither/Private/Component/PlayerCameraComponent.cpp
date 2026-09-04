@@ -12,6 +12,11 @@
 #include "Interface/WeaponComponentUserInterface.h"
 #include "Player/PlayerCharacter.h"
 
+#include "Component/CombatComponent.h"
+#include "Component/StatComponent.h"
+#include "Interface/CombatComponentUserInterface.h"
+#include "Interface/StatComponentUserInterface.h"
+
 UPlayerCameraComponent::UPlayerCameraComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -95,6 +100,7 @@ void UPlayerCameraComponent::InitializeCamera(UCameraComponent* InCameraComponen
 	CameraState = EPlayerCameraState::None;
 	LockonTarget = nullptr;
 	ResetLockOnLookInput();
+	LockOnOccludedTime = 0.0f;
 
 	NormalSocketOffset = SpringArmComponent->SocketOffset;
 	NormalArmLength = SpringArmComponent->TargetArmLength;
@@ -220,6 +226,8 @@ void UPlayerCameraComponent::ChangeCameraState(EPlayerCameraState NewState)
 	}
 
 	CameraState = NewState;
+	ResetLockOnLookInput();
+	LockOnOccludedTime = 0.0f;
 }
 
 void UPlayerCameraComponent::ToggleLockOn()
@@ -240,6 +248,11 @@ void UPlayerCameraComponent::ToggleLockOn()
 
 AActor* UPlayerCameraComponent::FindLockOnTarget()
 {
+	if (!IsOwnerAlive())
+	{
+		return nullptr;
+	}
+
 	if (!IsValid(OwnerPlayer))
 	{
 		UE_LOG(
@@ -481,21 +494,17 @@ void UPlayerCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 		return;
 	}
 
-	if (!OwnerPlayer->IsLocallyControlled())
+	if (!OwnerPlayer->IsLocallyControlled() || !IsOwnerAlive())
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("PlayerCameraComponent::TickComponent - OwnerPlayer가 로컬에서 조작되고 있지 않습니다.")
-		);
+		if (CameraState != EPlayerCameraState::None || IsValid(LockonTarget))
+		{
+			ChangeCameraState(EPlayerCameraState::None);
+		}
+
+		UpdateCameraFOV(DeltaTime);
 		return;
 	}
-
-	if (CameraState == EPlayerCameraState::LockOn &&
-		(OwnerPlayer->IsInventoryOpen() || !IsValidLockOnTarget(LockonTarget.Get())))
-	{
-		ClearLockOn();
-	}
+	UpdateLockOnValidity(DeltaTime);
 
 	UpdateCameraPlacement(DeltaTime);
 	UpdateCameraFOV(DeltaTime);
@@ -587,6 +596,11 @@ void UPlayerCameraComponent::UpdateCameraFOV(float DeltaTime)
 
 bool UPlayerCameraComponent::CanZoom() const
 {
+	if (!IsOwnerAlive())
+	{
+		return false;
+	}
+
 	if (!IsValid(OwnerPlayer))
 	{
 		UE_LOG(
@@ -725,3 +739,94 @@ void UPlayerCameraComponent::ResetLockOnLookInput()
 	LockOnMouseSamples.Reset();
 	LastLockOnMouseInputTime = -1.0;
 }
+
+bool UPlayerCameraComponent::IsOwnerAlive() const
+{
+	if (!IsValid(OwnerPlayer))
+	{
+		return false;
+	}
+
+	const UStatComponent* StatComponent =
+		IStatComponentUserInterface::Execute_GetStatComponent(OwnerPlayer.Get());
+
+	const UCombatComponent* CombatComponent =
+		ICombatComponentUserInterface::Execute_GetCombatComponent(OwnerPlayer.Get());
+
+	if (!IsValid(StatComponent) || !IsValid(CombatComponent))
+	{
+		return false;
+	}
+
+	return !StatComponent->IsHealthZero() && CombatComponent->GetActionState() != EPlayerActionState::Dead;
+}
+
+bool UPlayerCameraComponent::HasLockOnLineOfSight() const
+{
+	AActor* Target = LockonTarget.Get();
+	UWorld* World = GetWorld();
+
+	if (!IsValid(OwnerPlayer) || !IsValid(CameraComponent) || !IsValid(Target) || !IsValid(World))
+	{
+		return false;
+	}
+
+	const FVector TraceStart = CameraComponent->GetComponentLocation();
+	const FVector TraceEnd = Target->GetActorLocation() + LockOnTargetOffset;
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(OwnerPlayer.Get());
+
+	const UWeaponComponent* WeaponComponent =
+		IWeaponComponentUserInterface::Execute_GetWeaponComponent(OwnerPlayer.Get());
+
+	if (IsValid(WeaponComponent))
+	{
+		AActor* WeaponActor = WeaponComponent->GetWeaponActor();
+		if (IsValid(WeaponActor))
+		{
+			QueryParams.AddIgnoredActor(WeaponActor);
+		}
+	}
+
+	FHitResult Hit;
+	const bool bBlockingHit = World->LineTraceSingleByChannel(
+		Hit,
+		TraceStart,
+		TraceEnd,
+		ECC_Visibility,
+		QueryParams
+	);
+
+	return !bBlockingHit || Hit.GetActor() == Target;
+}
+
+void UPlayerCameraComponent::UpdateLockOnValidity(float DeltaTime)
+{
+	if (CameraState != EPlayerCameraState::LockOn)
+	{
+		LockOnOccludedTime = 0.0f;
+		return ;
+	}
+
+	if (!IsValid(OwnerPlayer) || OwnerPlayer->IsInventoryOpen() || !IsValidLockOnTarget(LockonTarget.Get()))
+	{
+		ClearLockOn();
+		return;
+	}
+
+	if (HasLockOnLineOfSight())
+	{
+		LockOnOccludedTime = 0.0f;
+		return;
+	}
+
+	LockOnOccludedTime += FMath::Max(DeltaTime, 0.0f);
+
+	if (LockOnOccludedTime >= LockOnOcclusionGraceTime)
+	{
+		ClearLockOn();
+	}
+}
+
+
