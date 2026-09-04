@@ -15,6 +15,7 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class UPlayerCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 class UStatComponent;
@@ -118,6 +119,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInventoryComponent> InventoryComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPlayerCameraComponent> PlayerCameraComponent;
 
 	/*
 	*  테스트용 시작 무기.

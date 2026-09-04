@@ -6,6 +6,7 @@
 #include "Component/WeaponComponent.h"
 #include "Component/CombatComponent.h"
 #include "Component/InventoryComponent.h"
+#include "Component/PlayerCameraComponent.h"
 #include "Equipment/EquipmentComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "Widget/TestMainUIWidget.h"
@@ -52,6 +53,7 @@ APlayerCharacter::APlayerCharacter()
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
     EquipmentComponent = CreateDefaultSubobject<UEquipmentComponent>(TEXT("EquipmentComponent"));
     InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
+    PlayerCameraComponent = CreateDefaultSubobject<UPlayerCameraComponent>(TEXT("PlayerCameraComponent"));
 }
 
 void APlayerCharacter::SetCanMove(bool bNewCanMove)
@@ -159,6 +161,11 @@ UCombatComponent* APlayerCharacter::GetCombatComponent_Implementation() const
 void APlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+    if (IsValid(PlayerCameraComponent))
+    {
+        PlayerCameraComponent->InitializeCamera(PlayerCamera.Get(), CameraArm.Get());
+    }
 	
     AddDefaultTestWeapons();
 
@@ -269,11 +276,29 @@ void APlayerCharacter::Move(const FInputActionValue& Value)
 
 void APlayerCharacter::Look(const FInputActionValue& Value)
 {
-    if (!Controller) { return; }
-    const FVector2D Input = Value.Get<FVector2D>();
+    if (!Controller)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("PlayerCameraComponent::HandleLookInput - 플레이어 컨트롤러가 유효하지 않습니다.")
+        );
+        return;
+    }
 
-    AddControllerYawInput(Input.X);
-    AddControllerPitchInput(Input.Y);
+    if (!IsValid(PlayerCameraComponent))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("PlayerCameraComponent::HandleLookInput - PlayerCameraComponent 가 유효하지 않습니다.")
+        );
+        return;
+    }
+
+    const FVector2D Input = Value.Get<FVector2D>();
+    
+    PlayerCameraComponent->HandleLookInput(Input);
 }
 
 void APlayerCharacter::StartRun()
