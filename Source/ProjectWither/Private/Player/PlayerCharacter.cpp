@@ -6,6 +6,7 @@
 #include "Component/WeaponComponent.h"
 #include "Component/CombatComponent.h"
 #include "Component/InventoryComponent.h"
+#include "Component/InteractionComponent.h"
 #include "Equipment/EquipmentComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "Widget/TestMainUIWidget.h"
@@ -52,6 +53,7 @@ APlayerCharacter::APlayerCharacter()
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
     EquipmentComponent = CreateDefaultSubobject<UEquipmentComponent>(TEXT("EquipmentComponent"));
     InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
+    InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
 }
 
 void APlayerCharacter::SetCanMove(bool bNewCanMove)
@@ -236,6 +238,7 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &APlayerCharacter::SwapWeaponInput);
     EnhancedInput->BindAction(InventoryAction, ETriggerEvent::Started, this, &APlayerCharacter::ToggleInventory);
+    EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &APlayerCharacter::InteractInput);
 }
 
 float APlayerCharacter::TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -445,6 +448,14 @@ void APlayerCharacter::AddDefaultTestWeapons()
         {
             UE_LOG(LogTemp, Warning, TEXT("기본 테스트 검 자동 장착에 실패했습니다."));
         }
+    }
+}
+
+void APlayerCharacter::InteractInput()
+{
+    if (IsValid(InteractionComponent))
+    {
+        InteractionComponent->TryInteract();
     }
 }
 
