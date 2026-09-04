@@ -243,6 +243,9 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &APlayerCharacter::SwapWeaponInput);
     EnhancedInput->BindAction(InventoryAction, ETriggerEvent::Started, this, &APlayerCharacter::ToggleInventory);
+    EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Started, this, &APlayerCharacter::StartZoomInput);
+    EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopZoomInput);
+    EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopZoomInput);
 }
 
 float APlayerCharacter::TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -407,6 +410,56 @@ void APlayerCharacter::StopBlockInput()
 {
     if (!IsValid(CombatComponent)) { return; }
     CombatComponent->StopBlock();
+}
+
+void APlayerCharacter::StartZoomInput()
+{
+    if (!IsValid(WeaponComponent))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("APlayerCharacter::StartZoomInput - WeaponComponent 가 유효하지 않습니다.")
+        );
+        return;
+    }
+
+    if (!WeaponComponent->IsGunEquipped())
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("APlayerCharacter::StartZoomInput - 플레이어가 총을 현재 장착하고 있지 않습니다.")
+        );
+        return;
+    }
+
+    if (!IsValid(PlayerCameraComponent))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("APlayerCharacter::StartZoomInput - PlayerCameraComponent 가 유효하지 않습니다.")
+        );
+        return;
+    }
+
+    PlayerCameraComponent->StartZoom();
+}
+
+void APlayerCharacter::StopZoomInput()
+{
+    if (!IsValid(PlayerCameraComponent))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("APlayerCharacter::StopZoomInput - PlayerCameraComponent 가 유효하지 않습니다.")
+        );
+        return;
+    }
+
+    PlayerCameraComponent->StopZoom();
 }
 
 void APlayerCharacter::SwapWeaponInput()

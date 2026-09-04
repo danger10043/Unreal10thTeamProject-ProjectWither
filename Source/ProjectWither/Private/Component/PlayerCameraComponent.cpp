@@ -153,6 +153,46 @@ void UPlayerCameraComponent::HandleLookInput(const FVector2D& Input)
 
 }
 
+void UPlayerCameraComponent::StartZoom()
+{
+	ChangeCameraState(EPlayerCameraState::Zoom);
+}
+
+void UPlayerCameraComponent::StopZoom()
+{
+	if (CameraState != EPlayerCameraState::Zoom)
+	{
+		return;
+	}
+
+	ChangeCameraState(EPlayerCameraState::None);
+}
+
+void UPlayerCameraComponent::ChangeCameraState(EPlayerCameraState NewState)
+{
+	switch (NewState)
+	{
+	case EPlayerCameraState::None:
+		break;
+
+	case EPlayerCameraState::Zoom:
+		if (!CanZoom())
+		{
+			return;
+		}
+		break;
+	case EPlayerCameraState::LockOn:
+		// TODO : 락온 진입 조건과 대상 선택 구현
+		return;
+
+	default:
+		return;
+	}
+
+	LockonTarget = nullptr;
+	CameraState = NewState;
+}
+
 void UPlayerCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -198,6 +238,7 @@ void UPlayerCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 	}
 
 	UpdateCameraPlacement(DeltaTime);
+	UpdateCameraFOV(DeltaTime);
 }
 
 void UPlayerCameraComponent::UpdateCameraPlacement(float DeltaTime)
@@ -231,4 +272,90 @@ void UPlayerCameraComponent::UpdateCameraPlacement(float DeltaTime)
 		);
 }
 
+void UPlayerCameraComponent::UpdateCameraFOV(float DeltaTime)
+{
+	if (!IsValid(CameraComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::UpdateCameraFOV - CameraComponent 가 유효하지 않습니다.")
+		);
+		return;
+	}
 
+	if (CameraState == EPlayerCameraState::Zoom && !CanZoom())
+	{
+		StopZoom();
+	}
+
+	const float TargetFOV =
+		CameraState == EPlayerCameraState::Zoom ? FMath::Min(ZoomFOV, NormalFOV) : NormalFOV;
+
+	CameraComponent->SetFieldOfView(
+		FMath::FInterpTo(
+			CameraComponent->FieldOfView,
+			TargetFOV,
+			DeltaTime,
+			ZoomInterpSpeed
+		)
+	);
+}
+
+bool UPlayerCameraComponent::CanZoom() const
+{
+	if (!IsValid(OwnerPlayer))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::CanZoom - OwnerPlayer가 유효하지 않습니다.")
+		);
+		return false;
+	}
+
+	if (!IsValid(CameraComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::CanZoom - CameraComponent가 유효하지 않습니다.")
+		);
+		return false;
+	}
+
+	if (!IsValid(SpringArmComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::CanZoom - SpringArmComponent가 유효하지 않습니다.")
+		);
+		return false;
+	}
+
+	if (!OwnerPlayer->IsLocallyControlled())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::CanZoom - OwnerPlayer가 로컬에서 조작되고 있지 않습니다.")
+		);
+		return false;
+	}
+
+	if (OwnerPlayer->IsInventoryOpen())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::CanZoom - OwnerPlayer의 인벤토리가 열려 있어 줌 기능을 사용할 수 없습니다.")
+		);
+		return false;
+	}
+
+	const UWeaponComponent* WeaponComponent =
+		IWeaponComponentUserInterface::Execute_GetWeaponComponent(OwnerPlayer.Get());
+
+	return IsValid(WeaponComponent) && WeaponComponent->IsGunEquipped();
+}

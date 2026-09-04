@@ -26,6 +26,15 @@ public:
 	// 기존 LookAction의 입력값 전달받기
 	void HandleLookInput(const FVector2D& Input);
 
+	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
+	void StartZoom();
+
+	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
+	void StopZoom();
+
+	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
+	void ChangeCameraState(EPlayerCameraState NewState);
+
 protected:
 	virtual void TickComponent(
 		float DeltaTime,
@@ -35,6 +44,8 @@ protected:
 
 private:
 	void UpdateCameraPlacement(float DeltaTime);
+	void UpdateCameraFOV(float DeltaTime);
+	bool CanZoom() const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<APlayerCharacter> OwnerPlayer = nullptr;
@@ -130,4 +141,15 @@ private:
 		)
 	)
 	float CameraPlacementInterpSpeed = 8.0f;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera|Zoom",
+		meta = (
+			AllowPrivateAccess = "true",
+			ClampMin = "0.1"
+		)
+	)
+	float ZoomInterpSpeed = 10.0f;
 };
