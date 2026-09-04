@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "CommonHeader/ArmorTypeEnums.h"
+#include "CommonHeader/WeaponTypeEnums.h"
 #include "Item/ItemInstance.h"
 #include "EquipmentComponent.generated.h"
 
@@ -20,6 +22,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	bool EquipItemFromInventorySlot(int32 SlotIndex);											// 지정한 인벤토리 슬롯의 장비 아이템을 장착한다.
+
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	bool UnequipItem(const FItemInstance& EquipmentItem);										// 지정한 장비 아이템을 해제한다.
 
 	UFUNCTION(BlueprintPure, Category = "Equipment|Weapon")
 	FItemInstance GetEquippedSword() const;														// 현재 장착 중인 근접 무기 반환
@@ -40,6 +45,10 @@ public:
 	FItemInstance GetEquippedBoots() const;														// 현재 장착 중인 신발 반환
 
 private:
+	FItemInstance* GetWeaponEquipmentSlot(EWeaponType WeaponType);								// 무기 타입에 맞는 장비 슬롯 반환
+
+	FItemInstance* GetArmorEquipmentSlot(EArmorType ArmorType);									// 방어구 타입에 맞는 장비 슬롯 반환
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Equipment|Weapon", meta = (AllowPrivateAccess = "true"))
 	FItemInstance EquippedSword;																// 현재 장착 중인 근접 무기
 
