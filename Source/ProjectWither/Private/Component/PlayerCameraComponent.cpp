@@ -2,12 +2,14 @@
 
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Component/WeaponComponent.h"
+#include "Interface/WeaponComponentUserInterface.h"
 #include "Player/PlayerCharacter.h"
 
 UPlayerCameraComponent::UPlayerCameraComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
-
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
 void UPlayerCameraComponent::InitializeCamera(UCameraComponent* InCameraComponent, USpringArmComponent* InSpringComponent)
@@ -85,6 +87,13 @@ void UPlayerCameraComponent::InitializeCamera(UCameraComponent* InCameraComponen
 	NormalFOV = CameraComponent->FieldOfView;
 	CameraState = EPlayerCameraState::None;
 	LockonTarget = nullptr;
+
+	NormalSocketOffset = SpringArmComponent->SocketOffset;
+	NormalArmLength = SpringArmComponent->TargetArmLength;
+
+	SpringArmComponent->AddTickPrerequisiteComponent(this);
+
+	SetComponentTickEnabled(true);
 }
 
 void UPlayerCameraComponent::HandleLookInput(const FVector2D& Input)
@@ -141,4 +150,85 @@ void UPlayerCameraComponent::HandleLookInput(const FVector2D& Input)
 
 	OwnerPlayer->AddControllerYawInput(Input.X);
 	OwnerPlayer->AddControllerPitchInput(Input.Y);
+
 }
+
+void UPlayerCameraComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!IsValid(OwnerPlayer))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::TickComponent - OwnerPlayer가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	if (!IsValid(CameraComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::TickComponent - CameraComponent가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	if (!IsValid(SpringArmComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::TickComponent - SpringArmComponent가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	if (!OwnerPlayer->IsLocallyControlled())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("PlayerCameraComponent::TickComponent - OwnerPlayer가 로컬에서 조작되고 있지 않습니다.")
+		);
+		return;
+	}
+
+	UpdateCameraPlacement(DeltaTime);
+}
+
+void UPlayerCameraComponent::UpdateCameraPlacement(float DeltaTime)
+{
+	const UWeaponComponent* WeaponComponent =
+		IWeaponComponentUserInterface::Execute_GetWeaponComponent(OwnerPlayer.Get());
+
+	const bool bIsGunEquipped =
+		IsValid(WeaponComponent) && WeaponComponent->IsGunEquipped();
+
+	const FVector TargetSocketOffset =
+		bIsGunEquipped ? NormalSocketOffset + RangedSocketOffset : NormalSocketOffset;
+
+	const float TargetArmLength =
+		bIsGunEquipped ? RangedArmLength : NormalArmLength;
+
+	SpringArmComponent->SocketOffset =
+		FMath::VInterpTo(
+			SpringArmComponent->SocketOffset,
+			TargetSocketOffset,
+			DeltaTime,
+			CameraPlacementInterpSpeed
+		);
+
+	SpringArmComponent->TargetArmLength =
+		FMath::FInterpTo(
+			SpringArmComponent->TargetArmLength,
+			TargetArmLength,
+			DeltaTime,
+			CameraPlacementInterpSpeed
+		);
+}
+
+
