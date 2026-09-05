@@ -40,6 +40,9 @@ public:
     // Both monster actor types forward their damage here.
     float ApplyMonsterDamage(float Damage);
 
+    // Controlled by the system requesting the lock; independent of boss phases and cooldowns.
+    void SetCombatLocked(bool bLocked) { bCombatLocked = bLocked; }
+
     UFUNCTION(BlueprintPure, Category = "Monster")
     bool IsDead() const { return bIsDead; }
 
@@ -268,6 +271,8 @@ protected:
 	// -------------------------------------------------------------------------
 
 private:
+	bool bCombatLocked = false;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UPawnMovementComponent> LockedMontageMovement = nullptr;
 

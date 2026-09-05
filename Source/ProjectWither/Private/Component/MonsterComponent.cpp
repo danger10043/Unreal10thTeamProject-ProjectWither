@@ -237,7 +237,7 @@ bool UMonsterComponent::IsInAttackRange()
 
 bool UMonsterComponent::CanAttack()
 {
-	if (bIsDead || !bCanAttack)
+	if (bIsDead || !bCanAttack || bCombatLocked)
 	{
 		return false;
 	}
@@ -365,7 +365,7 @@ void UMonsterComponent::ResetAttackCooldown()
 
 void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultiplier)
 {
-	if (bIsDead || !IsValid(HitTarget) || !IsValid(StatComponent))
+	if (bIsDead || bCombatLocked || !IsValid(HitTarget) || !IsValid(StatComponent))
 	{
 		return;
 	}
@@ -447,7 +447,7 @@ void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveCompone
 
 void UMonsterComponent::BeginAttackHitWindow(FName HitboxName)
 {
-	if (bIsDead || MonsterState != EMonsterState::Attack)
+	if (bIsDead || bCombatLocked || MonsterState != EMonsterState::Attack)
 	{
 		return;
 	}
@@ -526,7 +526,7 @@ void UMonsterComponent::CancelAttack()
 
 void UMonsterComponent::PlayHitReaction()
 {
-	if (bIsDead)
+	if (bIsDead || bCombatLocked)
 	{
 		return;
 	}
@@ -542,7 +542,7 @@ void UMonsterComponent::PlayHitReaction()
 
 void UMonsterComponent::HandleParried()
 {
-	if (bIsDead)
+	if (bIsDead || bCombatLocked)
 	{
 		return;
 	}
@@ -596,7 +596,7 @@ void UMonsterComponent::ResetForReuse(const FVector& NewSpawnLocation)
 
 bool UMonsterComponent::PlaySearchAnimation()
 {
-	if (bIsDead || !IsValid(SearchMontage) || !IsValid(GetOwner()))
+	if (bIsDead || bCombatLocked || !IsValid(SearchMontage) || !IsValid(GetOwner()))
 	{
 		return false;
 	}
@@ -769,7 +769,7 @@ void UMonsterComponent::OnAttackHitboxOverlap(UPrimitiveComponent* OverlappedCom
 
 void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 {
-	if (bIsDead ||
+	if (bIsDead || bCombatLocked ||
 		MonsterState != EMonsterState::Attack ||
 		!IsValid(ActiveAttackHitbox))
 	{

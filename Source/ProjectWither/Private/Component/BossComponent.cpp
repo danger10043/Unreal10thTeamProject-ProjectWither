@@ -7,6 +7,7 @@
 #include "Component/MonsterComponent.h"
 #include "Component/StatComponent.h"
 #include "Interface/StatComponentUserInterface.h"
+#include "Engine/World.h"
 
 // Sets default values for this component's properties
 UBossComponent::UBossComponent()
@@ -28,8 +29,32 @@ void UBossComponent::FinishPhaseTransition()
 {
 	if (CurrentPhase == EBossPhase::Transition)
 	{
+		const UStatComponent* Stat = GetOwner()->FindComponentByClass<UStatComponent>();
+		if (IsValid(Stat) && Stat->IsHealthZero()) return;
 		SetPhase(EBossPhase::Phase2);
 	}
+}
+
+void UBossComponent::HandlePhaseTransitionTimeout()
+{
+	UE_LOG(LogTemp, Warning, TEXT("Boss phase transition timed out: %s"), *GetNameSafe(GetOwner()));
+	FinishPhaseTransition();
+}
+
+void UBossComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (IsTransitioning() && IsValid(GetOwner()))
+	{
+		if (UMonsterComponent* Monster = GetOwner()->FindComponentByClass<UMonsterComponent>())
+		{
+			Monster->SetCombatLocked(false);
+		}
+	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PhaseTransitionTimerHandle);
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 void UBossComponent::BeginPlay()
@@ -67,7 +92,7 @@ void UBossComponent::BeginPlay()
 
 void UBossComponent::HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount)
 {
-	if (bPhase2Triggered || MaxHealth <= 0.0f)
+	if (bPhase2Triggered || CurrentPhase != EBossPhase::Phase1 || MaxHealth <= 0.0f)
 	{
 		return;
 	}
@@ -96,6 +121,33 @@ void UBossComponent::SetPhase(EBossPhase NewPhase)
 
 	const EBossPhase PreviousPhase = CurrentPhase;
 	CurrentPhase = NewPhase;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PhaseTransitionTimerHandle);
+		if (IsTransitioning())
+		{
+			World->GetTimerManager().SetTimer(PhaseTransitionTimerHandle, this,
+				&UBossComponent::HandlePhaseTransitionTimeout,
+				FMath::Max(0.1f, PhaseTransitionTimeout), false);
+		}
+	}
+
+	// The boss owns the phase rule; the monster only knows about a combat lock.
+	// Lock before cancellation callbacks or BP can try to start another attack.
+	if (UMonsterComponent* Monster = GetOwner()->FindComponentByClass<UMonsterComponent>())
+	{
+		Monster->SetCombatLocked(IsTransitioning());
+		if (IsTransitioning())
+		{
+			Monster->CancelAttack();
+			Monster->FinishAttack();
+			Monster->CancelSearch();
+		}
+	}
+
+	// Cancellation callbacks can synchronously change the phase (for example death).
+	if (CurrentPhase != NewPhase) return;
 
 	OnBossPhaseChanged.Broadcast(PreviousPhase, CurrentPhase);
 }

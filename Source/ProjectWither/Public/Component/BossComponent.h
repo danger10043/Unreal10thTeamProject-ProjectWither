@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "CommonHeader/BossPhaseEnums.h"
+#include "TimerManager.h"
 #include "BossComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
@@ -53,6 +54,7 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
     UFUNCTION()
@@ -66,6 +68,7 @@ private:
     void HandleBossDeath();
 
     void SetPhase(EBossPhase NewPhase);
+    void HandlePhaseTransitionTimeout();
 
     UPROPERTY(
         VisibleInstanceOnly,
@@ -77,6 +80,13 @@ private:
 
     UPROPERTY(EditDefaultsOnly, Category = "Boss|Phase")
     float Phase2HealthRatio = 0.5f;
+
+    // BP calls FinishPhaseTransition on presentation completion or interruption.
+    // This watchdog prevents a missing callback from locking combat indefinitely.
+    UPROPERTY(EditDefaultsOnly, Category = "Boss|Phase", meta = (ClampMin = "0.1", Units = "s"))
+    float PhaseTransitionTimeout = 10.0f;
+
+    FTimerHandle PhaseTransitionTimerHandle;
 
     bool bPhase2Triggered = false;
 };
