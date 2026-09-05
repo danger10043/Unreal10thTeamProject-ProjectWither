@@ -8,6 +8,9 @@
 #include "Component/StatComponent.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Engine/World.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Components/SkeletalMeshComponent.h"
 
 // Sets default values for this component's properties
 UBossComponent::UBossComponent()
@@ -43,6 +46,7 @@ void UBossComponent::HandlePhaseTransitionTimeout()
 
 void UBossComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	StopPhaseTransitionMontage();
 	if (IsTransitioning() && IsValid(GetOwner()))
 	{
 		if (UMonsterComponent* Monster = GetOwner()->FindComponentByClass<UMonsterComponent>())
@@ -121,6 +125,10 @@ void UBossComponent::SetPhase(EBossPhase NewPhase)
 
 	const EBossPhase PreviousPhase = CurrentPhase;
 	CurrentPhase = NewPhase;
+	if (PreviousPhase == EBossPhase::Transition)
+	{
+		StopPhaseTransitionMontage();
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -150,5 +158,69 @@ void UBossComponent::SetPhase(EBossPhase NewPhase)
 	if (CurrentPhase != NewPhase) return;
 
 	OnBossPhaseChanged.Broadcast(PreviousPhase, CurrentPhase);
+	if (NewPhase == EBossPhase::Transition && IsTransitioning())
+	{
+		PlayPhaseTransitionMontage();
+	}
+}
+
+void UBossComponent::PlayPhaseTransitionMontage()
+{
+	USkeletalMeshComponent* Mesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+	if (!IsValid(PhaseTransitionMontage) || !IsValid(AnimInstance))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Boss transition montage or AnimInstance missing: %s"), *GetNameSafe(GetOwner()));
+		FinishPhaseTransition();
+		return;
+	}
+
+	const float Duration = AnimInstance->Montage_Play(
+		PhaseTransitionMontage, 1.0f, EMontagePlayReturnType::Duration);
+	if (Duration <= 0.0f)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Boss transition montage failed to play: %s"), *GetNameSafe(GetOwner()));
+		FinishPhaseTransition();
+		return;
+	}
+
+	// Montage callbacks can change the phase while Montage_Play stops old montages.
+	if (!IsTransitioning())
+	{
+		AnimInstance->Montage_Stop(0.0f, PhaseTransitionMontage);
+		return;
+	}
+
+	TransitionAnimInstance = AnimInstance;
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(this, &UBossComponent::HandleTransitionMontageEnded);
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, PhaseTransitionMontage);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(PhaseTransitionTimerHandle, this,
+			&UBossComponent::HandlePhaseTransitionTimeout,
+			FMath::Max(PhaseTransitionTimeout, Duration + 1.0f), false);
+	}
+}
+
+void UBossComponent::HandleTransitionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != PhaseTransitionMontage) return;
+	TransitionAnimInstance.Reset();
+	// Both natural completion and interruption release the transition lock.
+	FinishPhaseTransition();
+}
+
+void UBossComponent::StopPhaseTransitionMontage()
+{
+	UAnimInstance* AnimInstance = TransitionAnimInstance.Get();
+	TransitionAnimInstance.Reset();
+	if (IsValid(AnimInstance) && IsValid(PhaseTransitionMontage))
+	{
+		// Unbind first: death, timeout, or a manual finish must not reenter SetPhase.
+		FOnMontageEnded EmptyDelegate;
+		AnimInstance->Montage_SetEndDelegate(EmptyDelegate, PhaseTransitionMontage);
+		AnimInstance->Montage_Stop(0.0f, PhaseTransitionMontage);
+	}
 }
 

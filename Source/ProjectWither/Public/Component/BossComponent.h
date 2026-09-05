@@ -8,6 +8,9 @@
 #include "TimerManager.h"
 #include "BossComponent.generated.h"
 
+class UAnimInstance;
+class UAnimMontage;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     FOnBossPhaseChanged,
     EBossPhase, PreviousPhase,
@@ -69,6 +72,9 @@ private:
 
     void SetPhase(EBossPhase NewPhase);
     void HandlePhaseTransitionTimeout();
+    void PlayPhaseTransitionMontage();
+    void StopPhaseTransitionMontage();
+    void HandleTransitionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
     UPROPERTY(
         VisibleInstanceOnly,
@@ -81,10 +87,14 @@ private:
     UPROPERTY(EditDefaultsOnly, Category = "Boss|Phase")
     float Phase2HealthRatio = 0.5f;
 
-    // BP calls FinishPhaseTransition on presentation completion or interruption.
-    // This watchdog prevents a missing callback from locking combat indefinitely.
+    UPROPERTY(EditDefaultsOnly, Category = "Boss|Phase")
+    TObjectPtr<UAnimMontage> PhaseTransitionMontage = nullptr;
+
+    // Fallback for missing callbacks or looping montages. Extended for long montages.
     UPROPERTY(EditDefaultsOnly, Category = "Boss|Phase", meta = (ClampMin = "0.1", Units = "s"))
     float PhaseTransitionTimeout = 10.0f;
+
+    TWeakObjectPtr<UAnimInstance> TransitionAnimInstance;
 
     FTimerHandle PhaseTransitionTimerHandle;
 
