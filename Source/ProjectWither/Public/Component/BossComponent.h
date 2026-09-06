@@ -6,10 +6,12 @@
 #include "Components/ActorComponent.h"
 #include "CommonHeader/BossPhaseEnums.h"
 #include "TimerManager.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "BossComponent.generated.h"
 
 class UAnimInstance;
 class UAnimMontage;
+class UBrainComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     FOnBossPhaseChanged,
@@ -75,6 +77,8 @@ private:
     void PlayPhaseTransitionMontage();
     void StopPhaseTransitionMontage();
     void HandleTransitionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+    void LockTransitionMovement();
+    void ReleaseTransitionMovement(bool bRestore);
 
     UPROPERTY(
         VisibleInstanceOnly,
@@ -95,6 +99,10 @@ private:
     float PhaseTransitionTimeout = 10.0f;
 
     TWeakObjectPtr<UAnimInstance> TransitionAnimInstance;
+    TWeakObjectPtr<UCharacterMovementComponent> TransitionMovement;
+    TWeakObjectPtr<UBrainComponent> TransitionBrain;
+    TEnumAsByte<EMovementMode> PreviousMovementMode = MOVE_None;
+    uint8 PreviousCustomMovementMode = 0;
 
     FTimerHandle PhaseTransitionTimerHandle;
 

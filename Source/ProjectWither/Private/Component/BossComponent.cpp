@@ -11,6 +11,9 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "AIController.h"
+#include "BrainComponent.h"
+#include "GameFramework/Character.h"
 
 // Sets default values for this component's properties
 UBossComponent::UBossComponent()
@@ -47,6 +50,7 @@ void UBossComponent::HandlePhaseTransitionTimeout()
 void UBossComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopPhaseTransitionMontage();
+	ReleaseTransitionMovement(false);
 	if (IsTransitioning() && IsValid(GetOwner()))
 	{
 		if (UMonsterComponent* Monster = GetOwner()->FindComponentByClass<UMonsterComponent>())
@@ -157,6 +161,16 @@ void UBossComponent::SetPhase(EBossPhase NewPhase)
 	// Cancellation callbacks can synchronously change the phase (for example death).
 	if (CurrentPhase != NewPhase) return;
 
+	if (IsTransitioning())
+	{
+		LockTransitionMovement();
+	}
+	else if (PreviousPhase == EBossPhase::Transition)
+	{
+		ReleaseTransitionMovement(NewPhase != EBossPhase::Dead);
+	}
+	if (CurrentPhase != NewPhase) return;
+
 	OnBossPhaseChanged.Broadcast(PreviousPhase, CurrentPhase);
 	if (NewPhase == EBossPhase::Transition && IsTransitioning())
 	{
@@ -221,6 +235,65 @@ void UBossComponent::StopPhaseTransitionMontage()
 		FOnMontageEnded EmptyDelegate;
 		AnimInstance->Montage_SetEndDelegate(EmptyDelegate, PhaseTransitionMontage);
 		AnimInstance->Montage_Stop(0.0f, PhaseTransitionMontage);
+	}
+}
+
+void UBossComponent::LockTransitionMovement()
+{
+	APawn* Pawn = Cast<APawn>(GetOwner());
+	if (!IsValid(Pawn)) return;
+
+	// Disable Character movement, including root motion, independently of the
+	// common montage callbacks that may reactivate the movement component.
+	if (UCharacterMovementComponent* Movement = Cast<UCharacterMovementComponent>(Pawn->GetMovementComponent()))
+	{
+		if (!TransitionMovement.IsValid())
+		{
+			TransitionMovement = Movement;
+			PreviousMovementMode = Movement->MovementMode;
+			PreviousCustomMovementMode = Movement->CustomMovementMode;
+		}
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+	}
+	Pawn->ConsumeMovementInputVector();
+
+	if (AAIController* AI = Cast<AAIController>(Pawn->GetController()))
+	{
+		UBrainComponent* Brain = AI->GetBrainComponent();
+		if (IsValid(Brain) && Brain->IsRunning() && !Brain->IsPaused())
+		{
+			TransitionBrain = Brain;
+			Brain->PauseLogic(TEXT("Boss phase transition"));
+		}
+		AI->StopMovement();
+	}
+}
+
+void UBossComponent::ReleaseTransitionMovement(bool bRestore)
+{
+	const UMonsterComponent* Monster = IsValid(GetOwner())
+		? GetOwner()->FindComponentByClass<UMonsterComponent>() : nullptr;
+	const UStatComponent* Stat = IsValid(GetOwner())
+		? GetOwner()->FindComponentByClass<UStatComponent>() : nullptr;
+	const bool bCanRestore = bRestore && IsValid(GetOwner())
+		&& (!IsValid(Monster) || !Monster->IsDead())
+		&& (!IsValid(Stat) || !Stat->IsHealthZero());
+
+	UCharacterMovementComponent* Movement = TransitionMovement.Get();
+	UBrainComponent* Brain = TransitionBrain.Get();
+	TransitionMovement.Reset();
+	TransitionBrain.Reset();
+	if (!bCanRestore) return;
+
+	if (IsValid(Movement))
+	{
+		Movement->SetMovementMode(PreviousMovementMode, PreviousCustomMovementMode);
+	}
+	// Resume only logic that this component paused. Never restart stopped AI.
+	if (IsValid(Brain) && Brain->IsPaused())
+	{
+		Brain->ResumeLogic(TEXT("Boss phase transition finished"));
 	}
 }
 
