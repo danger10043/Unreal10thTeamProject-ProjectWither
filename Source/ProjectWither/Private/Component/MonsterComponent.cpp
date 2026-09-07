@@ -6,14 +6,17 @@
 #include "Data/ItemDropTable.h"
 #include "Item/PickupItem.h"
 #include "Monster/MonsterAIController.h"
-#include "Player/PlayerCharacter.h"
+#include "Interface/PlayerInterface.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Framework/SubSystem/ObjectPoolSubsystem.h"
+#include "DataAsset/MonsterDataAsset.h"
 
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -38,8 +41,51 @@ void UMonsterComponent::BeginPlay()
             StatComponent->OnHealthZero.AddUniqueDynamic(this, &UMonsterComponent::HandleDeath);
         }
 
+		ApplyMonsterData();
+
 		CachePawnCollisionResponses();
     }
+}
+
+void UMonsterComponent::ApplyMonsterData()
+{
+	if (!IsValid(MonsterData))
+	{
+		return;
+	}
+
+	MonsterId = MonsterData->MonsterId;
+	AllowRange = FMath::Max(0.0f, MonsterData->BaseSettings.AllowRange);
+	AttackRange = FMath::Max(0.0f, MonsterData->BaseSettings.AttackRange);
+	AttackCooldown = FMath::Max(0.0f, MonsterData->BaseSettings.AttackCooldown);
+	DespawnPolicy = MonsterData->DespawnPolicy;
+	DespawnDelay = FMath::Max(0.0f, MonsterData->DespawnDelay);
+	AttackMontage = MonsterData->AttackMontage;
+	HitReactMontage = MonsterData->HitReactMontage;
+	ParriedMontage = MonsterData->ParriedMontage;
+	DeathMontage = MonsterData->DeathMontage;
+	SearchMontage = MonsterData->SearchMontage;
+	ItemDropTable = MonsterData->ItemDropTable;
+	ItemPickupClass = MonsterData->ItemPickupClass;
+
+	if (IsValid(StatComponent))
+	{
+		StatComponent->ConfigureStats(
+			MonsterData->MaxHealth,
+			MonsterData->MaxStamina,
+			MonsterData->MinAttackPower,
+			MonsterData->MaxAttackPower,
+			MonsterData->DefensePower);
+		StatComponent->SetCombatMultipliers(
+			MonsterData->BaseSettings.AttackPowerMultiplier,
+			MonsterData->BaseSettings.DefenseMultiplier);
+	}
+
+	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
+	{
+		Character->GetCharacterMovement()->MaxWalkSpeed =
+			FMath::Max(0.0f, MonsterData->BaseSettings.MoveSpeed);
+	}
 }
 
 void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -69,7 +115,7 @@ void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 float UMonsterComponent::ApplyMonsterDamage(float Damage)
 {
-	if (bIsDead || !IsValid(StatComponent))
+	if (bIsDead || bDamageLocked || !IsValid(StatComponent))
 	{
 		return 0.0f;
 	}
@@ -94,6 +140,7 @@ void UMonsterComponent::HandleDeath()
 	bIsDead = true;
 
 	CancelAttack();
+	LockMovementForMontage();
 
 	MonsterState = EMonsterState::Dead;
 	ClearTarget();
@@ -236,7 +283,7 @@ bool UMonsterComponent::IsInAttackRange()
 
 bool UMonsterComponent::CanAttack()
 {
-	if (bIsDead || !bCanAttack)
+	if (bIsDead || !bCanAttack || bCombatLocked)
 	{
 		return false;
 	}
@@ -278,7 +325,7 @@ bool UMonsterComponent::Attack()
 
 	bCanAttack = false;
 	SetMonsterState(EMonsterState::Attack);
-	LockMovementForAttack();
+	LockMovementForMontage();
 
 	const float PlayedLength =
 		AnimInstance->Montage_Play(AttackMontage);
@@ -287,7 +334,7 @@ bool UMonsterComponent::Attack()
 	if (PlayedLength <= 0.0f)
 	{
 		// 재생 실패 시 공격 잠금 복구
-		UnlockMovementAfterAttack();
+		UnlockMovementAfterMontage();
 		bCanAttack = true;
 		SetMonsterState(PreviousState);
 		return false;
@@ -314,7 +361,10 @@ bool UMonsterComponent::Attack()
 void UMonsterComponent::FinishAttack()
 {
 	DisableAllAttackHitboxes();
-	UnlockMovementAfterAttack();
+	if (!bIsDead)
+	{
+		UnlockMovementAfterMontage();
+	}
 
 	if (bIsDead) return;
 
@@ -361,7 +411,7 @@ void UMonsterComponent::ResetAttackCooldown()
 
 void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultiplier)
 {
-	if (bIsDead || !IsValid(HitTarget) || !IsValid(StatComponent))
+	if (bIsDead || bCombatLocked || !IsValid(HitTarget) || !IsValid(StatComponent))
 	{
 		return;
 	}
@@ -443,7 +493,7 @@ void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveCompone
 
 void UMonsterComponent::BeginAttackHitWindow(FName HitboxName)
 {
-	if (bIsDead || MonsterState != EMonsterState::Attack)
+	if (bIsDead || bCombatLocked || MonsterState != EMonsterState::Attack)
 	{
 		return;
 	}
@@ -522,7 +572,7 @@ void UMonsterComponent::CancelAttack()
 
 void UMonsterComponent::PlayHitReaction()
 {
-	if (bIsDead)
+	if (bIsDead || bCombatLocked)
 	{
 		return;
 	}
@@ -538,7 +588,7 @@ void UMonsterComponent::PlayHitReaction()
 
 void UMonsterComponent::HandleParried()
 {
-	if (bIsDead)
+	if (bIsDead || bCombatLocked)
 	{
 		return;
 	}
@@ -576,6 +626,7 @@ void UMonsterComponent::ResetForReuse(const FVector& NewSpawnLocation)
 {
 	ClearRuntimeTimers();
 	StopAllMontages();
+	UnlockMovementAfterMontage();
 
 	// 먼저 MonsterState를 Idle로 초기화
 	ResetRuntimeState();
@@ -591,7 +642,7 @@ void UMonsterComponent::ResetForReuse(const FVector& NewSpawnLocation)
 
 bool UMonsterComponent::PlaySearchAnimation()
 {
-	if (bIsDead || !IsValid(SearchMontage) || !IsValid(GetOwner()))
+	if (bIsDead || bCombatLocked || !IsValid(SearchMontage) || !IsValid(GetOwner()))
 	{
 		return false;
 	}
@@ -622,6 +673,8 @@ bool UMonsterComponent::PlaySearchAnimation()
 		SetMonsterState(PreviousState);
 		return false;
 	}
+
+	LockMovementForMontage();
 
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(
@@ -762,7 +815,7 @@ void UMonsterComponent::OnAttackHitboxOverlap(UPrimitiveComponent* OverlappedCom
 
 void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 {
-	if (bIsDead ||
+	if (bIsDead || bCombatLocked ||
 		MonsterState != EMonsterState::Attack ||
 		!IsValid(ActiveAttackHitbox))
 	{
@@ -774,13 +827,14 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 		return;
 	}
 
-	APlayerCharacter* Player = Cast<APlayerCharacter>(OtherActor);
-	if (!IsValid(Player))
+	if (!OtherActor->Implements<UPlayerInterface>() ||
+		!OtherActor->Implements<UStatComponentUserInterface>())
 	{
 		return;
 	}
 
-	UStatComponent* PlayerStat = IStatComponentUserInterface::Execute_GetStatComponent(Player);
+	UStatComponent* PlayerStat =
+		IStatComponentUserInterface::Execute_GetStatComponent(OtherActor);
 
 	if (!IsValid(PlayerStat) || PlayerStat->IsHealthZero())
 	{
@@ -846,6 +900,7 @@ void UMonsterComponent::PlayReactionMontage(UAnimMontage* Montage)
 	}
 
 	SetMonsterState(EMonsterState::Hit);
+	LockMovementForMontage();
 
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(
@@ -861,6 +916,8 @@ void UMonsterComponent::OnReactionMontageEnded(UAnimMontage* Montage, bool bInte
 	{
 		return;
 	}
+
+	UnlockMovementAfterMontage();
 
 	if (MonsterState == EMonsterState::Hit)
 	{
@@ -922,6 +979,7 @@ void UMonsterComponent::OnSearchMontageEnded(UAnimMontage* Montage, bool bInterr
 
 	if (!bIsDead && MonsterState == EMonsterState::Search)
 	{
+		UnlockMovementAfterMontage();
 		SetMonsterState(IsValid(GetTargetActor()) ? EMonsterState::Chase : EMonsterState::Idle);
 	}
 
@@ -990,6 +1048,8 @@ void UMonsterComponent::ResetRuntimeState()
 
 	bIsDead = false;
 	bCanAttack = true;
+	bCombatLocked = false;
+	bDamageLocked = false;
 	MonsterState = EMonsterState::Idle;
 
 	if (AActor* Owner = GetOwner())
@@ -1122,7 +1182,7 @@ void UMonsterComponent::ResetAnimation()
 	Mesh->InitAnim(true);
 }
 
-void UMonsterComponent::LockMovementForAttack()
+void UMonsterComponent::LockMovementForMontage()
 {
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (!IsValid(OwnerPawn)) return;
@@ -1132,24 +1192,28 @@ void UMonsterComponent::LockMovementForAttack()
 		AIController->StopMovement();
 	}
 
-	LockedAttackMovement = OwnerPawn->GetMovementComponent();
-	if (IsValid(LockedAttackMovement))
+	// 이미 잠겨 있다면 최초 활성 상태를 덮어쓰지 않는다.
+	if (!IsValid(LockedMontageMovement))
 	{
-		bAttackMovementWasActive = LockedAttackMovement->IsActive();
-		LockedAttackMovement->StopMovementImmediately();
-		LockedAttackMovement->Deactivate();
+		LockedMontageMovement = OwnerPawn->GetMovementComponent();
+		if (IsValid(LockedMontageMovement))
+		{
+			bMontageMovementWasActive = LockedMontageMovement->IsActive();
+			LockedMontageMovement->StopMovementImmediately();
+			LockedMontageMovement->Deactivate();
+		}
 	}
 
 	OwnerPawn->ConsumeMovementInputVector();
 }
 
-void UMonsterComponent::UnlockMovementAfterAttack()
+void UMonsterComponent::UnlockMovementAfterMontage()
 {
-	if (IsValid(LockedAttackMovement) && bAttackMovementWasActive)
+	if (IsValid(LockedMontageMovement) && bMontageMovementWasActive)
 	{
-		LockedAttackMovement->Activate(true);
+		LockedMontageMovement->Activate(true);
 	}
 
-	LockedAttackMovement = nullptr;
-	bAttackMovementWasActive = false;
+	LockedMontageMovement = nullptr;
+	bMontageMovementWasActive = false;
 }

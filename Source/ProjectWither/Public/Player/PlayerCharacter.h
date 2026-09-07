@@ -15,6 +15,7 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class UPlayerCameraComponent;
 class UInputAction;
 class UInputMappingContext;
 class UStatComponent;
@@ -25,6 +26,8 @@ class UWeaponDataAsset;
 class UUserWidget;
 class UTestMainUIWidget;
 class UInteractionComponent;
+class UCrosshairUI;
+class ULockOnWidget;
 
 UCLASS()
 class PROJECTWITHER_API APlayerCharacter : 
@@ -49,6 +52,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|Movement")
 	bool IsRunning() const { return bIsRunning; }
 
+	void RefreshMovementForCameraState();
 
 	//Inventory 관련 함수
 	UFUNCTION(BlueprintCallable, Category = "Player|Inventory")
@@ -100,6 +104,11 @@ private:
 	void StartBlockInput();
 	void StopBlockInput();
 
+	void StartZoomInput();
+	void StopZoomInput();
+
+	void LockOnInput();
+
 	void SwapWeaponInput();
 
 	void AddDefaultTestWeapons();
@@ -125,6 +134,9 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInteractionComponent> InteractionComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPlayerCameraComponent> PlayerCameraComponent;
+
 	/*
 	*  테스트용 시작 무기.
 	* PlayerCharacter Blueprint의 디폴트 창에서 지정.
@@ -149,6 +161,18 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTestMainUIWidget> TestMainUIInstance;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Player|UI")
+	TSubclassOf<UCrosshairUI> CrossHairUIClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCrosshairUI> CrossHairUIInstance;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Player|UI")
+	TSubclassOf<ULockOnWidget> LockOnUIClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ULockOnWidget> LockOnUIInstance;
 
 	// 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Camera", meta = (AllowPrivateAccess = "true"))
@@ -186,6 +210,12 @@ private:
 	TObjectPtr<UInputAction> InteractAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> ZoomAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> LockOnAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
 
@@ -195,6 +225,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RunSpeed = 1200.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float ZoomWalkSpeed = 300.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement|Run", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RunStaminaCostPerTick = 2.0f;

@@ -16,6 +16,7 @@ class UDataTable;
 class APickupItem;
 class UPrimitiveComponent;
 class UPawnMovementComponent;
+class UMonsterDataAsset;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterDied);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterAttackFinished, bool, bInterrupted);
@@ -39,6 +40,19 @@ protected:
 public:
     // Both monster actor types forward their damage here.
     float ApplyMonsterDamage(float Damage);
+
+    // Controlled by the system requesting the lock; independent of boss phases and cooldowns.
+    void SetCombatLocked(bool bLocked) { bCombatLocked = bLocked; }
+
+    // Prevents incoming damage without coupling invulnerability to attack/movement locks.
+    void SetDamageLocked(bool bLocked) { bDamageLocked = bLocked; }
+
+    UFUNCTION(BlueprintPure, Category = "Monster|Data")
+    UMonsterDataAsset* GetMonsterData() const { return MonsterData; }
+
+    void SetAttackCooldown(float NewCooldown) { AttackCooldown = FMath::Max(0.0f, NewCooldown); }
+    void SetAttackRange(float NewRange) { AttackRange = FMath::Max(0.0f, NewRange); }
+    void SetAllowRange(float NewRange) { AllowRange = FMath::Max(0.0f, NewRange); }
 
     UFUNCTION(BlueprintPure, Category = "Monster")
     bool IsDead() const { return bIsDead; }
@@ -178,15 +192,19 @@ private:
 
 	void ClearRuntimeTimers();	// 타이머 초기화
 	void ResetRuntimeState();	// 변수들 초기화
+	void ApplyMonsterData();
 	void StopAllMontages();		// 몽타주 정지
 	void CachePawnCollisionResponses();	// 공격 콜리전 캐싱
 	void SetDeadCollision(bool bDeadCollision);	// 공격 콜리전 비활성화
 	void RestartAI();			// AI 재시작
 	void ResetAnimation();		// 애니메이션 초기화
-	void LockMovementForAttack();
-	void UnlockMovementAfterAttack();
+	void LockMovementForMontage();
+	void UnlockMovementAfterMontage();
 
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster|Data")
+	TObjectPtr<UMonsterDataAsset> MonsterData = nullptr;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	int32 MonsterId = 0; // 몬스터 고유 ID
 
@@ -268,10 +286,13 @@ protected:
 	// -------------------------------------------------------------------------
 
 private:
-	UPROPERTY(Transient)
-	TObjectPtr<UPawnMovementComponent> LockedAttackMovement = nullptr;
+	bool bCombatLocked = false;
+	bool bDamageLocked = false;
 
-	bool bAttackMovementWasActive = false;
+	UPROPERTY(Transient)
+	TObjectPtr<UPawnMovementComponent> LockedMontageMovement = nullptr;
+
+	bool bMontageMovementWasActive = false;
 
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<UItemDataAsset>, int32> DropItem;	// 계산 후 확정된 드랍 아이템들

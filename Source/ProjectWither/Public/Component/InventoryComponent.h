@@ -76,6 +76,8 @@ public:
 
 	bool SetItemAtSlot(int32 SlotIndex, const FItemInstance& NewItemInstance);						// 지정한 슬롯의 아이템 정보를 그대로 교체
 
+	bool AddItemInstanceToEmptySlot(const FItemInstance& NewItemInstance);							// 지정한 아이템 정보를 비어있는 슬롯에 추가
+
 	bool UpdataItemAtSlot(int32 SlotIndex, const FItemInstance& NewItemInstance);
 
 	int32 ConsumeAmmoByType(EAmmoType AmmoType, int32 RequestedQuantity);

@@ -7,9 +7,12 @@
 #include "Component/CombatComponent.h"
 #include "Component/InventoryComponent.h"
 #include "Component/InteractionComponent.h"
+#include "Component/PlayerCameraComponent.h"
 #include "Equipment/EquipmentComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "Widget/TestMainUIWidget.h"
+#include "Widget/CrosshairUI.h"
+#include "Widget/LockOnWidget.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -54,6 +57,7 @@ APlayerCharacter::APlayerCharacter()
     EquipmentComponent = CreateDefaultSubobject<UEquipmentComponent>(TEXT("EquipmentComponent"));
     InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
     InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
+    PlayerCameraComponent = CreateDefaultSubobject<UPlayerCameraComponent>(TEXT("PlayerCameraComponent"));
 }
 
 void APlayerCharacter::SetCanMove(bool bNewCanMove)
@@ -65,6 +69,17 @@ void APlayerCharacter::SetCanMove(bool bNewCanMove)
         StopRun();
         GetCharacterMovement()->StopMovementImmediately();
     }
+}
+
+void APlayerCharacter::RefreshMovementForCameraState()
+{
+    if (IsValid(PlayerCameraComponent) && PlayerCameraComponent->IsZooming())
+    {
+        StopRun();
+        return;
+    }
+
+    UpdateMovementSpeed();
 }
 
 void APlayerCharacter::ToggleInventory()
@@ -165,9 +180,52 @@ UCombatComponent* APlayerCharacter::GetCombatComponent_Implementation() const
 
 void APlayerCharacter::BeginPlay()
 {
-	Super::BeginPlay();
-	
+    Super::BeginPlay();
+
+    if (IsValid(PlayerCameraComponent))
+    {
+        PlayerCameraComponent->InitializeCamera(PlayerCamera.Get(), CameraArm.Get());
+    }
+
     AddDefaultTestWeapons();
+
+    if (IsLocallyControlled() && IsValid(LockOnUIClass))
+    {
+        APlayerController* LockOnController =
+            Cast<APlayerController>(GetController());
+
+        if (IsValid(LockOnController))
+        {
+            LockOnUIInstance = CreateWidget<ULockOnWidget>(
+                LockOnController,
+                LockOnUIClass
+            );
+
+            if (IsValid(LockOnUIInstance))
+            {
+                LockOnUIInstance->AddToPlayerScreen();
+            }
+        }
+    }
+
+    if (IsLocallyControlled() && IsValid(CrossHairUIClass))
+    {
+        APlayerController* CrossHairController =
+            Cast<APlayerController>(GetController());
+
+        if (IsValid(CrossHairController))
+        {
+            CrossHairUIInstance = CreateWidget<UCrosshairUI>(
+                CrossHairController,
+                CrossHairUIClass
+            );
+
+            if (IsValid(CrossHairUIInstance))
+            {
+                CrossHairUIInstance->AddToPlayerScreen();
+            }
+        }
+    }
 
     if (IsLocallyControlled() && IsValid(TestMainUIClass))
     {
@@ -205,6 +263,18 @@ void APlayerCharacter::BeginPlay()
 void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     GetWorldTimerManager().ClearTimer(RunStaminaTimerHandle);
+
+    if (IsValid(LockOnUIInstance))
+    {
+        LockOnUIInstance->RemoveFromParent();
+        LockOnUIInstance = nullptr;
+    }
+
+    if (IsValid(CrossHairUIInstance))
+    {
+        CrossHairUIInstance->RemoveFromParent();
+        CrossHairUIInstance = nullptr;
+    }
 
     if (IsValid(TestMainUIInstance))
     {
@@ -244,6 +314,11 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &APlayerCharacter::SwapWeaponInput);
     EnhancedInput->BindAction(InventoryAction, ETriggerEvent::Started, this, &APlayerCharacter::ToggleInventory);
     EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &APlayerCharacter::InteractInput);
+    EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Started, this, &APlayerCharacter::StartZoomInput);
+    EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopZoomInput);
+    EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopZoomInput);
+    EnhancedInput->BindAction(LockOnAction, ETriggerEvent::Started, this, &APlayerCharacter::LockOnInput);
+    
 }
 
 float APlayerCharacter::TakeDamage(float Damage, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
@@ -277,17 +352,39 @@ void APlayerCharacter::Move(const FInputActionValue& Value)
 
 void APlayerCharacter::Look(const FInputActionValue& Value)
 {
-    if (!Controller) { return; }
-    const FVector2D Input = Value.Get<FVector2D>();
+    if (!Controller)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("PlayerCameraComponent::HandleLookInput - 플레이어 컨트롤러가 유효하지 않습니다.")
+        );
+        return;
+    }
 
-    AddControllerYawInput(Input.X);
-    AddControllerPitchInput(Input.Y);
+    if (!IsValid(PlayerCameraComponent))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("PlayerCameraComponent::HandleLookInput - PlayerCameraComponent 가 유효하지 않습니다.")
+        );
+        return;
+    }
+
+    const FVector2D Input = Value.Get<FVector2D>();
+    
+    PlayerCameraComponent->HandleLookInput(Input);
 }
 
 void APlayerCharacter::StartRun()
 {
     if (!bCanMove || !IsValid(StatComponent)) return;
 
+    if (IsValid(PlayerCameraComponent) && PlayerCameraComponent->IsZooming())
+    {
+        return;
+    }
 
     if (StatComponent->GetCurrentStamina() <= 0.0f)
     {
@@ -356,6 +453,23 @@ void APlayerCharacter::UpdateMovementSpeed()
     UCharacterMovementComponent* Movement = GetCharacterMovement();
 
     if (!Movement) { return; }
+
+    const bool bIsGunZooming =
+        IsValid(WeaponComponent) &&
+        WeaponComponent->IsGunEquipped() &&
+        IsValid(PlayerCameraComponent) &&
+        PlayerCameraComponent->IsZooming();
+
+    if (bIsGunZooming)
+    {
+        Movement->MaxWalkSpeed = FMath::Clamp(
+            ZoomWalkSpeed,
+            0.0f,
+            FMath::Max(0.0f, WalkSpeed)
+        );
+        return;
+    }
+
     Movement->MaxWalkSpeed = bIsRunning ? RunSpeed : WalkSpeed;
 }
 
@@ -390,6 +504,63 @@ void APlayerCharacter::StopBlockInput()
 {
     if (!IsValid(CombatComponent)) { return; }
     CombatComponent->StopBlock();
+}
+
+void APlayerCharacter::StartZoomInput()
+{
+    if (!IsValid(WeaponComponent))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("APlayerCharacter::StartZoomInput - WeaponComponent 가 유효하지 않습니다.")
+        );
+        return;
+    }
+
+    if (!WeaponComponent->IsGunEquipped())
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("APlayerCharacter::StartZoomInput - 플레이어가 총을 현재 장착하고 있지 않습니다.")
+        );
+        return;
+    }
+
+    if (!IsValid(PlayerCameraComponent))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("APlayerCharacter::StartZoomInput - PlayerCameraComponent 가 유효하지 않습니다.")
+        );
+        return;
+    }
+
+    PlayerCameraComponent->StartZoom();
+}
+
+void APlayerCharacter::StopZoomInput()
+{
+    if (!IsValid(PlayerCameraComponent))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("APlayerCharacter::StopZoomInput - PlayerCameraComponent 가 유효하지 않습니다.")
+        );
+        return;
+    }
+
+    PlayerCameraComponent->StopZoom();
+}
+
+void APlayerCharacter::LockOnInput()
+{
+    if (!IsValid(PlayerCameraComponent)) return;
+
+    PlayerCameraComponent->ToggleLockOn();
 }
 
 void APlayerCharacter::SwapWeaponInput()
