@@ -15,6 +15,7 @@
 #include "BrainComponent.h"
 #include "GameFramework/Character.h"
 #include "DataAsset/BossDataAsset.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 // Sets default values for this component's properties
 UBossComponent::UBossComponent()
@@ -104,6 +105,7 @@ void UBossComponent::BeginPlay()
         }
     }
 
+	InitializeDynamicMaterials();
 	ApplyPhaseSettings(EBossPhase::Phase1);
 }
 
@@ -320,6 +322,61 @@ void UBossComponent::ApplyPhaseSettings(EBossPhase Phase)
 		Stat->SetCombatMultipliers(
 			Settings->AttackPowerMultiplier,
 			Settings->DefenseMultiplier);
+	}
+
+	ApplyPhaseVisuals(*Settings);
+}
+
+void UBossComponent::InitializeDynamicMaterials()
+{
+	BodyDynamicMaterials.Reset();
+	FurDynamicMaterials.Reset();
+
+	const UBossDataAsset* BossData = GetBossData();
+	USkeletalMeshComponent* Mesh = IsValid(GetOwner())
+		? GetOwner()->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+	if (!IsValid(BossData) || !IsValid(Mesh)) return;
+
+	auto CreateForSlots = [Mesh](const TArray<FName>& SlotNames,
+		TArray<TObjectPtr<UMaterialInstanceDynamic>>& OutMaterials)
+	{
+		for (const FName SlotName : SlotNames)
+		{
+			const int32 MaterialIndex = Mesh->GetMaterialIndex(SlotName);
+			if (MaterialIndex == INDEX_NONE) continue;
+
+			if (UMaterialInstanceDynamic* Material = Mesh->CreateDynamicMaterialInstance(MaterialIndex))
+			{
+				OutMaterials.AddUnique(Material);
+			}
+		}
+	};
+
+	CreateForSlots(BossData->BodyMaterialSlots, BodyDynamicMaterials);
+	CreateForSlots(BossData->FurMaterialSlots, FurDynamicMaterials);
+}
+
+void UBossComponent::ApplyPhaseVisuals(const FBossPhaseSettings& Settings)
+{
+	const UBossDataAsset* BossData = GetBossData();
+	if (!IsValid(BossData)) return;
+
+	for (UMaterialInstanceDynamic* Material : BodyDynamicMaterials)
+	{
+		if (!IsValid(Material)) continue;
+		Material->SetVectorParameterValue(BossData->BodyTintParameterName, Settings.BodyTint);
+		Material->SetScalarParameterValue(
+			BossData->EmissiveStrengthParameterName,
+			FMath::Max(0.0f, Settings.EmissiveStrength));
+	}
+
+	for (UMaterialInstanceDynamic* Material : FurDynamicMaterials)
+	{
+		if (!IsValid(Material)) continue;
+		Material->SetVectorParameterValue(BossData->FurTintParameterName, Settings.FurTint);
+		Material->SetScalarParameterValue(
+			BossData->EmissiveStrengthParameterName,
+			FMath::Max(0.0f, Settings.EmissiveStrength));
 	}
 }
 

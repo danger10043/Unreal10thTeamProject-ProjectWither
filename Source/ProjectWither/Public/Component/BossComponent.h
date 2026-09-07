@@ -13,6 +13,7 @@ class UAnimInstance;
 class UAnimMontage;
 class UBrainComponent;
 class UBossDataAsset;
+class UMaterialInstanceDynamic;
 struct FBossPhaseSettings;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
@@ -85,6 +86,8 @@ private:
     UAnimMontage* GetPhaseTransitionMontage() const;
     const FBossPhaseSettings* GetPhaseSettings(EBossPhase Phase) const;
     void ApplyPhaseSettings(EBossPhase Phase);
+    void InitializeDynamicMaterials();
+    void ApplyPhaseVisuals(const FBossPhaseSettings& Settings);
 
     UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Boss", meta = (AllowPrivateAccess = "true"))
     EBossPhase CurrentPhase = EBossPhase::Phase1;
@@ -100,6 +103,12 @@ private:
     uint8 PreviousCustomMovementMode = 0;
 
     FTimerHandle PhaseTransitionTimerHandle;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UMaterialInstanceDynamic>> BodyDynamicMaterials;
+
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UMaterialInstanceDynamic>> FurDynamicMaterials;
 
     bool bPhase2Triggered = false;
 };

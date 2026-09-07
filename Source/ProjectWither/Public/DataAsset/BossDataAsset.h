@@ -20,4 +20,19 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Phase")
     TObjectPtr<UAnimMontage> PhaseTransitionMontage;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Visual")
+    TArray<FName> BodyMaterialSlots;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Visual")
+    TArray<FName> FurMaterialSlots;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Visual")
+    FName BodyTintParameterName = TEXT("BodyTint");
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Visual")
+    FName FurTintParameterName = TEXT("FurTint");
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Visual")
+    FName EmissiveStrengthParameterName = TEXT("EmissiveStrength");
 };
