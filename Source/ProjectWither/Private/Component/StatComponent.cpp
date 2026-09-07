@@ -7,6 +7,30 @@ UStatComponent::UStatComponent()
 
 }
 
+void UStatComponent::ConfigureStats(float InMaxHealth, float InMaxStamina,
+	float InMinAttackPower, float InMaxAttackPower, float InDefensePower)
+{
+	MaxHealth = FMath::Max(0.0f, InMaxHealth);
+	MaxStamina = FMath::Max(0.0f, InMaxStamina);
+	MinAttackPower = FMath::Max(0.0f, InMinAttackPower);
+	MaxAttackPower = FMath::Max(0.0f, InMaxAttackPower);
+	if (MinAttackPower > MaxAttackPower)
+	{
+		Swap(MinAttackPower, MaxAttackPower);
+	}
+	DefensePower = FMath::Max(0.0f, InDefensePower);
+	AttackPowerMultiplier = 1.0f;
+	DefenseMultiplier = 1.0f;
+	CurrentHealth = MaxHealth;
+	CurrentStamina = MaxStamina;
+}
+
+void UStatComponent::SetCombatMultipliers(float InAttackPowerMultiplier, float InDefenseMultiplier)
+{
+	AttackPowerMultiplier = FMath::Max(0.0f, InAttackPowerMultiplier);
+	DefenseMultiplier = FMath::Max(0.0f, InDefenseMultiplier);
+}
+
 void UStatComponent::BeginPlay()
 {
 	Super::BeginPlay();

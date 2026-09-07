@@ -5,13 +5,18 @@
 #include "CommonHeader/MonsterStateEnums.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Interface/PoolableInterface.h"
+#include "Interface/EnemyInterface.h"
 #include "MonsterCharacterBase.generated.h"
 
 class UMonsterComponent;
 class UStatComponent;
 
 UCLASS()
-class PROJECTWITHER_API AMonsterCharacterBase : public ACharacter, public IStatComponentUserInterface, public IPoolableInterface
+class PROJECTWITHER_API AMonsterCharacterBase : 
+    public ACharacter, 
+    public IStatComponentUserInterface,
+    public IPoolableInterface,
+    public IEnemyInterface
 {
     GENERATED_BODY()
 

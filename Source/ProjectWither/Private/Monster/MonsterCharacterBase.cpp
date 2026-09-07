@@ -1,12 +1,30 @@
 #include "Monster/MonsterCharacterBase.h"
 #include "Component/MonsterComponent.h"
 #include "Component/StatComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 AMonsterCharacterBase::AMonsterCharacterBase()
 {
     PrimaryActorTick.bCanEverTick = true;
+
     StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
+
     MonsterComponent = CreateDefaultSubobject<UMonsterComponent>(TEXT("MonsterComponent"));
+
+    bUseControllerRotationYaw = false;
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationRoll = false;
+
+    UCharacterMovementComponent* Movement =
+        GetCharacterMovement();
+
+    if (Movement)
+    {
+        Movement->bOrientRotationToMovement = true;
+        Movement->bUseControllerDesiredRotation = false;
+        Movement->RotationRate =
+            FRotator(0.0f, 180.0f, 0.0f);
+    }
 }
 
 float AMonsterCharacterBase::TakeDamage(float Damage, const FDamageEvent& DamageEvent,
