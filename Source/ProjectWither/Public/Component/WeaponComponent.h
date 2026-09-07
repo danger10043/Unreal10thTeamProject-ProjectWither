@@ -55,11 +55,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Gun")
 	bool FireGun();
 
-	UFUNCTION(BlueprintNativeEvent, Category = "Weapon|Gun")
-	bool PerformGunFire(AActor* CurrentWeaponActor);
-
-	virtual bool PerformGunFire_Implementation(AActor* CurrentWeaponActor);
-
 	bool ConsumeAmmo();
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Gun")

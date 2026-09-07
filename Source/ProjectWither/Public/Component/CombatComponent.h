@@ -190,13 +190,11 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimMontage> SwordAttackMontage;
 
-	UPROPERTY(
-		EditDefaultsOnly,
-		BlueprintReadOnly,
-		Category = "Combat|HitReact",
-		meta = (AllowPrivateAccess = "true")
-	)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|HitReact", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimMontage> HitReactMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Death", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> DeathMontage;
 
 	/*
 	* 하나의 SwordAttackAnimNotifyState 구간에서 이미 피해를 받은 적

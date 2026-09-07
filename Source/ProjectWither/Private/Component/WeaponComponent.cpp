@@ -1,12 +1,15 @@
 #include "Component/WeaponComponent.h"
 #include "Component/InventoryComponent.h"
 #include "Component/StatComponent.h"
+#include "Equipment/Weapon/RangedWeaponActorBase.h"
 
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/Pawn.h"
 #include "Interface/StatComponentUserInterface.h"
 
 UWeaponComponent::UWeaponComponent()
@@ -145,7 +148,7 @@ bool UWeaponComponent::SwapWeapon()
 	if (!InventoryComponent->GetItemAtSlot(TargetSlot, TargetWeapon)) return false;
 
 	UWeaponDataAsset* TargetWeaponData = Cast<UWeaponDataAsset>(TargetWeapon.ItemData.Get());
-
+	
 	return IsValid(TargetWeaponData) && EquipWeapon(TargetWeaponData);
 }
 
@@ -184,19 +187,147 @@ bool UWeaponComponent::IsGunEquipped() const
 }
 
 bool UWeaponComponent::FireGun()
-{
-	if (!IsGunEquipped() || GetCurrentAmmo() <= 0 || !IsValid(WeaponActor)) return false;
+{	
+	if (!IsGunEquipped())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::FireGun - 캐릭터가 총을 장착하고 있지 않습니다.")
+		);
+		return false;
+	}
 
-	if (!IsValid(StatComponent) || StatComponent->IsHealthZero()) return false;
+	if (GetCurrentAmmo() <= 0)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::FireGun - 현재 총의 탄약 개수가 0입니다.")
+		);
+		return false;
+	}
 
-	if (!PerformGunFire(WeaponActor)) return false;
+	if (!IsValid(WeaponActor))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::FireGun - WeaponActor가 유효하지 않습니다.")
+		);
+		return false;
+	}
+
+	if (!IsValid(StatComponent))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::FireGun - StatComponent가 유효하지 않습니다.")
+		);
+		return false;
+	}
+
+	if (StatComponent->IsHealthZero())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::FireGun - 현재 플레이어의 체력이 0 입니다.")
+		);
+		return false;
+	}
+
+	ARangedWeaponActorBase* RangedWeapon = Cast<ARangedWeaponActorBase>(WeaponActor);
+
+	if (!IsValid(RangedWeapon))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::FireGun - 장착된 총기 액터가 ARangedWeaponActorBase를 상속하지 않았습니다. 현재 액터: %s"),
+			*GetNameSafe(WeaponActor)
+		);
+		return false;
+	}
+
+	AActor* OwnerActor = GetOwner();
+
+	if (!IsValid(OwnerActor))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::FireGun - OwnerActor가 유효하지 않습니다.")
+		);
+		return false;
+	}
+
+	APawn* OwnerPawn = Cast<APawn>(OwnerActor);
+	AController* OwnerController = IsValid(OwnerPawn) ? OwnerPawn->GetController() : nullptr;
+
+	FVector AimOrigin = FVector::ZeroVector;
+	FRotator AimRotation = FRotator::ZeroRotator;
+
+	if (IsValid(OwnerController))
+	{
+		OwnerController->GetPlayerViewPoint(
+			AimOrigin,
+			AimRotation
+		);
+	}
+	else
+	{
+		OwnerActor->GetActorEyesViewPoint(
+			AimOrigin,
+			AimRotation
+		);
+	}
+
+	const UWeaponDataAsset* WeaponData = GetCurrentWeaponData();
+
+	if (!IsValid(WeaponData))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::FireGun - WeaponData 가 유효하지 않습니다.")
+		);
+		return false;
+	}
+
+	const float MinAttackPower = 
+		FMath::Min(
+		StatComponent->GetMinAttackPower(),
+		StatComponent->GetMaxAttackPower()
+		);
+
+	const float MaxAttackPower =
+		FMath::Max(
+			StatComponent->GetMinAttackPower(),
+			StatComponent->GetMaxAttackPower()
+		);
+
+	FGunFireContext FireContext;
+	FireContext.Shooter = OwnerActor;
+	FireContext.InstigatorController = OwnerController;
+	FireContext.AimOrigin = AimOrigin;
+	FireContext.AimDirection = AimRotation.Vector().GetSafeNormal();
+	FireContext.Damage =
+		FMath::Max(
+			0.0f,
+			FMath::FRandRange(
+				MinAttackPower,
+				MaxAttackPower
+			) + WeaponData->GetWeaponPower()
+		);
+
+	if (!RangedWeapon->Fire(FireContext))
+	{
+		return false;
+	}
 
 	return ConsumeAmmo();
-}
-
-bool UWeaponComponent::PerformGunFire_Implementation(AActor* CurrentWeaponActor)
-{
-	return false;
 }
 
 bool UWeaponComponent::ConsumeAmmo()
