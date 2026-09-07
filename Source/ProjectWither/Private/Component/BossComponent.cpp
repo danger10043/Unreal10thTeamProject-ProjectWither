@@ -57,6 +57,7 @@ void UBossComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		if (UMonsterComponent* Monster = GetOwner()->FindComponentByClass<UMonsterComponent>())
 		{
 			Monster->SetCombatLocked(false);
+			Monster->SetDamageLocked(false);
 		}
 	}
 	if (UWorld* World = GetWorld())
@@ -168,6 +169,7 @@ void UBossComponent::SetPhase(EBossPhase NewPhase)
 	if (UMonsterComponent* Monster = GetOwner()->FindComponentByClass<UMonsterComponent>())
 	{
 		Monster->SetCombatLocked(IsTransitioning());
+		Monster->SetDamageLocked(IsTransitioning());
 		if (IsTransitioning())
 		{
 			Monster->CancelAttack();

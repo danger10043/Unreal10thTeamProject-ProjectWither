@@ -69,7 +69,7 @@ void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 float UMonsterComponent::ApplyMonsterDamage(float Damage)
 {
-	if (bIsDead || !IsValid(StatComponent))
+	if (bIsDead || bDamageLocked || !IsValid(StatComponent))
 	{
 		return 0.0f;
 	}
@@ -1002,6 +1002,8 @@ void UMonsterComponent::ResetRuntimeState()
 
 	bIsDead = false;
 	bCanAttack = true;
+	bCombatLocked = false;
+	bDamageLocked = false;
 	MonsterState = EMonsterState::Idle;
 
 	if (AActor* Owner = GetOwner())

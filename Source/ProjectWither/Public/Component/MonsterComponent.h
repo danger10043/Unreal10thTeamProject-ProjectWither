@@ -43,6 +43,9 @@ public:
     // Controlled by the system requesting the lock; independent of boss phases and cooldowns.
     void SetCombatLocked(bool bLocked) { bCombatLocked = bLocked; }
 
+    // Prevents incoming damage without coupling invulnerability to attack/movement locks.
+    void SetDamageLocked(bool bLocked) { bDamageLocked = bLocked; }
+
     UFUNCTION(BlueprintPure, Category = "Monster")
     bool IsDead() const { return bIsDead; }
 
@@ -272,6 +275,7 @@ protected:
 
 private:
 	bool bCombatLocked = false;
+	bool bDamageLocked = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPawnMovementComponent> LockedMontageMovement = nullptr;
