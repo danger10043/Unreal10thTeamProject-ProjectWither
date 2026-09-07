@@ -32,6 +32,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
 	void StopZoom();
 
+	UFUNCTION(BlueprintPure, Category = "Player|Camera")
+	bool IsZooming() const
+	{
+		return CameraState == EPlayerCameraState::Zoom;
+	}
+
 	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
 	void ChangeCameraState(EPlayerCameraState NewState);
 
@@ -43,6 +49,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
 	void ClearLockOn();
+
+	UFUNCTION(BlueprintPure, Category = "Player|Camera")
+	AActor* GetLockOnTarget() const
+	{
+		return CameraState == EPlayerCameraState::LockOn &&
+			IsValid(LockonTarget)
+			? LockonTarget.Get() : nullptr;
+	}
 
 	void UpdateLockOnRotation(float DeltaTime);
 

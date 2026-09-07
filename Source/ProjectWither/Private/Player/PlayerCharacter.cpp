@@ -11,6 +11,8 @@
 #include "Equipment/EquipmentComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "Widget/TestMainUIWidget.h"
+#include "Widget/CrosshairUI.h"
+#include "Widget/LockOnWidget.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -67,6 +69,17 @@ void APlayerCharacter::SetCanMove(bool bNewCanMove)
         StopRun();
         GetCharacterMovement()->StopMovementImmediately();
     }
+}
+
+void APlayerCharacter::RefreshMovementForCameraState()
+{
+    if (IsValid(PlayerCameraComponent) && PlayerCameraComponent->IsZooming())
+    {
+        StopRun();
+        return;
+    }
+
+    UpdateMovementSpeed();
 }
 
 void APlayerCharacter::ToggleInventory()
@@ -162,14 +175,52 @@ UCombatComponent* APlayerCharacter::GetCombatComponent_Implementation() const
 
 void APlayerCharacter::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
 
     if (IsValid(PlayerCameraComponent))
     {
         PlayerCameraComponent->InitializeCamera(PlayerCamera.Get(), CameraArm.Get());
     }
-	
+
     AddDefaultTestWeapons();
+
+    if (IsLocallyControlled() && IsValid(LockOnUIClass))
+    {
+        APlayerController* LockOnController =
+            Cast<APlayerController>(GetController());
+
+        if (IsValid(LockOnController))
+        {
+            LockOnUIInstance = CreateWidget<ULockOnWidget>(
+                LockOnController,
+                LockOnUIClass
+            );
+
+            if (IsValid(LockOnUIInstance))
+            {
+                LockOnUIInstance->AddToPlayerScreen();
+            }
+        }
+    }
+
+    if (IsLocallyControlled() && IsValid(CrossHairUIClass))
+    {
+        APlayerController* CrossHairController =
+            Cast<APlayerController>(GetController());
+
+        if (IsValid(CrossHairController))
+        {
+            CrossHairUIInstance = CreateWidget<UCrosshairUI>(
+                CrossHairController,
+                CrossHairUIClass
+            );
+
+            if (IsValid(CrossHairUIInstance))
+            {
+                CrossHairUIInstance->AddToPlayerScreen();
+            }
+        }
+    }
 
     if (IsLocallyControlled() && IsValid(TestMainUIClass))
     {
@@ -207,6 +258,18 @@ void APlayerCharacter::BeginPlay()
 void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     GetWorldTimerManager().ClearTimer(RunStaminaTimerHandle);
+
+    if (IsValid(LockOnUIInstance))
+    {
+        LockOnUIInstance->RemoveFromParent();
+        LockOnUIInstance = nullptr;
+    }
+
+    if (IsValid(CrossHairUIInstance))
+    {
+        CrossHairUIInstance->RemoveFromParent();
+        CrossHairUIInstance = nullptr;
+    }
 
     if (IsValid(TestMainUIInstance))
     {
@@ -313,6 +376,10 @@ void APlayerCharacter::StartRun()
 {
     if (!bCanMove || !IsValid(StatComponent)) return;
 
+    if (IsValid(PlayerCameraComponent) && PlayerCameraComponent->IsZooming())
+    {
+        return;
+    }
 
     if (StatComponent->GetCurrentStamina() <= 0.0f)
     {
@@ -381,6 +448,23 @@ void APlayerCharacter::UpdateMovementSpeed()
     UCharacterMovementComponent* Movement = GetCharacterMovement();
 
     if (!Movement) { return; }
+
+    const bool bIsGunZooming =
+        IsValid(WeaponComponent) &&
+        WeaponComponent->IsGunEquipped() &&
+        IsValid(PlayerCameraComponent) &&
+        PlayerCameraComponent->IsZooming();
+
+    if (bIsGunZooming)
+    {
+        Movement->MaxWalkSpeed = FMath::Clamp(
+            ZoomWalkSpeed,
+            0.0f,
+            FMath::Max(0.0f, WalkSpeed)
+        );
+        return;
+    }
+
     Movement->MaxWalkSpeed = bIsRunning ? RunSpeed : WalkSpeed;
 }
 
