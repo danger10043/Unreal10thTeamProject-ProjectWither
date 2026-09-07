@@ -16,6 +16,7 @@
 #include "Component/StatComponent.h"
 #include "Interface/CombatComponentUserInterface.h"
 #include "Interface/StatComponentUserInterface.h"
+#include "Interface/EnemyInterface.h"
 
 UPlayerCameraComponent::UPlayerCameraComponent()
 {
@@ -670,10 +671,15 @@ bool UPlayerCameraComponent::IsValidLockOnTarget(AActor* Target) const
 		return false;
 	}
 
+	if (!Target->GetClass()->ImplementsInterface(UEnemyInterface::StaticClass()))
+	{
+		return false;
+	}
+
 	const UMonsterComponent* MonsterComponent =
 		Target->FindComponentByClass<UMonsterComponent>();
 
-	if (!IsValid(MonsterComponent) || MonsterComponent->IsDead())
+	if (IsValid(MonsterComponent) && MonsterComponent->IsDead())
 	{
 		return false;
 	}
