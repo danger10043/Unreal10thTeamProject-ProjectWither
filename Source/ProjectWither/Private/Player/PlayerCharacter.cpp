@@ -11,6 +11,7 @@
 #include "Equipment/EquipmentComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "Widget/TestMainUIWidget.h"
+#include "Widget/CrosshairUI.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -162,14 +163,33 @@ UCombatComponent* APlayerCharacter::GetCombatComponent_Implementation() const
 
 void APlayerCharacter::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
 
     if (IsValid(PlayerCameraComponent))
     {
         PlayerCameraComponent->InitializeCamera(PlayerCamera.Get(), CameraArm.Get());
     }
-	
+
     AddDefaultTestWeapons();
+
+    if (IsLocallyControlled() && IsValid(CrossHairUIClass))
+    {
+        APlayerController* CrossHairController =
+            Cast<APlayerController>(GetController());
+
+        if (IsValid(CrossHairController))
+        {
+            CrossHairUIInstance = CreateWidget<UCrosshairUI>(
+                CrossHairController,
+                CrossHairUIClass
+            );
+
+            if (IsValid(CrossHairUIInstance))
+            {
+                CrossHairUIInstance->AddToPlayerScreen();
+            }
+        }
+    }
 
     if (IsLocallyControlled() && IsValid(TestMainUIClass))
     {
@@ -207,6 +227,12 @@ void APlayerCharacter::BeginPlay()
 void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     GetWorldTimerManager().ClearTimer(RunStaminaTimerHandle);
+
+    if (IsValid(CrossHairUIInstance))
+    {
+        CrossHairUIInstance->RemoveFromParent();
+        CrossHairUIInstance = nullptr;
+    }
 
     if (IsValid(TestMainUIInstance))
     {

@@ -26,6 +26,7 @@ class UWeaponDataAsset;
 class UUserWidget;
 class UTestMainUIWidget;
 class UInteractionComponent;
+class UCrosshairUI;
 
 UCLASS()
 class PROJECTWITHER_API APlayerCharacter : 
@@ -158,6 +159,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTestMainUIWidget> TestMainUIInstance;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Player|UI")
+	TSubclassOf<UCrosshairUI> CrossHairUIClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCrosshairUI> CrossHairUIInstance;
 
 	// 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Camera", meta = (AllowPrivateAccess = "true"))
