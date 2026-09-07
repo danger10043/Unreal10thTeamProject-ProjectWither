@@ -162,7 +162,10 @@ void UPlayerCameraComponent::HandleLookInput(const FVector2D& Input)
 		return;
 	}
 
-	HandleLockOnLookInput(Input);
+	if (CameraState == EPlayerCameraState::LockOn)
+	{
+		return;
+	}
 
 	OwnerPlayer->AddControllerYawInput(Input.X);
 	OwnerPlayer->AddControllerPitchInput(Input.Y);
@@ -421,13 +424,6 @@ void UPlayerCameraComponent::UpdateLockOnRotation(float DeltaTime)
 	UWorld* World = GetWorld();
 
 	if (!IsValid(PC) || !IsValid(World) || !OwnerPlayer->IsLocallyControlled() || PC->IsLookInputIgnored())
-	{
-		return;
-	}
-
-	// 마우스 조작 직후에는 자동 회전을 잠시 유예
-	const double Now = World->GetTimeSeconds();
-	if (LastLockOnMouseInputTime >= 0.0 && Now - LastLockOnMouseInputTime < LockOnReturnDelay)
 	{
 		return;
 	}
