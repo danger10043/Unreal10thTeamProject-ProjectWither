@@ -13,6 +13,7 @@
 #include "Widget/TestMainUIWidget.h"
 #include "Widget/CrosshairUI.h"
 #include "Widget/LockOnWidget.h"
+#include "Widget/StatWindowWidget.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -153,6 +154,53 @@ void APlayerCharacter::CloseInventory()
     PlayerController->SetInputMode(InputMode);														// 설정한 입력 모드를 PlayerController에 적용한다.
 }
 
+void APlayerCharacter::ToggleStatWindow()
+{
+    if (IsValid(StatWindowInstance))
+    {
+        CloseStatWindow();
+        return;
+    }
+
+    OpenStatWindow();
+}
+
+void APlayerCharacter::OpenStatWindow()
+{
+    if (IsValid(StatWindowInstance) || !IsLocallyControlled() || !IsValid(StatWindowClass))
+    {
+        return;
+    }
+
+    APlayerController* PlayerController = Cast<APlayerController>(GetController());
+
+    if (!IsValid(PlayerController))
+    {
+        return;
+    }
+
+    StatWindowInstance = CreateWidget<UStatWindowWidget>(PlayerController, StatWindowClass);
+
+    if (!IsValid(StatWindowInstance))
+    {
+        return;
+    }
+
+    StatWindowInstance->AddToViewport();
+    StatWindowInstance->RefreshStats();
+}
+
+void APlayerCharacter::CloseStatWindow()
+{
+    if (!IsValid(StatWindowInstance))
+    {
+        return;
+    }
+
+    StatWindowInstance->RemoveFromParent();
+    StatWindowInstance = nullptr;
+}
+
 UStatComponent* APlayerCharacter::GetStatComponent_Implementation() const
 {
     return StatComponent;
@@ -277,6 +325,8 @@ void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
         TestMainUIInstance = nullptr;
     }
 
+    CloseStatWindow();
+
     Super::EndPlay(EndPlayReason);
 }
 
@@ -308,6 +358,10 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &APlayerCharacter::SwapWeaponInput);
     EnhancedInput->BindAction(InventoryAction, ETriggerEvent::Started, this, &APlayerCharacter::ToggleInventory);
+    if (IsValid(StatWindowAction))
+    {
+        EnhancedInput->BindAction(StatWindowAction, ETriggerEvent::Started, this, &APlayerCharacter::ToggleStatWindow);
+    }
     EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &APlayerCharacter::InteractInput);
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Started, this, &APlayerCharacter::StartZoomInput);
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopZoomInput);

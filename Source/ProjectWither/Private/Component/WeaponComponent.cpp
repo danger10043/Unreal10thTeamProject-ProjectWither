@@ -107,6 +107,8 @@ bool UWeaponComponent::EquipWeapon(UWeaponDataAsset* WeaponData)
 	CurrentWeaponSlot = NewWeaponSlot;
 	WeaponActor = NewWeaponActor;
 
+	OnWeaponChanged.Broadcast();
+
 	return true;
 }
 
@@ -120,6 +122,8 @@ void UWeaponComponent::UnequipWeapon()
 	DestroyWeaponActor();
 	CurrentWeapon = FItemInstance();
 	CurrentWeaponSlot = INDEX_NONE;
+
+	OnWeaponChanged.Broadcast();
 }
 
 bool UWeaponComponent::SwapWeapon()
