@@ -39,6 +39,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction|UI")
 	bool IsInteractionUIOpen() const;
 
+	UFUNCTION(BlueprintPure, Category = "Interaction|UI")
+	AActor* GetActiveInteractionTarget() const
+	{
+		return ActiveInteractionTarget.Get();
+	}
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;

@@ -3,11 +3,14 @@
 
 #include "NPC/BlacksmithNPC.h"
 #include "Component/InteractionComponent.h"
+#include "Component/BlacksmithComponent.h"
 #include "Blueprint/UserWidget.h"
 
 ABlacksmithNPC::ABlacksmithNPC()
 {
 	NPCName = FText::FromString(TEXT("대장장이"));
+
+	BlacksmithComponent = CreateDefaultSubobject<UBlacksmithComponent>(TEXT("BlacksmithComponent"));
 }
 
 void ABlacksmithNPC::HandleInteraction(AActor* Interactor)

@@ -7,6 +7,7 @@
 #include "BlacksmithNPC.generated.h"
 
 class UUserWidget;
+class UBlacksmithComponent;
 
 /**
  * 
@@ -19,11 +20,17 @@ class PROJECTWITHER_API ABlacksmithNPC : public ANPCBase
 public:
 	ABlacksmithNPC();
 
+	UFUNCTION(BlueprintPure, Category = "Blacksmith")
+	UBlacksmithComponent* GetBlacksmithComponent() const { return BlacksmithComponent; }
+
 protected:
 	virtual void HandleInteraction(AActor* Interactor) override;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "NPC|UI")
 	TSubclassOf<UUserWidget> BlacksmithWidgetClass;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "NPC|Component")
+	TObjectPtr<UBlacksmithComponent> BlacksmithComponent;
 
 };
