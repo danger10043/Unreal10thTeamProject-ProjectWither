@@ -12,6 +12,8 @@
 class UAnimInstance;
 class UAnimMontage;
 class UBrainComponent;
+class UBossDataAsset;
+struct FBossPhaseSettings;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
     FOnBossPhaseChanged,
@@ -57,6 +59,10 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "Boss|Event")
     FOnBossEncounterEnded OnBossEncounterEnded;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Data",
+        meta = (AllowPrivateAccess = "true"))
+    TObjectPtr<UBossDataAsset> BossData = nullptr;
+
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -79,20 +85,12 @@ private:
     void HandleTransitionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
     void LockTransitionMovement();
     void ReleaseTransitionMovement(bool bRestore);
+    UAnimMontage* GetPhaseTransitionMontage() const;
+    const FBossPhaseSettings* GetPhaseSettings(EBossPhase Phase) const;
+    void ApplyPhaseSettings(EBossPhase Phase);
 
-    UPROPERTY(
-        VisibleInstanceOnly,
-        BlueprintReadOnly,
-        Category = "Boss",
-        meta = (AllowPrivateAccess = "true")
-    )
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Boss", meta = (AllowPrivateAccess = "true"))
     EBossPhase CurrentPhase = EBossPhase::Phase1;
-
-    UPROPERTY(EditDefaultsOnly, Category = "Boss|Phase")
-    float Phase2HealthRatio = 0.5f;
-
-    UPROPERTY(EditDefaultsOnly, Category = "Boss|Phase")
-    TObjectPtr<UAnimMontage> PhaseTransitionMontage = nullptr;
 
     // Fallback for missing callbacks or looping montages. Extended for long montages.
     UPROPERTY(EditDefaultsOnly, Category = "Boss|Phase", meta = (ClampMin = "0.1", Units = "s"))

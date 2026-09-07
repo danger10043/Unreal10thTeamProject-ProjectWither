@@ -14,6 +14,7 @@
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "GameFramework/Character.h"
+#include "DataAsset/BossDataAsset.h"
 
 // Sets default values for this component's properties
 UBossComponent::UBossComponent()
@@ -75,6 +76,11 @@ void UBossComponent::BeginPlay()
         return;
     }
 
+	if (!IsValid(BossData))
+	{
+		UE_LOG(LogTemp, Error, TEXT("BossData is missing: %s"), *GetNameSafe(GetOwner()));
+	}
+
 	if (OwnerActor->GetClass()->ImplementsInterface(UStatComponentUserInterface::StaticClass()))
     {
 		if (UStatComponent* Stat = IStatComponentUserInterface::Execute_GetStatComponent(OwnerActor))
@@ -86,7 +92,7 @@ void UBossComponent::BeginPlay()
         }
     }
 
-	if (AMonsterCharacterBase* Monster = Cast<AMonsterCharacterBase>(OwnerActor))
+    if (AMonsterCharacterBase* Monster = Cast<AMonsterCharacterBase>(OwnerActor))
     {
 		if (UMonsterComponent* MonsterComp = Monster->GetMonsterComponent())
         {
@@ -96,6 +102,8 @@ void UBossComponent::BeginPlay()
             );
         }
     }
+
+	ApplyPhaseSettings(EBossPhase::Phase1);
 }
 
 void UBossComponent::HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount)
@@ -107,7 +115,13 @@ void UBossComponent::HandleHealthChanged(float CurrentHealth, float MaxHealth, f
 
 	const float HealthRatio = CurrentHealth / MaxHealth;
 
-	if (HealthRatio <= Phase2HealthRatio && CurrentHealth > 0.0f)
+	if (!IsValid(BossData))
+	{
+		return;
+	}
+
+	if (HealthRatio <= BossData->Phase2HealthRatio &&
+		CurrentHealth > 0.0f)
 	{
 		bPhase2Triggered = true;
 		SetPhase(EBossPhase::Transition);
@@ -129,6 +143,10 @@ void UBossComponent::SetPhase(EBossPhase NewPhase)
 
 	const EBossPhase PreviousPhase = CurrentPhase;
 	CurrentPhase = NewPhase;
+	if (NewPhase == EBossPhase::Phase1 || NewPhase == EBossPhase::Phase2)
+	{
+		ApplyPhaseSettings(NewPhase);
+	}
 	if (PreviousPhase == EBossPhase::Transition)
 	{
 		StopPhaseTransitionMontage();
@@ -180,9 +198,10 @@ void UBossComponent::SetPhase(EBossPhase NewPhase)
 
 void UBossComponent::PlayPhaseTransitionMontage()
 {
+	UAnimMontage* TransitionMontage = GetPhaseTransitionMontage();
 	USkeletalMeshComponent* Mesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
 	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
-	if (!IsValid(PhaseTransitionMontage) || !IsValid(AnimInstance))
+	if (!IsValid(TransitionMontage) || !IsValid(AnimInstance))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Boss transition montage or AnimInstance missing: %s"), *GetNameSafe(GetOwner()));
 		FinishPhaseTransition();
@@ -190,7 +209,7 @@ void UBossComponent::PlayPhaseTransitionMontage()
 	}
 
 	const float Duration = AnimInstance->Montage_Play(
-		PhaseTransitionMontage, 1.0f, EMontagePlayReturnType::Duration);
+		TransitionMontage, 1.0f, EMontagePlayReturnType::Duration);
 	if (Duration <= 0.0f)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Boss transition montage failed to play: %s"), *GetNameSafe(GetOwner()));
@@ -201,14 +220,14 @@ void UBossComponent::PlayPhaseTransitionMontage()
 	// Montage callbacks can change the phase while Montage_Play stops old montages.
 	if (!IsTransitioning())
 	{
-		AnimInstance->Montage_Stop(0.0f, PhaseTransitionMontage);
+		AnimInstance->Montage_Stop(0.0f, TransitionMontage);
 		return;
 	}
 
 	TransitionAnimInstance = AnimInstance;
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(this, &UBossComponent::HandleTransitionMontageEnded);
-	AnimInstance->Montage_SetEndDelegate(EndDelegate, PhaseTransitionMontage);
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, TransitionMontage);
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(PhaseTransitionTimerHandle, this,
@@ -219,7 +238,7 @@ void UBossComponent::PlayPhaseTransitionMontage()
 
 void UBossComponent::HandleTransitionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-	if (Montage != PhaseTransitionMontage) return;
+	if (Montage != GetPhaseTransitionMontage()) return;
 	TransitionAnimInstance.Reset();
 	// Both natural completion and interruption release the transition lock.
 	FinishPhaseTransition();
@@ -227,14 +246,53 @@ void UBossComponent::HandleTransitionMontageEnded(UAnimMontage* Montage, bool bI
 
 void UBossComponent::StopPhaseTransitionMontage()
 {
+	UAnimMontage* TransitionMontage = GetPhaseTransitionMontage();
 	UAnimInstance* AnimInstance = TransitionAnimInstance.Get();
 	TransitionAnimInstance.Reset();
-	if (IsValid(AnimInstance) && IsValid(PhaseTransitionMontage))
+	if (IsValid(AnimInstance) && IsValid(TransitionMontage))
 	{
 		// Unbind first: death, timeout, or a manual finish must not reenter SetPhase.
 		FOnMontageEnded EmptyDelegate;
-		AnimInstance->Montage_SetEndDelegate(EmptyDelegate, PhaseTransitionMontage);
-		AnimInstance->Montage_Stop(0.0f, PhaseTransitionMontage);
+		AnimInstance->Montage_SetEndDelegate(EmptyDelegate, TransitionMontage);
+		AnimInstance->Montage_Stop(0.0f, TransitionMontage);
+	}
+}
+
+UAnimMontage* UBossComponent::GetPhaseTransitionMontage() const
+{
+	return IsValid(BossData) ? BossData->PhaseTransitionMontage.Get() : nullptr;
+}
+
+const FBossPhaseSettings* UBossComponent::GetPhaseSettings(EBossPhase Phase) const
+{
+	if (!IsValid(BossData))
+	{
+		return nullptr;
+	}
+
+	switch (Phase)
+	{
+	case EBossPhase::Phase1:
+		return &BossData->Phase1Settings;
+	case EBossPhase::Phase2:
+		return &BossData->Phase2Settings;
+	default:
+		return nullptr;
+	}
+}
+
+void UBossComponent::ApplyPhaseSettings(EBossPhase Phase)
+{
+	const FBossPhaseSettings* Settings = GetPhaseSettings(Phase);
+	ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+	if (!Settings || !IsValid(OwnerCharacter))
+	{
+		return;
+	}
+
+	if (UCharacterMovementComponent* Movement = OwnerCharacter->GetCharacterMovement())
+	{
+		Movement->MaxWalkSpeed = FMath::Max(0.0f, Settings->MoveSpeed);
 	}
 }
 
