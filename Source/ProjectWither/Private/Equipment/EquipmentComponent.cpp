@@ -7,6 +7,22 @@
 #include "DataAsset/WeaponDataAsset.h"
 #include "GameFramework/Actor.h"
 
+namespace
+{
+	float GetArmorDefensePowerBonusFromItem(const FItemInstance& EquipmentItem)
+	{
+		if (!IsValid(EquipmentItem.ItemData) || EquipmentItem.Quantity <= 0)
+		{
+			return 0.0f;
+		}
+
+		const UArmorDataAsset* ArmorData =
+			Cast<UArmorDataAsset>(EquipmentItem.ItemData.Get());
+
+		return IsValid(ArmorData) ? FMath::Max(0.0f, ArmorData->GetArmorDefense()) : 0.0f;
+	}
+}
+
 UEquipmentComponent::UEquipmentComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -286,4 +302,29 @@ FItemInstance UEquipmentComponent::GetEquippedLeggings() const
 FItemInstance UEquipmentComponent::GetEquippedBoots() const
 {
 	return EquippedBoots;
+}
+
+float UEquipmentComponent::GetWeaponAttackPowerBonus() const
+{
+	const AActor* OwnerActor = GetOwner();
+	const UWeaponComponent* WeaponComponent =
+		IsValid(OwnerActor)
+		? OwnerActor->FindComponentByClass<UWeaponComponent>()
+		: nullptr;
+
+	const UWeaponDataAsset* CurrentWeaponData =
+		IsValid(WeaponComponent)
+		? WeaponComponent->GetCurrentWeaponData()
+		: nullptr;
+
+	return IsValid(CurrentWeaponData) ? FMath::Max(0.0f, CurrentWeaponData->GetWeaponPower()) : 0.0f;
+}
+
+float UEquipmentComponent::GetArmorDefensePowerBonus() const
+{
+	return
+		GetArmorDefensePowerBonusFromItem(EquippedHelmet) +
+		GetArmorDefensePowerBonusFromItem(EquippedChestplate) +
+		GetArmorDefensePowerBonusFromItem(EquippedLeggings) +
+		GetArmorDefensePowerBonusFromItem(EquippedBoots);
 }
