@@ -171,7 +171,10 @@ void UMonsterComponent::HandleDeath()
 
 	OnMonsterDied.Broadcast();
 
-	ScheduleFinishDeath();
+	// Prefer the configured death montage. If no montage is assigned or it
+	// cannot be played, PlayDeathMontage falls back to the AnimBP Dead state
+	// while the normal despawn timer runs.
+	PlayDeathMontage();
 }
 
 void UMonsterComponent::SetMonsterState(EMonsterState NewState)
@@ -710,14 +713,16 @@ void UMonsterComponent::CancelSearch()
 	}
 }
 
-void UMonsterComponent::ScheduleFinishDeath()
+void UMonsterComponent::ScheduleFinishDeath(float MinimumDelay)
 {
 	if (DespawnPolicy == EMonsterDespawnPolicy::KeepCorpse)
 	{
 		return;
 	}
 
-	if (DespawnDelay <= 0.0f)
+	const float EffectiveDelay = FMath::Max(DespawnDelay, MinimumDelay);
+
+	if (EffectiveDelay <= 0.0f)
 	{
 		FinishDeath();
 		return;
@@ -729,7 +734,7 @@ void UMonsterComponent::ScheduleFinishDeath()
 			DespawnTimerHandle,
 			this,
 			&UMonsterComponent::FinishDeath,
-			DespawnDelay,
+			EffectiveDelay,
 			false
 		);
 	}
@@ -952,6 +957,11 @@ void UMonsterComponent::PlayDeathMontage()
 		return;
 	}
 
+	// Auto Blend Out may be disabled to hold the final death pose. In that
+	// case the montage-ended delegate does not fire, so despawn must be
+	// scheduled as soon as playback starts.
+	ScheduleFinishDeath(PlayedLength);
+
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(
 		this,
@@ -967,7 +977,8 @@ void UMonsterComponent::OnDeathMontageEnded(UAnimMontage* Montage, bool bInterru
 		return;
 	}
 
-	ScheduleFinishDeath();
+	// Despawn was already scheduled when the montage started. Do not restart
+	// the delay here, otherwise the corpse lingers for an extra full delay.
 }
 
 void UMonsterComponent::OnSearchMontageEnded(UAnimMontage* Montage, bool bInterrupted)
