@@ -12,6 +12,7 @@
 #include "DataAsset/WeaponDataAsset.h"
 #include "Widget/TestMainUIWidget.h"
 #include "Widget/CrosshairUI.h"
+#include "Widget/LockOnWidget.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -183,6 +184,25 @@ void APlayerCharacter::BeginPlay()
 
     AddDefaultTestWeapons();
 
+    if (IsLocallyControlled() && IsValid(LockOnUIClass))
+    {
+        APlayerController* LockOnController =
+            Cast<APlayerController>(GetController());
+
+        if (IsValid(LockOnController))
+        {
+            LockOnUIInstance = CreateWidget<ULockOnWidget>(
+                LockOnController,
+                LockOnUIClass
+            );
+
+            if (IsValid(LockOnUIInstance))
+            {
+                LockOnUIInstance->AddToPlayerScreen();
+            }
+        }
+    }
+
     if (IsLocallyControlled() && IsValid(CrossHairUIClass))
     {
         APlayerController* CrossHairController =
@@ -238,6 +258,12 @@ void APlayerCharacter::BeginPlay()
 void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     GetWorldTimerManager().ClearTimer(RunStaminaTimerHandle);
+
+    if (IsValid(LockOnUIInstance))
+    {
+        LockOnUIInstance->RemoveFromParent();
+        LockOnUIInstance = nullptr;
+    }
 
     if (IsValid(CrossHairUIInstance))
     {

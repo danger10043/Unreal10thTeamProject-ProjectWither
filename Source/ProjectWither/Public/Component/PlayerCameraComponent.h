@@ -50,6 +50,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
 	void ClearLockOn();
 
+	UFUNCTION(BlueprintPure, Category = "Player|Camera")
+	AActor* GetLockOnTarget() const
+	{
+		return CameraState == EPlayerCameraState::LockOn &&
+			IsValid(LockonTarget)
+			? LockonTarget.Get() : nullptr;
+	}
+
 	void UpdateLockOnRotation(float DeltaTime);
 
 protected:
