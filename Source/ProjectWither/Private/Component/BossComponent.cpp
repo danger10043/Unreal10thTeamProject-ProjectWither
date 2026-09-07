@@ -77,7 +77,7 @@ void UBossComponent::BeginPlay()
         return;
     }
 
-	if (!IsValid(BossData))
+	if (!IsValid(GetBossData()))
 	{
 		UE_LOG(LogTemp, Error, TEXT("BossData is missing: %s"), *GetNameSafe(GetOwner()));
 	}
@@ -116,6 +116,7 @@ void UBossComponent::HandleHealthChanged(float CurrentHealth, float MaxHealth, f
 
 	const float HealthRatio = CurrentHealth / MaxHealth;
 
+	const UBossDataAsset* BossData = GetBossData();
 	if (!IsValid(BossData))
 	{
 		return;
@@ -262,11 +263,21 @@ void UBossComponent::StopPhaseTransitionMontage()
 
 UAnimMontage* UBossComponent::GetPhaseTransitionMontage() const
 {
+	const UBossDataAsset* BossData = GetBossData();
 	return IsValid(BossData) ? BossData->PhaseTransitionMontage.Get() : nullptr;
+}
+
+UBossDataAsset* UBossComponent::GetBossData() const
+{
+	if (!IsValid(GetOwner())) return nullptr;
+
+	const UMonsterComponent* Monster = GetOwner()->FindComponentByClass<UMonsterComponent>();
+	return IsValid(Monster) ? Cast<UBossDataAsset>(Monster->GetMonsterData()) : nullptr;
 }
 
 const FBossPhaseSettings* UBossComponent::GetPhaseSettings(EBossPhase Phase) const
 {
+	const UBossDataAsset* BossData = GetBossData();
 	if (!IsValid(BossData))
 	{
 		return nullptr;
@@ -275,7 +286,7 @@ const FBossPhaseSettings* UBossComponent::GetPhaseSettings(EBossPhase Phase) con
 	switch (Phase)
 	{
 	case EBossPhase::Phase1:
-		return &BossData->Phase1Settings;
+		return &BossData->BaseSettings;
 	case EBossPhase::Phase2:
 		return &BossData->Phase2Settings;
 	default:
@@ -295,6 +306,20 @@ void UBossComponent::ApplyPhaseSettings(EBossPhase Phase)
 	if (UCharacterMovementComponent* Movement = OwnerCharacter->GetCharacterMovement())
 	{
 		Movement->MaxWalkSpeed = FMath::Max(0.0f, Settings->MoveSpeed);
+	}
+
+	if (UMonsterComponent* Monster = OwnerCharacter->FindComponentByClass<UMonsterComponent>())
+	{
+		Monster->SetAttackCooldown(Settings->AttackCooldown);
+		Monster->SetAttackRange(Settings->AttackRange);
+		Monster->SetAllowRange(Settings->AllowRange);
+	}
+
+	if (UStatComponent* Stat = OwnerCharacter->FindComponentByClass<UStatComponent>())
+	{
+		Stat->SetCombatMultipliers(
+			Settings->AttackPowerMultiplier,
+			Settings->DefenseMultiplier);
 	}
 }
 

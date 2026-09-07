@@ -9,11 +9,14 @@
 #include "Interface/PlayerInterface.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Framework/SubSystem/ObjectPoolSubsystem.h"
+#include "DataAsset/MonsterDataAsset.h"
 
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -38,8 +41,51 @@ void UMonsterComponent::BeginPlay()
             StatComponent->OnHealthZero.AddUniqueDynamic(this, &UMonsterComponent::HandleDeath);
         }
 
+		ApplyMonsterData();
+
 		CachePawnCollisionResponses();
     }
+}
+
+void UMonsterComponent::ApplyMonsterData()
+{
+	if (!IsValid(MonsterData))
+	{
+		return;
+	}
+
+	MonsterId = MonsterData->MonsterId;
+	AllowRange = FMath::Max(0.0f, MonsterData->BaseSettings.AllowRange);
+	AttackRange = FMath::Max(0.0f, MonsterData->BaseSettings.AttackRange);
+	AttackCooldown = FMath::Max(0.0f, MonsterData->BaseSettings.AttackCooldown);
+	DespawnPolicy = MonsterData->DespawnPolicy;
+	DespawnDelay = FMath::Max(0.0f, MonsterData->DespawnDelay);
+	AttackMontage = MonsterData->AttackMontage;
+	HitReactMontage = MonsterData->HitReactMontage;
+	ParriedMontage = MonsterData->ParriedMontage;
+	DeathMontage = MonsterData->DeathMontage;
+	SearchMontage = MonsterData->SearchMontage;
+	ItemDropTable = MonsterData->ItemDropTable;
+	ItemPickupClass = MonsterData->ItemPickupClass;
+
+	if (IsValid(StatComponent))
+	{
+		StatComponent->ConfigureStats(
+			MonsterData->MaxHealth,
+			MonsterData->MaxStamina,
+			MonsterData->MinAttackPower,
+			MonsterData->MaxAttackPower,
+			MonsterData->DefensePower);
+		StatComponent->SetCombatMultipliers(
+			MonsterData->BaseSettings.AttackPowerMultiplier,
+			MonsterData->BaseSettings.DefenseMultiplier);
+	}
+
+	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
+	{
+		Character->GetCharacterMovement()->MaxWalkSpeed =
+			FMath::Max(0.0f, MonsterData->BaseSettings.MoveSpeed);
+	}
 }
 
 void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)

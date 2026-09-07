@@ -59,10 +59,6 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "Boss|Event")
     FOnBossEncounterEnded OnBossEncounterEnded;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Data",
-        meta = (AllowPrivateAccess = "true"))
-    TObjectPtr<UBossDataAsset> BossData = nullptr;
-
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -85,6 +81,7 @@ private:
     void HandleTransitionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
     void LockTransitionMovement();
     void ReleaseTransitionMovement(bool bRestore);
+    UBossDataAsset* GetBossData() const;
     UAnimMontage* GetPhaseTransitionMontage() const;
     const FBossPhaseSettings* GetPhaseSettings(EBossPhase Phase) const;
     void ApplyPhaseSettings(EBossPhase Phase);

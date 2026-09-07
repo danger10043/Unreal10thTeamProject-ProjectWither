@@ -21,6 +21,12 @@ struct FBossPhaseSettings
     float DefenseMultiplier = 1.0f;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+    float AttackRange = 400.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+    float AllowRange = 100.0f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
     FLinearColor BodyTint = FLinearColor::White;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)

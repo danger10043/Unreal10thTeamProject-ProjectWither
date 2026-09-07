@@ -26,7 +26,11 @@ class PROJECTWITHER_API UStatComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
+public:
+	void ConfigureStats(float InMaxHealth, float InMaxStamina,
+		float InMinAttackPower, float InMaxAttackPower, float InDefensePower);
+	void SetCombatMultipliers(float InAttackPowerMultiplier, float InDefenseMultiplier);
+
 	UStatComponent();
 
 protected:
@@ -85,13 +89,13 @@ public:
 	FORCEINLINE float GetMaxStamina() const { return MaxStamina; }
 
 	UFUNCTION(BlueprintPure, Category = "Stat|Combat")
-	FORCEINLINE float GetMinAttackPower() const { return MinAttackPower; }
+	FORCEINLINE float GetMinAttackPower() const { return MinAttackPower * AttackPowerMultiplier; }
 
 	UFUNCTION(BlueprintPure, Category = "Stat|Combat")
-	FORCEINLINE float GetMaxAttackPower() const { return MaxAttackPower; }
+	FORCEINLINE float GetMaxAttackPower() const { return MaxAttackPower * AttackPowerMultiplier; }
 
 	UFUNCTION(BlueprintPure, Category = "Stat|Combat")
-	FORCEINLINE float GetDefensePower() const { return DefensePower; }
+	FORCEINLINE float GetDefensePower() const { return DefensePower * DefenseMultiplier; }
 
 public:
 	/*
@@ -153,5 +157,8 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float DefensePower = 0.0f;
+
+	float AttackPowerMultiplier = 1.0f;
+	float DefenseMultiplier = 1.0f;
 
 };
