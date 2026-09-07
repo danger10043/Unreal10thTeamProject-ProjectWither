@@ -32,6 +32,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
 	void StopZoom();
 
+	UFUNCTION(BlueprintPure, Category = "Player|Camera")
+	bool IsZooming() const
+	{
+		return CameraState == EPlayerCameraState::Zoom;
+	}
+
 	UFUNCTION(BlueprintCallable, Category = "Player|Camera")
 	void ChangeCameraState(EPlayerCameraState NewState);
 

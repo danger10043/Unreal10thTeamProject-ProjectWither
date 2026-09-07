@@ -70,6 +70,17 @@ void APlayerCharacter::SetCanMove(bool bNewCanMove)
     }
 }
 
+void APlayerCharacter::RefreshMovementForCameraState()
+{
+    if (IsValid(PlayerCameraComponent) && PlayerCameraComponent->IsZooming())
+    {
+        StopRun();
+        return;
+    }
+
+    UpdateMovementSpeed();
+}
+
 void APlayerCharacter::ToggleInventory()
 {
     if (bIsInventoryOpen)
@@ -339,6 +350,10 @@ void APlayerCharacter::StartRun()
 {
     if (!bCanMove || !IsValid(StatComponent)) return;
 
+    if (IsValid(PlayerCameraComponent) && PlayerCameraComponent->IsZooming())
+    {
+        return;
+    }
 
     if (StatComponent->GetCurrentStamina() <= 0.0f)
     {
@@ -407,6 +422,23 @@ void APlayerCharacter::UpdateMovementSpeed()
     UCharacterMovementComponent* Movement = GetCharacterMovement();
 
     if (!Movement) { return; }
+
+    const bool bIsGunZooming =
+        IsValid(WeaponComponent) &&
+        WeaponComponent->IsGunEquipped() &&
+        IsValid(PlayerCameraComponent) &&
+        PlayerCameraComponent->IsZooming();
+
+    if (bIsGunZooming)
+    {
+        Movement->MaxWalkSpeed = FMath::Clamp(
+            ZoomWalkSpeed,
+            0.0f,
+            FMath::Max(0.0f, WalkSpeed)
+        );
+        return;
+    }
+
     Movement->MaxWalkSpeed = bIsRunning ? RunSpeed : WalkSpeed;
 }
 

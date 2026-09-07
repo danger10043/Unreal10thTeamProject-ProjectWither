@@ -51,6 +51,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|Movement")
 	bool IsRunning() const { return bIsRunning; }
 
+	void RefreshMovementForCameraState();
 
 	//Inventory 관련 함수
 	UFUNCTION(BlueprintCallable, Category = "Player|Inventory")
@@ -217,6 +218,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RunSpeed = 1200.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
+	float ZoomWalkSpeed = 300.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement|Run", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RunStaminaCostPerTick = 2.0f;

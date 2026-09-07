@@ -228,6 +228,11 @@ void UPlayerCameraComponent::ChangeCameraState(EPlayerCameraState NewState)
 	CameraState = NewState;
 	ResetLockOnLookInput();
 	LockOnOccludedTime = 0.0f;
+
+	if (IsValid(OwnerPlayer))
+	{
+		OwnerPlayer->RefreshMovementForCameraState();
+	}
 }
 
 void UPlayerCameraComponent::ToggleLockOn()
