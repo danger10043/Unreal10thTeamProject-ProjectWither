@@ -20,6 +20,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
 );
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHealthZeropDelegate);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStatsChangedDelegate);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class PROJECTWITHER_API UStatComponent : public UActorComponent
@@ -70,6 +71,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Stat|Stamina")
 	float UseStamina(float Amount);
 
+	UFUNCTION(BlueprintCallable, Category = "Stat|Upgrade")
+	void AddMaxHealth(float Amount, bool bRecoverByAddedAmount = false);
+
+	UFUNCTION(BlueprintCallable, Category = "Stat|Upgrade")
+	void AddMaxStamina(float Amount, bool bRecoverByAddedAmount = false);
+
+	UFUNCTION(BlueprintCallable, Category = "Stat|Upgrade")
+	void AddAttackPower(float MinAmount, float MaxAmount);
+
+	UFUNCTION(BlueprintCallable, Category = "Stat|Upgrade")
+	void AddDefensePower(float Amount);
+
 	UFUNCTION(BlueprintPure, Category = "Stat|Stamina")
 	FORCEINLINE bool HasEnoughStamina(float Amount) const { return Amount <= CurrentStamina; }
 
@@ -115,6 +128,9 @@ public:
 	// 체력이 0이 될 시 호출되는 Delegate
 	UPROPERTY(BlueprintAssignable, Category = "Stat|Event")
 	FOnHealthZeropDelegate OnHealthZero;
+
+	UPROPERTY(BlueprintAssignable, Category = "Stat|Event")
+	FOnStatsChangedDelegate OnStatsChanged;
 
 private:
 	void RestartStaminaRecoveryDelay();
