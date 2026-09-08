@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Monster/MonsterCharacterBase.h"
+#include "TimerManager.h"
 #include "GroundBossBase.generated.h"
 
 /**
@@ -18,6 +19,8 @@ class PROJECTWITHER_API AGroundBossBase : public AMonsterCharacterBase
 
 public:
     AGroundBossBase();
+	virtual void OnSpawnFromPool_Implementation() override;
+	virtual void OnReturnToPool_Implementation() override;
 
     UFUNCTION(BlueprintPure, Category = "Boss")
     UBossComponent* GetBossComponent() const { return BossComponent; }
@@ -25,4 +28,7 @@ public:
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss")
     TObjectPtr<UBossComponent> BossComponent;
+
+private:
+	FTimerHandle SpawnRevealTimerHandle;
 };

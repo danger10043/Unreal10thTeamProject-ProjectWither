@@ -210,6 +210,32 @@ private:
 	)
 	float LockOnRotationInterpSpeed = 8.0;
 
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera|LockOn",
+		meta = (
+			AllowPrivateAccess = "true",
+			ClampMin = "-89.0",
+			ClampMax = "89.0",
+			Units = "deg"
+		)
+	)
+	float LockOnPitchMin = -20.0f;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Camera|LockOn",
+		meta = (
+			AllowPrivateAccess = "true",
+			ClampMin = "-89.0",
+			ClampMax = "89.0",
+			Units = "deg"
+		)
+	)
+	float LockOnPitchMax = 30.0f;
+
 	// 마지막 마우스 입력 이후 자동 추적을 재개하기까지의 시간
 	UPROPERTY(
 		EditDefaultsOnly,

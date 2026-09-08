@@ -153,6 +153,79 @@ float UStatComponent::UseStamina(float Amount)
 	return Amount;
 }
 
+void UStatComponent::AddMaxHealth(float Amount, bool bRecoverByAddedAmount)
+{
+	if (Amount <= 0.0f)
+	{
+		return;
+	}
+
+	const float PreviousHealth = CurrentHealth;
+	const float PreviousMaxHealth = MaxHealth;
+	const float PreviousHealthRatio = PreviousMaxHealth > 0.0f
+		? CurrentHealth / PreviousMaxHealth
+		: 1.0f;
+
+	MaxHealth = FMath::Max(0.0f, MaxHealth + Amount);
+	CurrentHealth = bRecoverByAddedAmount
+		? FMath::Clamp(CurrentHealth + Amount, 0.0f, MaxHealth)
+		: FMath::Clamp(MaxHealth * PreviousHealthRatio, 0.0f, MaxHealth);
+
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth, CurrentHealth - PreviousHealth);
+	OnStatsChanged.Broadcast();
+}
+
+void UStatComponent::AddMaxStamina(float Amount, bool bRecoverByAddedAmount)
+{
+	if (Amount <= 0.0f)
+	{
+		return;
+	}
+
+	const float PreviousStamina = CurrentStamina;
+	const float PreviousMaxStamina = MaxStamina;
+	const float PreviousStaminaRatio = PreviousMaxStamina > 0.0f
+		? CurrentStamina / PreviousMaxStamina
+		: 1.0f;
+
+	MaxStamina = FMath::Max(0.0f, MaxStamina + Amount);
+	CurrentStamina = bRecoverByAddedAmount
+		? FMath::Clamp(CurrentStamina + Amount, 0.0f, MaxStamina)
+		: FMath::Clamp(MaxStamina * PreviousStaminaRatio, 0.0f, MaxStamina);
+
+	OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina, CurrentStamina - PreviousStamina);
+	OnStatsChanged.Broadcast();
+}
+
+void UStatComponent::AddAttackPower(float MinAmount, float MaxAmount)
+{
+	if (MinAmount <= 0.0f && MaxAmount <= 0.0f)
+	{
+		return;
+	}
+
+	MinAttackPower = FMath::Max(0.0f, MinAttackPower + FMath::Max(0.0f, MinAmount));
+	MaxAttackPower = FMath::Max(0.0f, MaxAttackPower + FMath::Max(0.0f, MaxAmount));
+
+	if (MinAttackPower > MaxAttackPower)
+	{
+		Swap(MinAttackPower, MaxAttackPower);
+	}
+
+	OnStatsChanged.Broadcast();
+}
+
+void UStatComponent::AddDefensePower(float Amount)
+{
+	if (Amount <= 0.0f)
+	{
+		return;
+	}
+
+	DefensePower = FMath::Max(0.0f, DefensePower + Amount);
+	OnStatsChanged.Broadcast();
+}
+
 void UStatComponent::RestartStaminaRecoveryDelay()
 {
 	UWorld* World = GetWorld();

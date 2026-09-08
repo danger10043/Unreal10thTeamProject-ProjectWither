@@ -6,6 +6,7 @@
 #include "Data/ItemDropTable.h"
 #include "Item/PickupItem.h"
 #include "Monster/MonsterAIController.h"
+#include "Monster/MonsterProjectile.h"
 #include "Interface/PlayerInterface.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Framework/SubSystem/ObjectPoolSubsystem.h"
@@ -26,25 +27,25 @@
 
 UMonsterComponent::UMonsterComponent()
 {
-    PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = false;
 }
 
 void UMonsterComponent::BeginPlay()
 {
-    Super::BeginPlay();
-    if (AActor* Owner = GetOwner())
-    {
-        SpawnLocation = Owner->GetActorLocation();
-        StatComponent = Owner->FindComponentByClass<UStatComponent>();
-        if (StatComponent)
-        {
-            StatComponent->OnHealthZero.AddUniqueDynamic(this, &UMonsterComponent::HandleDeath);
-        }
+	Super::BeginPlay();
+	if (AActor* Owner = GetOwner())
+	{
+		SpawnLocation = Owner->GetActorLocation();
+		StatComponent = Owner->FindComponentByClass<UStatComponent>();
+		if (StatComponent)
+		{
+			StatComponent->OnHealthZero.AddUniqueDynamic(this, &UMonsterComponent::HandleDeath);
+		}
 
 		ApplyMonsterData();
 
 		CachePawnCollisionResponses();
-    }
+	}
 }
 
 void UMonsterComponent::ApplyMonsterData()
@@ -90,10 +91,10 @@ void UMonsterComponent::ApplyMonsterData()
 
 void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    if (IsValid(StatComponent))
-    {
-        StatComponent->OnHealthZero.RemoveDynamic(this, &UMonsterComponent::HandleDeath);
-    }
+	if (IsValid(StatComponent))
+	{
+		StatComponent->OnHealthZero.RemoveDynamic(this, &UMonsterComponent::HandleDeath);
+	}
 	ClearRuntimeTimers();
 
 	DisableAllAttackHitboxes();
@@ -110,7 +111,7 @@ void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	AttackHitboxes.Reset();
 
-    Super::EndPlay(EndPlayReason);
+	Super::EndPlay(EndPlayReason);
 }
 
 float UMonsterComponent::ApplyMonsterDamage(float Damage)
@@ -119,15 +120,15 @@ float UMonsterComponent::ApplyMonsterDamage(float Damage)
 	{
 		return 0.0f;
 	}
-    
+
 	const float AppliedDamage = StatComponent->ApplyDamage(Damage);
-    
+
 	if (!bIsDead && AppliedDamage > 0.0f)
 	{
 		PlayHitReaction();
 	}
-	
-    return AppliedDamage;
+
+	return AppliedDamage;
 }
 
 void UMonsterComponent::HandleDeath()
@@ -171,7 +172,7 @@ void UMonsterComponent::HandleDeath()
 
 	OnMonsterDied.Broadcast();
 
-	ScheduleFinishDeath();
+	PlayDeathMontage();
 }
 
 void UMonsterComponent::SetMonsterState(EMonsterState NewState)
@@ -220,7 +221,7 @@ void UMonsterComponent::CalculateDrops()
 		if (FMath::FRand() > Row->DropRate) continue;
 
 		int32 Quantity = FMath::RandRange(Row->MinQuantity, Row->MaxQuantity);
-		
+
 		DropItem.FindOrAdd(Row->ItemData) += Quantity;
 	}
 }
@@ -273,12 +274,23 @@ bool UMonsterComponent::IsInAttackRange()
 {
 	if (!IsValid(TargetActor) || !IsValid(GetOwner()))
 	{
+		bWasInAttackRange = false;
 		return false;
 	}
 
 	const float Distance = GetDistanceToTarget();
 
-	return Distance >= 0.0f && Distance <= AttackRange;
+	// 경계선 근처에서 짧은 시간에 여러 번 뒤집히면 BT 블랙보드 옵저버가
+	// 전환을 놓칠 수 있어서, 진입(AttackRange)과 이탈(AttackRange + Hysteresis)
+	// 기준을 다르게 둬서 경계 근처의 미세한 움직임으로는 값이 안 뒤집히게 함
+	const float EffectiveRange = bWasInAttackRange
+		? (AttackRange + AttackRangeHysteresis)
+		: AttackRange;
+
+	const bool bResult = Distance >= 0.0f && Distance <= EffectiveRange;
+	bWasInAttackRange = bResult;
+
+	return bResult;
 }
 
 bool UMonsterComponent::CanAttack()
@@ -305,10 +317,13 @@ bool UMonsterComponent::CanAttack()
 
 bool UMonsterComponent::Attack()
 {
-	if (!CanAttack() || !IsValid(AttackMontage))
+	if (!CanAttack())
 	{
 		return false;
 	}
+
+	UAnimMontage* SelectedMontage = SelectAttackMontage();
+	if (!IsValid(SelectedMontage)) return false;
 
 	USkeletalMeshComponent* Mesh =
 		GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
@@ -318,7 +333,7 @@ bool UMonsterComponent::Attack()
 
 	if (!IsValid(AnimInstance)) return false;
 
-	const FName SelectedSection = SelectAttackSection();
+	const FName SelectedSection = SelectAttackSection(SelectedMontage);
 	if (SelectedSection.IsNone()) return false;
 
 	const EMonsterState PreviousState = MonsterState;
@@ -328,7 +343,7 @@ bool UMonsterComponent::Attack()
 	LockMovementForMontage();
 
 	const float PlayedLength =
-		AnimInstance->Montage_Play(AttackMontage);
+		AnimInstance->Montage_Play(SelectedMontage);
 
 
 	if (PlayedLength <= 0.0f)
@@ -347,12 +362,13 @@ bool UMonsterComponent::Attack()
 
 	AnimInstance->Montage_SetEndDelegate(
 		EndDelegate,
-		AttackMontage);
+		SelectedMontage);
 
 	AnimInstance->Montage_JumpToSection(
-		SelectedSection, AttackMontage);
+		SelectedSection, SelectedMontage);
 
 	// 재생에 성공한 경우에만 직전 공격으로 기록
+	ActiveAttackMontage = SelectedMontage;
 	LastAttackSection = SelectedSection;
 
 	return true;
@@ -361,6 +377,7 @@ bool UMonsterComponent::Attack()
 void UMonsterComponent::FinishAttack()
 {
 	DisableAllAttackHitboxes();
+	ActiveAttackMontage = nullptr;
 	if (!bIsDead)
 	{
 		UnlockMovementAfterMontage();
@@ -438,7 +455,7 @@ void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultipl
 
 	const float DefenseMultiplier = DefenseScalingConstant / (DefenseScalingConstant + Defense);
 
-	const float FinalDamage = FMath::Max(1.0f, 
+	const float FinalDamage = FMath::Max(1.0f,
 		BaseDamage *
 		FMath::Max(0.0f, AttackMultiplier) *
 		DefenseMultiplier);
@@ -449,6 +466,56 @@ void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultipl
 		GetOwner()->GetInstigatorController(),
 		GetOwner(),
 		UDamageType::StaticClass());
+}
+
+void UMonsterComponent::FireProjectileAtTarget()
+{
+	if (bIsDead || !IsValid(ProjectileClass))
+	{
+		return;
+	}
+
+	AActor* Owner = GetOwner();
+	if (!IsValid(Owner) || !IsValid(TargetActor))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* Mesh = Owner->FindComponentByClass<USkeletalMeshComponent>();
+
+	const FVector MuzzleLocation =
+		(IsValid(Mesh) && Mesh->DoesSocketExist(ProjectileMuzzleSocketName))
+		? Mesh->GetSocketLocation(ProjectileMuzzleSocketName)
+		: Owner->GetActorLocation();
+
+	const FVector LaunchDirection = (TargetActor->GetActorLocation() - MuzzleLocation).GetSafeNormal();
+
+	if (LaunchDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = Owner;
+	SpawnParams.Instigator = Owner->GetInstigator();
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	AMonsterProjectile* Projectile = World->SpawnActor<AMonsterProjectile>(
+		ProjectileClass,
+		MuzzleLocation,
+		LaunchDirection.Rotation(),
+		SpawnParams);
+
+	if (IsValid(Projectile))
+	{
+		Projectile->InitializeProjectile(this, LaunchDirection, ProjectileAttackMultiplier);
+	}
 }
 
 void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox)
@@ -561,9 +628,10 @@ void UMonsterComponent::CancelAttack()
 		{
 			if (UAnimInstance* AnimInstance = Mesh->GetAnimInstance())
 			{
-				if (AnimInstance->Montage_IsPlaying(AttackMontage))
+				if (IsValid(ActiveAttackMontage) &&
+					AnimInstance->Montage_IsPlaying(ActiveAttackMontage))
 				{
-					AnimInstance->Montage_Stop(0.15f, AttackMontage);
+					AnimInstance->Montage_Stop(0.15f, ActiveAttackMontage);
 				}
 			}
 		}
@@ -602,8 +670,8 @@ void UMonsterComponent::ActivateFromPool()
 	const AActor* Owner = GetOwner();
 	ResetForReuse(
 		IsValid(Owner)
-			? Owner->GetActorLocation()
-			: FVector::ZeroVector);
+		? Owner->GetActorLocation()
+		: FVector::ZeroVector);
 }
 
 void UMonsterComponent::DeactivateForPool()
@@ -710,14 +778,16 @@ void UMonsterComponent::CancelSearch()
 	}
 }
 
-void UMonsterComponent::ScheduleFinishDeath()
+void UMonsterComponent::ScheduleFinishDeath(float MinimumDelay)
 {
 	if (DespawnPolicy == EMonsterDespawnPolicy::KeepCorpse)
 	{
 		return;
 	}
 
-	if (DespawnDelay <= 0.0f)
+	const float EffectiveDelay = FMath::Max(DespawnDelay, MinimumDelay);
+
+	if (EffectiveDelay <= 0.0f)
 	{
 		FinishDeath();
 		return;
@@ -729,24 +799,34 @@ void UMonsterComponent::ScheduleFinishDeath()
 			DespawnTimerHandle,
 			this,
 			&UMonsterComponent::FinishDeath,
-			DespawnDelay,
+			EffectiveDelay,
 			false
 		);
 	}
 }
 
-FName UMonsterComponent::SelectAttackSection() const
+UAnimMontage* UMonsterComponent::SelectAttackMontage() const
 {
-	if (!IsValid(AttackMontage))
+	if (IsValid(AttackMontage) && IsValid(AdditionalAttackMontage))
+	{
+		return FMath::RandBool() ? AttackMontage.Get() : AdditionalAttackMontage.Get();
+	}
+
+	return IsValid(AttackMontage) ? AttackMontage.Get() : AdditionalAttackMontage.Get();
+}
+
+FName UMonsterComponent::SelectAttackSection(UAnimMontage* Montage) const
+{
+	if (!IsValid(Montage))
 	{
 		return NAME_None;
 	}
 
 	TArray<FName> Candidates;
 
-	for (int32 Index = 0; Index < AttackMontage->GetNumSections(); Index++)
+	for (int32 Index = 0; Index < Montage->GetNumSections(); Index++)
 	{
-		const FName SectionName = AttackMontage->GetSectionName(Index);
+		const FName SectionName = Montage->GetSectionName(Index);
 
 		if (!SectionName.ToString().StartsWith(AttackSectionPrefix))
 		{
@@ -765,11 +845,11 @@ FName UMonsterComponent::SelectAttackSection() const
 	if (Candidates.IsEmpty())
 	{
 		for (int32 Index = 0;
-			Index < AttackMontage->GetNumSections();
+			Index < Montage->GetNumSections();
 			++Index)
 		{
 			const FName SectionName =
-				AttackMontage->GetSectionName(Index);
+				Montage->GetSectionName(Index);
 
 			if (SectionName.ToString().StartsWith(
 				AttackSectionPrefix))
@@ -870,7 +950,7 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 
 void UMonsterComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-	if (Montage != AttackMontage) return;
+	if (Montage != ActiveAttackMontage) return;
 
 	FinishAttack();
 	OnMonsterAttackFinished.Broadcast(bInterrupted);
@@ -921,7 +1001,7 @@ void UMonsterComponent::OnReactionMontageEnded(UAnimMontage* Montage, bool bInte
 
 	if (MonsterState == EMonsterState::Hit)
 	{
-		SetMonsterState(IsValid(GetTargetActor()) ? 
+		SetMonsterState(IsValid(GetTargetActor()) ?
 			EMonsterState::Chase : EMonsterState::Idle);
 	}
 }
@@ -951,6 +1031,10 @@ void UMonsterComponent::PlayDeathMontage()
 		ScheduleFinishDeath();
 		return;
 	}
+
+	// Auto Blend Out이 꺼진 몽타주는 종료 델리게이트가 호출되지 않을 수
+	// 있으므로 재생 시작 시점에도 풀 반환/파괴를 예약한다.
+	ScheduleFinishDeath(PlayedLength);
 
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(
@@ -1200,7 +1284,6 @@ void UMonsterComponent::LockMovementForMontage()
 		{
 			bMontageMovementWasActive = LockedMontageMovement->IsActive();
 			LockedMontageMovement->StopMovementImmediately();
-			LockedMontageMovement->Deactivate();
 		}
 	}
 
@@ -1209,11 +1292,6 @@ void UMonsterComponent::LockMovementForMontage()
 
 void UMonsterComponent::UnlockMovementAfterMontage()
 {
-	if (IsValid(LockedMontageMovement) && bMontageMovementWasActive)
-	{
-		LockedMontageMovement->Activate(true);
-	}
-
 	LockedMontageMovement = nullptr;
 	bMontageMovementWasActive = false;
 }

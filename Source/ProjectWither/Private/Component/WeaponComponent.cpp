@@ -1,6 +1,7 @@
 #include "Component/WeaponComponent.h"
 #include "Component/InventoryComponent.h"
 #include "Component/StatComponent.h"
+#include "Equipment/EquipmentComponent.h"
 #include "Equipment/Weapon/RangedWeaponActorBase.h"
 
 #include "Components/CapsuleComponent.h"
@@ -62,6 +63,7 @@ void UWeaponComponent::BeginPlay()
 
 void UWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	SyncCurrentWeaponToEquipment();
 	SaveCurrentWeaponToInventory();
 	DestroyWeaponActor();
 
@@ -93,8 +95,48 @@ bool UWeaponComponent::EquipWeapon(UWeaponDataAsset* WeaponData)
 
 	if (NewWeaponInstance.Quantity <= 0 || NewWeaponInstance.ItemData.Get() != WeaponData) return false;
 
+	AActor* OwnerActor = GetOwner();
+	UEquipmentComponent* EquipmentComponent =
+		IsValid(OwnerActor)
+		? OwnerActor->FindComponentByClass<UEquipmentComponent>()
+		: nullptr;
+
+	if (IsValid(EquipmentComponent))
+	{
+		return EquipmentComponent->EquipItemFromInventorySlot(NewWeaponSlot);
+	}
+
+	if (!EquipWeaponInstance(NewWeaponInstance)) return false;
+
+	CurrentWeaponSlot = NewWeaponSlot;
+	return true;
+}
+
+bool UWeaponComponent::EquipWeaponInstance(const FItemInstance& WeaponInstance)
+{
+	if (WeaponInstance.Quantity <= 0 || !IsValid(WeaponInstance.ItemData.Get())) return false;
+
+	UWeaponDataAsset* WeaponData = Cast<UWeaponDataAsset>(WeaponInstance.ItemData.Get());
+
+	if (!IsValid(WeaponData)) return false;
+
+	const EWeaponType WeaponType = WeaponData->GetWeaponType();
+
+	if (WeaponType != EWeaponType::Sword && WeaponType != EWeaponType::Gun) return false;
+
+	if (GetCurrentWeaponData() == WeaponData && IsValid(WeaponActor))
+	{
+		CurrentWeapon = WeaponInstance;
+		CurrentWeaponSlot = INDEX_NONE;
+		SyncCurrentWeaponToEquipment();
+		OnWeaponChanged.Broadcast();
+		return true;
+	}
+
 	AActor* NewWeaponActor = SpawnWeaponActor(WeaponData);
 	if (!IsValid(NewWeaponActor)) return false;
+
+	SyncCurrentWeaponToEquipment();
 
 	if (GetCurrentWeapon() && !SaveCurrentWeaponToInventory())
 	{
@@ -103,15 +145,20 @@ bool UWeaponComponent::EquipWeapon(UWeaponDataAsset* WeaponData)
 	}
 
 	DestroyWeaponActor();
-	CurrentWeapon = NewWeaponInstance;
-	CurrentWeaponSlot = NewWeaponSlot;
+	CurrentWeapon = WeaponInstance;
+	CurrentWeaponSlot = INDEX_NONE;
 	WeaponActor = NewWeaponActor;
+
+	SyncCurrentWeaponToEquipment();
+	OnWeaponChanged.Broadcast();
 
 	return true;
 }
 
 void UWeaponComponent::UnequipWeapon()
 {
+	SyncCurrentWeaponToEquipment();
+
 	if (GetCurrentWeapon() && !SaveCurrentWeaponToInventory())
 	{
 		return;
@@ -120,13 +167,24 @@ void UWeaponComponent::UnequipWeapon()
 	DestroyWeaponActor();
 	CurrentWeapon = FItemInstance();
 	CurrentWeaponSlot = INDEX_NONE;
+
+	OnWeaponChanged.Broadcast();
 }
 
 bool UWeaponComponent::SwapWeapon()
 {
-	if (!IsValid(InventoryComponent)) return false;
+	AActor* OwnerActor = GetOwner();
+	UEquipmentComponent* EquipmentComponent =
+		IsValid(OwnerActor)
+		? OwnerActor->FindComponentByClass<UEquipmentComponent>()
+		: nullptr;
+
+	if (!IsValid(EquipmentComponent)) return false;
+
+	SyncCurrentWeaponToEquipment();
 
 	EWeaponType TargetWeaponType = EWeaponType::Sword;
+	const bool bHasCurrentWeapon = IsSwordEquipped() || IsGunEquipped();
 
 	if (IsSwordEquipped())
 	{
@@ -136,20 +194,26 @@ bool UWeaponComponent::SwapWeapon()
 	{
 		TargetWeaponType = EWeaponType::Sword;
 	}
-	
-	const int32 TargetSlot = InventoryComponent->FindWeaponSlotByType(TargetWeaponType);
-	if (TargetSlot == INDEX_NONE)
+
+	FItemInstance TargetWeapon =
+		TargetWeaponType == EWeaponType::Gun
+		? EquipmentComponent->GetEquippedGun()
+		: EquipmentComponent->GetEquippedSword();
+
+	if (!IsValid(TargetWeapon.ItemData) || TargetWeapon.Quantity <= 0)
 	{
-		return false;
+		if (bHasCurrentWeapon)
+		{
+			return false;
+		}
+
+		TargetWeapon =
+			TargetWeaponType == EWeaponType::Gun
+			? EquipmentComponent->GetEquippedSword()
+			: EquipmentComponent->GetEquippedGun();
 	}
-	
-	FItemInstance TargetWeapon;
 
-	if (!InventoryComponent->GetItemAtSlot(TargetSlot, TargetWeapon)) return false;
-
-	UWeaponDataAsset* TargetWeaponData = Cast<UWeaponDataAsset>(TargetWeapon.ItemData.Get());
-	
-	return IsValid(TargetWeaponData) && EquipWeapon(TargetWeaponData);
+	return EquipWeaponInstance(TargetWeapon);
 }
 
 FItemInstance* UWeaponComponent::GetCurrentWeapon()
@@ -198,12 +262,12 @@ bool UWeaponComponent::FireGun()
 		return false;
 	}
 
-	if (GetCurrentAmmo() <= 0)
+	if (GetCurrentAmmo() <= 0 && !Reload())
 	{
 		UE_LOG(
 			LogTemp,
 			Warning,
-			TEXT("WeaponComponent::FireGun - 현재 총의 탄약 개수가 0입니다.")
+			TEXT("WeaponComponent::FireGun - 장전된 탄약이 없고 재장전할 탄약도 없습니다.")
 		);
 		return false;
 	}
@@ -327,7 +391,17 @@ bool UWeaponComponent::FireGun()
 		return false;
 	}
 
-	return ConsumeAmmo();
+	if (!ConsumeAmmo())
+	{
+		return false;
+	}
+
+	if (GetCurrentAmmo() <= 0)
+	{
+		Reload();
+	}
+
+	return true;
 }
 
 bool UWeaponComponent::ConsumeAmmo()
@@ -338,6 +412,8 @@ bool UWeaponComponent::ConsumeAmmo()
 	}
 
 	--CurrentWeapon.CurrentAmmo;
+	SyncCurrentWeaponToEquipment();
+	OnWeaponChanged.Broadcast();
 	return true;
 }
 
@@ -367,6 +443,8 @@ bool UWeaponComponent::Reload()
 	if (LoadedAmmo <= 0) return false;
 
 	CurrentWeapon.CurrentAmmo = FMath::Clamp(CurrentWeapon.CurrentAmmo + LoadedAmmo, 0, MaxAmmo);
+	SyncCurrentWeaponToEquipment();
+	OnWeaponChanged.Broadcast();
 
 	return true;
 }
@@ -383,12 +461,39 @@ bool UWeaponComponent::SaveCurrentWeaponToInventory()
 		return true;
 	}
 	
-	if (!IsValid(InventoryComponent) || CurrentWeaponSlot == INDEX_NONE)
+	if (CurrentWeaponSlot == INDEX_NONE)
+	{
+		return true;
+	}
+
+	if (!IsValid(InventoryComponent))
 	{
 		return false;
 	}
 
 	return InventoryComponent->UpdataItemAtSlot(CurrentWeaponSlot, CurrentWeapon);
+}
+
+void UWeaponComponent::SyncCurrentWeaponToEquipment()
+{
+	if (!GetCurrentWeapon())
+	{
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+
+	if (!IsValid(OwnerActor))
+	{
+		return;
+	}
+
+	UEquipmentComponent* EquipmentComponent = OwnerActor->FindComponentByClass<UEquipmentComponent>();
+
+	if (IsValid(EquipmentComponent))
+	{
+		EquipmentComponent->UpdateEquippedWeaponState(CurrentWeapon);
+	}
 }
 
 AActor* UWeaponComponent::SpawnWeaponActor(const UWeaponDataAsset* WeaponData) const

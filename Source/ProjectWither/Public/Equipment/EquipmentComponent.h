@@ -26,6 +26,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	bool UnequipItem(const FItemInstance& EquipmentItem);										// 지정한 장비 아이템을 해제한다.
 
+	bool UpdateEquippedWeaponState(const FItemInstance& WeaponItem);
+
 	UFUNCTION(BlueprintPure, Category = "Equipment|Weapon")
 	FItemInstance GetEquippedSword() const;														// 현재 장착 중인 근접 무기 반환
 
@@ -43,6 +45,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Equipment|Armor")
 	FItemInstance GetEquippedBoots() const;														// 현재 장착 중인 신발 반환
+
+	UFUNCTION(BlueprintPure, Category = "Equipment|Stat")
+	float GetWeaponAttackPowerBonus() const;														// 현재 사용 중인 무기의 공격력
+
+	UFUNCTION(BlueprintPure, Category = "Equipment|Stat")
+	float GetArmorDefensePowerBonus() const;														// 장착 방어구들이 제공하는 방어력 합산
 
 private:
 	FItemInstance* GetWeaponEquipmentSlot(EWeaponType WeaponType);								// 무기 타입에 맞는 장비 슬롯 반환

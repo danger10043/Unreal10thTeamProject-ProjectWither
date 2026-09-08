@@ -22,12 +22,14 @@ class UStatComponent;
 class UWeaponComponent;
 class UEquipmentComponent;
 class UInventoryComponent;
+class UStatUpgradeComponent;
 class UWeaponDataAsset;
 class UUserWidget;
 class UTestMainUIWidget;
 class UInteractionComponent;
 class UCrosshairUI;
 class ULockOnWidget;
+class UStatWindowWidget;
 
 UCLASS()
 class PROJECTWITHER_API APlayerCharacter : 
@@ -67,6 +69,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|Inventory")
 	bool IsInventoryOpen() const { return bIsInventoryOpen; }
 
+	UFUNCTION(BlueprintCallable, Category = "Player|UI")
+	void ToggleStatWindow();
+
+	UFUNCTION(BlueprintCallable, Category = "Player|UI")
+	void OpenStatWindow();
+
+	UFUNCTION(BlueprintCallable, Category = "Player|UI")
+	void CloseStatWindow();
+
 	virtual UStatComponent* GetStatComponent_Implementation() const override;
 
 	virtual UWeaponComponent* GetWeaponComponent_Implementation() const override;
@@ -74,6 +85,9 @@ public:
 	virtual UEquipmentComponent* GetEquipmentComponent_Implementation() const override;
 
 	virtual UCombatComponent* GetCombatComponent_Implementation() const override;
+
+	UFUNCTION(BlueprintPure, Category = "Player|Stat Upgrade")
+	UStatUpgradeComponent* GetStatUpgradeComponent() const { return StatUpgradeComponent; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -132,6 +146,9 @@ private:
 	TObjectPtr<UInventoryComponent> InventoryComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStatUpgradeComponent> StatUpgradeComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInteractionComponent> InteractionComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
@@ -161,6 +178,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTestMainUIWidget> TestMainUIInstance;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|UI", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UStatWindowWidget> StatWindowClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStatWindowWidget> StatWindowInstance;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Player|UI")
 	TSubclassOf<UCrosshairUI> CrossHairUIClass;
@@ -205,6 +228,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> InventoryAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> StatWindowAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> InteractAction;

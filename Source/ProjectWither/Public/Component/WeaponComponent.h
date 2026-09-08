@@ -11,6 +11,8 @@ class UInventoryComponent;
 class UStatComponent;
 class UWeaponDataAsset;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWeaponChangedDelegate);
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class PROJECTWITHER_API UWeaponComponent : public UActorComponent
 {
@@ -18,6 +20,9 @@ class PROJECTWITHER_API UWeaponComponent : public UActorComponent
 
 public:	
 	UWeaponComponent();
+
+	UPROPERTY(BlueprintAssignable, Category = "Weapon|Event")
+	FOnWeaponChangedDelegate OnWeaponChanged;
 
 protected:
 	virtual void BeginPlay() override;
@@ -27,6 +32,8 @@ protected:
 public:	
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	bool EquipWeapon(UWeaponDataAsset* WeaponData);
+
+	bool EquipWeaponInstance(const FItemInstance& WeaponInstance);
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void UnequipWeapon();
@@ -65,6 +72,7 @@ public:
 
 private:
 	bool SaveCurrentWeaponToInventory();
+	void SyncCurrentWeaponToEquipment();
 
 	AActor* SpawnWeaponActor(const UWeaponDataAsset* WeaponData) const;
 	

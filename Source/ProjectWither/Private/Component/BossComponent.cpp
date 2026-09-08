@@ -29,8 +29,123 @@ UBossComponent::UBossComponent()
 
 void UBossComponent::StartEncounter()
 {
+	if (bEncounterStarted || CurrentPhase == EBossPhase::Dead) return;
+	bEncounterStarted = true;
 	SetPhase(EBossPhase::Phase1);
 	OnBossEncounterStarted.Broadcast();
+	PlayEntranceMontage();
+}
+
+void UBossComponent::RestartEncounterFromPool()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(EntranceTimerHandle);
+		World->GetTimerManager().ClearTimer(PhaseTransitionTimerHandle);
+	}
+
+	EntranceAnimInstance.Reset();
+	TransitionAnimInstance.Reset();
+	bEncounterStarted = false;
+	bEntrancePlaying = false;
+	bPhase2Triggered = false;
+	CurrentPhase = EBossPhase::Phase1;
+	ReleaseTransitionMovement(true);
+	ApplyPhaseSettings(EBossPhase::Phase1);
+	StartEncounter();
+}
+
+void UBossComponent::PrepareForPoolReturn()
+{
+	bEntrancePlaying = false;
+	StopEntranceMontage();
+	StopPhaseTransitionMontage();
+	ReleaseTransitionMovement(false);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(EntranceTimerHandle);
+		World->GetTimerManager().ClearTimer(PhaseTransitionTimerHandle);
+	}
+}
+
+void UBossComponent::PlayEntranceMontage()
+{
+	UMonsterComponent* Monster = GetOwner()->FindComponentByClass<UMonsterComponent>();
+	UAnimMontage* Montage = GetEntranceMontage();
+	USkeletalMeshComponent* Mesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+	if (!IsValid(Montage) || !IsValid(AnimInstance)) return;
+
+	bEntrancePlaying = true;
+	if (IsValid(Monster))
+	{
+		Monster->SetCombatLocked(true);
+		Monster->SetDamageLocked(true);
+		Monster->CancelAttack();
+		Monster->FinishAttack();
+		Monster->CancelSearch();
+	}
+	LockTransitionMovement();
+
+	const float Duration = AnimInstance->Montage_Play(Montage, 1.0f, EMontagePlayReturnType::Duration);
+	if (Duration <= 0.0f)
+	{
+		FinishEntrance();
+		return;
+	}
+
+	EntranceAnimInstance = AnimInstance;
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(this, &UBossComponent::HandleEntranceMontageEnded);
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, Montage);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(EntranceTimerHandle, this,
+			&UBossComponent::HandleEntranceTimeout,
+			FMath::Max(PhaseTransitionTimeout, Duration + 1.0f), false);
+	}
+}
+
+void UBossComponent::HandleEntranceMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != GetEntranceMontage()) return;
+	EntranceAnimInstance.Reset();
+	FinishEntrance();
+}
+
+void UBossComponent::HandleEntranceTimeout()
+{
+	FinishEntrance();
+}
+
+void UBossComponent::FinishEntrance()
+{
+	if (!bEntrancePlaying) return;
+	bEntrancePlaying = false;
+	StopEntranceMontage();
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(EntranceTimerHandle);
+
+	UMonsterComponent* Monster = GetOwner()->FindComponentByClass<UMonsterComponent>();
+	if (IsValid(Monster) && !Monster->IsDead())
+	{
+		Monster->SetCombatLocked(false);
+		Monster->SetDamageLocked(false);
+	}
+	ReleaseTransitionMovement(IsValid(Monster) && !Monster->IsDead());
+}
+
+void UBossComponent::StopEntranceMontage()
+{
+	UAnimMontage* Montage = GetEntranceMontage();
+	UAnimInstance* AnimInstance = EntranceAnimInstance.Get();
+	EntranceAnimInstance.Reset();
+	if (IsValid(AnimInstance) && IsValid(Montage))
+	{
+		FOnMontageEnded EmptyDelegate;
+		AnimInstance->Montage_SetEndDelegate(EmptyDelegate, Montage);
+		AnimInstance->Montage_Stop(0.0f, Montage);
+	}
 }
 
 void UBossComponent::FinishPhaseTransition()
@@ -45,12 +160,12 @@ void UBossComponent::FinishPhaseTransition()
 
 void UBossComponent::HandlePhaseTransitionTimeout()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Boss phase transition timed out: %s"), *GetNameSafe(GetOwner()));
 	FinishPhaseTransition();
 }
 
 void UBossComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	StopEntranceMontage();
 	StopPhaseTransitionMontage();
 	ReleaseTransitionMovement(false);
 	if (IsTransitioning() && IsValid(GetOwner()))
@@ -64,6 +179,7 @@ void UBossComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PhaseTransitionTimerHandle);
+		World->GetTimerManager().ClearTimer(EntranceTimerHandle);
 	}
 	Super::EndPlay(EndPlayReason);
 }
@@ -77,11 +193,6 @@ void UBossComponent::BeginPlay()
     {
         return;
     }
-
-	if (!IsValid(GetBossData()))
-	{
-		UE_LOG(LogTemp, Error, TEXT("BossData is missing: %s"), *GetNameSafe(GetOwner()));
-	}
 
 	if (OwnerActor->GetClass()->ImplementsInterface(UStatComponentUserInterface::StaticClass()))
     {
@@ -134,6 +245,13 @@ void UBossComponent::HandleHealthChanged(float CurrentHealth, float MaxHealth, f
 
 void UBossComponent::HandleBossDeath()
 {
+	bEntrancePlaying = false;
+	StopEntranceMontage();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(EntranceTimerHandle);
+	}
+	ReleaseTransitionMovement(false);
 	SetPhase(EBossPhase::Dead);
 	OnBossEncounterEnded.Broadcast();
 }
@@ -208,7 +326,6 @@ void UBossComponent::PlayPhaseTransitionMontage()
 	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
 	if (!IsValid(TransitionMontage) || !IsValid(AnimInstance))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Boss transition montage or AnimInstance missing: %s"), *GetNameSafe(GetOwner()));
 		FinishPhaseTransition();
 		return;
 	}
@@ -217,7 +334,6 @@ void UBossComponent::PlayPhaseTransitionMontage()
 		TransitionMontage, 1.0f, EMontagePlayReturnType::Duration);
 	if (Duration <= 0.0f)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Boss transition montage failed to play: %s"), *GetNameSafe(GetOwner()));
 		FinishPhaseTransition();
 		return;
 	}
@@ -269,6 +385,12 @@ UAnimMontage* UBossComponent::GetPhaseTransitionMontage() const
 	return IsValid(BossData) ? BossData->PhaseTransitionMontage.Get() : nullptr;
 }
 
+UAnimMontage* UBossComponent::GetEntranceMontage() const
+{
+	const UBossDataAsset* BossData = GetBossData();
+	return IsValid(BossData) ? BossData->EntranceMontage.Get() : nullptr;
+}
+
 UBossDataAsset* UBossComponent::GetBossData() const
 {
 	if (!IsValid(GetOwner())) return nullptr;
@@ -315,6 +437,11 @@ void UBossComponent::ApplyPhaseSettings(EBossPhase Phase)
 		Monster->SetAttackCooldown(Settings->AttackCooldown);
 		Monster->SetAttackRange(Settings->AttackRange);
 		Monster->SetAllowRange(Settings->AllowRange);
+		const UBossDataAsset* BossData = GetBossData();
+		Monster->SetAdditionalAttackMontage(
+			Phase == EBossPhase::Phase2 && IsValid(BossData)
+			? BossData->Phase2AttackMontage.Get()
+			: nullptr);
 	}
 
 	if (UStatComponent* Stat = OwnerCharacter->FindComponentByClass<UStatComponent>())
@@ -385,8 +512,6 @@ void UBossComponent::LockTransitionMovement()
 	APawn* Pawn = Cast<APawn>(GetOwner());
 	if (!IsValid(Pawn)) return;
 
-	// Disable Character movement, including root motion, independently of the
-	// common montage callbacks that may reactivate the movement component.
 	if (UCharacterMovementComponent* Movement = Cast<UCharacterMovementComponent>(Pawn->GetMovementComponent()))
 	{
 		if (!TransitionMovement.IsValid())
@@ -396,7 +521,6 @@ void UBossComponent::LockTransitionMovement()
 			PreviousCustomMovementMode = Movement->CustomMovementMode;
 		}
 		Movement->StopMovementImmediately();
-		Movement->DisableMovement();
 	}
 	Pawn->ConsumeMovementInputVector();
 
@@ -432,7 +556,7 @@ void UBossComponent::ReleaseTransitionMovement(bool bRestore)
 	{
 		Movement->SetMovementMode(PreviousMovementMode, PreviousCustomMovementMode);
 	}
-	// Resume only logic that this component paused. Never restart stopped AI.
+
 	if (IsValid(Brain) && Brain->IsPaused())
 	{
 		Brain->ResumeLogic(TEXT("Boss phase transition finished"));

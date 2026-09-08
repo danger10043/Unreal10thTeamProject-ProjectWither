@@ -44,12 +44,24 @@ protected:
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	virtual void TickComponent(
+		float DeltaTime,
+		ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction
+	) override;
+
 public:	
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void Attack();
 
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void SwordAttack();
+
+	void BeginNextAttackWindow(FName SectionName);
+	void EndNextAttackWindow(FName SectionName);
+	void ReachAttackCheckpoint(FName SectionName);
+
+	void CancelSwordRecovery();
 
 	UFUNCTION(BlueprintCallable, Category = "Combat|Sword")
 	void BeginSwordDamageWindow();
@@ -132,6 +144,53 @@ private:
 
 	void StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActionState AttackState, float StaminaCost);
 
+	bool IsCurrentComboSection(FName SectionName) const;
+	void TryAdvanceSwordCombo();
+	void ResetSwordCombo();
+
+	bool IsAttackAssistTarget(AActor* Target) const;
+	AActor* FindAttackAssistTarget() const;
+	bool IsAttackApproachPathClear(const FVector& Start, const FVector& End) const;
+
+	void BeginSwordApproach();
+	void FinishSwordApproach(bool bResumeAttack);
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Approach", meta = (ClampMin = "0.0", Units = "cm"))
+	float AttackSearchRadius = 600.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Approach", meta = (ClampMin = "1.0"))
+	float AttackApproachSpeed = 1800.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Approach", meta = (ClampMin = "0.0", Units = "cm"))
+	float AttackApproachGap = 50.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Approach", meta = (ClampMin = "0.0", Units = "cm"))
+	float AttackTargetHeightTolerance = 100.0f;
+
+	bool bSwordApproaching = false;
+	TWeakObjectPtr<AActor> AttackApproachTarget;
+	FVector AttackApproachDestination = FVector::ZeroVector;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Combo")
+	TArray<FName> SwordComboSections =
+	{
+		FName(TEXT("Attack1")),
+		FName(TEXT("Attack2")),
+		FName(TEXT("Attack3")),
+		FName(TEXT("Attack4")),
+
+	};
+
+	int32 CurrentComboIndex = INDEX_NONE;
+	bool bNextAttackWindowOpen = false;
+	bool bNextAttackQueued = false;
+	bool bAttackCheckpointReached = false;
+
+	bool bSwordRecovery = false;
+
+	// 새 공격 시작마다 증가, ResetSwordCombo 에서는 증가하지 않음.
+	uint64 SwordAttackExecutionId = 0;
+
 	void OpenParryWindow();
 
 	void CloseParryWindow();
@@ -140,7 +199,11 @@ private:
 
 	void OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
-	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void OnAttackMontageEnded(
+		UAnimMontage* Montage,
+		bool bInterrupted,
+		uint64 ExecutionId
+	);
 
 	UFUNCTION()
 	void HandleSwordCollisionBeginOverlap(

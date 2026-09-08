@@ -17,12 +17,13 @@ class APickupItem;
 class UPrimitiveComponent;
 class UPawnMovementComponent;
 class UMonsterDataAsset;
+class AMonsterProjectile;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMonsterDied);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterAttackFinished, bool, bInterrupted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMonsterSearchFinished, bool, bInterrupted);
 
-UCLASS(ClassGroup=(Monster), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Monster), meta = (BlueprintSpawnableComponent))
 class PROJECTWITHER_API UMonsterComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -38,39 +39,43 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
-    // Both monster actor types forward their damage here.
-    float ApplyMonsterDamage(float Damage);
+	// Both monster actor types forward their damage here.
+	float ApplyMonsterDamage(float Damage);
 
-    // Controlled by the system requesting the lock; independent of boss phases and cooldowns.
-    void SetCombatLocked(bool bLocked) { bCombatLocked = bLocked; }
+	// Controlled by the system requesting the lock; independent of boss phases and cooldowns.
+	void SetCombatLocked(bool bLocked) { bCombatLocked = bLocked; }
 
-    // Prevents incoming damage without coupling invulnerability to attack/movement locks.
-    void SetDamageLocked(bool bLocked) { bDamageLocked = bLocked; }
+	// Prevents incoming damage without coupling invulnerability to attack/movement locks.
+	void SetDamageLocked(bool bLocked) { bDamageLocked = bLocked; }
 
-    UFUNCTION(BlueprintPure, Category = "Monster|Data")
-    UMonsterDataAsset* GetMonsterData() const { return MonsterData; }
+	UFUNCTION(BlueprintPure, Category = "Monster|Data")
+	UMonsterDataAsset* GetMonsterData() const { return MonsterData; }
 
-    void SetAttackCooldown(float NewCooldown) { AttackCooldown = FMath::Max(0.0f, NewCooldown); }
-    void SetAttackRange(float NewRange) { AttackRange = FMath::Max(0.0f, NewRange); }
-    void SetAllowRange(float NewRange) { AllowRange = FMath::Max(0.0f, NewRange); }
+	void SetAttackCooldown(float NewCooldown) { AttackCooldown = FMath::Max(0.0f, NewCooldown); }
+	void SetAttackRange(float NewRange) { AttackRange = FMath::Max(0.0f, NewRange); }
+	void SetAllowRange(float NewRange) { AllowRange = FMath::Max(0.0f, NewRange); }
+	void SetAdditionalAttackMontage(UAnimMontage* NewMontage) { AdditionalAttackMontage = NewMontage; }
 
-    UFUNCTION(BlueprintPure, Category = "Monster")
-    bool IsDead() const { return bIsDead; }
+	UFUNCTION(BlueprintPure, Category = "Monster")
+	bool IsDead() const { return bIsDead; }
 
-    UFUNCTION(BlueprintPure, Category = "Monster")
-    int32 GetMonsterId() const { return MonsterId; }
+	UFUNCTION(BlueprintPure, Category = "Monster")
+	int32 GetMonsterId() const { return MonsterId; }
 
-    UFUNCTION(BlueprintPure, Category = "Monster")
-    EMonsterState GetMonsterState() const { return MonsterState; }
+	UFUNCTION(BlueprintPure, Category = "Monster")
+	EMonsterState GetMonsterState() const { return MonsterState; }
 
-    UFUNCTION(BlueprintPure, Category = "Monster")
-    FVector GetSpawnLocation() const { return SpawnLocation; }
+	UFUNCTION(BlueprintPure, Category = "Monster")
+	FVector GetSpawnLocation() const { return SpawnLocation; }
 
-    UFUNCTION(BlueprintPure, Category = "Monster")
-    float GetAllowRange() const { return AllowRange; }
+	UFUNCTION(BlueprintPure, Category = "Monster")
+	float GetAllowRange() const { return AllowRange; }
 
-    UPROPERTY(BlueprintAssignable, Category = "Monster")
-    FOnMonsterDied OnMonsterDied;
+	UFUNCTION(BlueprintPure, Category = "Monster")
+	float GetAttackCooldown() const { return AttackCooldown; }
+
+	UPROPERTY(BlueprintAssignable, Category = "Monster")
+	FOnMonsterDied OnMonsterDied;
 
 	UPROPERTY(BlueprintAssignable, Category = "Monster|Combat")
 	FOnMonsterAttackFinished OnMonsterAttackFinished;
@@ -118,6 +123,9 @@ public:
 	void ApplyAttackDamage(AActor* HitTarget, float AttackMultiplier = 1.0f);	// 실제 타격 판정, 피해 적용
 
 	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
+	void FireProjectileAtTarget();		// 현재 타겟을 향해 투사체 발사 (원거리 공격 노티파이에서 호출)
+
+	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
 	void RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox);	// 공격 히트 박스 등록
 
 	UFUNCTION(BlueprintCallable, Category = "Monster|Combat")
@@ -154,18 +162,19 @@ private:
 	UFUNCTION()
 	void HandleDeath();
 
-	FName SelectAttackSection() const;	// 공격 애니메이션 섹션 랜덤 선택 함수
+	FName SelectAttackSection(UAnimMontage* Montage) const;	// 공격 애니메이션 섹션 랜덤 선택 함수
+	UAnimMontage* SelectAttackMontage() const;
 
 	void DisableAllAttackHitboxes();	// 모든 공격 히트 박스 비활성화
 
 	UFUNCTION()	// 공격 히트박스 오버랩
-	void OnAttackHitboxOverlap(
-		UPrimitiveComponent* OverlappedComponent,
-		AActor* OtherActor,
-		UPrimitiveComponent* OtherComp,
-		int32 OtherBodyIndex,
-		bool bFromSweep,
-		const FHitResult& SweepResult);
+		void OnAttackHitboxOverlap(
+			UPrimitiveComponent* OverlappedComponent,
+			AActor* OtherActor,
+			UPrimitiveComponent* OtherComp,
+			int32 OtherBodyIndex,
+			bool bFromSweep,
+			const FHitResult& SweepResult);
 
 	void ProcessAttackOverlap(AActor* OtherActor); // 실제 오버랩 구현
 
@@ -181,14 +190,14 @@ private:
 	void PlayDeathMontage(); 	// 사망 몽타주 재생
 
 	// 사망 몽타주 종료 후
-	void OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted);	
+	void OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	// 플레이어 찾는 몽타주 종료 후
 	void OnSearchMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	void FinishDeath(); 	// 사망 후처리
 
-	void ScheduleFinishDeath();	// FinishDeath 타이머걸기
+	void ScheduleFinishDeath(float MinimumDelay = 0.0f);	// FinishDeath 타이머걸기
 
 	void ClearRuntimeTimers();	// 타이머 초기화
 	void ResetRuntimeState();	// 변수들 초기화
@@ -254,6 +263,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	float AttackRange = 400.0f;	// 공격 범위
 
+	// 경계선에서 값이 빠르게 뒤집혀 BT 옵저버가 전환을 놓치는 것을 막기 위한 여유 구간.
+	// 진입 판정은 AttackRange, 이탈 판정은 AttackRange + AttackRangeHysteresis 기준
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base", meta = (ClampMin = "0.0"))
+	float AttackRangeHysteresis = 100.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	float AttackCooldown = 1.0f;	// 공격 간격
 
@@ -261,10 +275,27 @@ protected:
 	float DefenseScalingConstant = 100.0f;
 	// -------------------------------------------------------------------------
 
+	// Ranged Attack -------------------------------------------------------------
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Ranged")
+	TSubclassOf<AMonsterProjectile> ProjectileClass;	// 발사할 투사체 클래스
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Ranged")
+	FName ProjectileMuzzleSocketName = TEXT("Muzzle");	// 투사체 발사 소켓 (없으면 액터 위치 사용)
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Ranged")
+	float ProjectileAttackMultiplier = 1.0f;	// 투사체 피격 시 데미지 배율
+	// -------------------------------------------------------------------------
+
 protected:
 	// Montage -----------------------------------------------------------------
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	TObjectPtr<UAnimMontage> AttackMontage = nullptr;	// 공격 몽타주
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> AdditionalAttackMontage = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveAttackMontage = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	FString AttackSectionPrefix = TEXT("Attack_");
@@ -288,6 +319,7 @@ protected:
 private:
 	bool bCombatLocked = false;
 	bool bDamageLocked = false;
+	bool bWasInAttackRange = false;	// IsInAttackRange 히스테리시스용 이전 상태
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPawnMovementComponent> LockedMontageMovement = nullptr;

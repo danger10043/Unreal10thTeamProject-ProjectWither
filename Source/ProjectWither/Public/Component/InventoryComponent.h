@@ -39,6 +39,9 @@ public:
 	int32 AddItem(UItemDataAsset* Item, int32 AddQuantity);											// 아이템을 인벤토리에 추가하고 실제 추가된 수량을 반환
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 AddItemInstance(const FItemInstance& NewItemInstance);									// 아이템 인스턴스 상태를 유지한 채 인벤토리에 추가하고 실제 추가된 수량을 반환
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool RemoveItem(int32 ItemId, int32 RemoveQuantity);											// 인벤토리 전체에서 지정한 아이템을 수량만큼 제거 (강화 재료, 소비 아이템 등에서 사용)
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
