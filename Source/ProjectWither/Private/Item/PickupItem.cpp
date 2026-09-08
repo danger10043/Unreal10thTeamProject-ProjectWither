@@ -166,10 +166,7 @@ void APickupItem::OnFinishPickupEffect()
 		IsValid(ItemInstance.ItemData.Get()) &&
 		ItemInstance.Quantity > 0)
 	{
-		const int32 AddedQuantity = Inventory->AddItem(
-			ItemInstance.ItemData.Get(),
-			ItemInstance.Quantity
-		);
+		const int32 AddedQuantity = Inventory->AddItemInstance(ItemInstance);
 
 		ItemInstance.Quantity -= AddedQuantity;
 

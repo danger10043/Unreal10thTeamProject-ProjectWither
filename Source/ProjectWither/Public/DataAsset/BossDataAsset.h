@@ -21,6 +21,13 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Phase")
     TObjectPtr<UAnimMontage> PhaseTransitionMontage;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Encounter")
+    TObjectPtr<UAnimMontage> EntranceMontage;
+
+    // Phase two randomly chooses between the base attack montage and this montage.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Phase")
+    TObjectPtr<UAnimMontage> Phase2AttackMontage;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Visual")
     TArray<FName> BodyMaterialSlots;
 

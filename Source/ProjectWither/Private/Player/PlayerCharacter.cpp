@@ -8,11 +8,13 @@
 #include "Component/InventoryComponent.h"
 #include "Component/InteractionComponent.h"
 #include "Component/PlayerCameraComponent.h"
+#include "Component/StatUpgradeComponent.h"
 #include "Equipment/EquipmentComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "Widget/TestMainUIWidget.h"
 #include "Widget/CrosshairUI.h"
 #include "Widget/LockOnWidget.h"
+#include "Widget/StatWindowWidget.h"
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
@@ -56,6 +58,7 @@ APlayerCharacter::APlayerCharacter()
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
     EquipmentComponent = CreateDefaultSubobject<UEquipmentComponent>(TEXT("EquipmentComponent"));
     InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
+    StatUpgradeComponent = CreateDefaultSubobject<UStatUpgradeComponent>(TEXT("StatUpgradeComponent"));
     InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
     PlayerCameraComponent = CreateDefaultSubobject<UPlayerCameraComponent>(TEXT("PlayerCameraComponent"));
 }
@@ -155,6 +158,53 @@ void APlayerCharacter::CloseInventory()
 
     FInputModeGameOnly InputMode;																	// 게임 입력만 받는 입력 모드로 복구한다.
     PlayerController->SetInputMode(InputMode);														// 설정한 입력 모드를 PlayerController에 적용한다.
+}
+
+void APlayerCharacter::ToggleStatWindow()
+{
+    if (IsValid(StatWindowInstance))
+    {
+        CloseStatWindow();
+        return;
+    }
+
+    OpenStatWindow();
+}
+
+void APlayerCharacter::OpenStatWindow()
+{
+    if (IsValid(StatWindowInstance) || !IsLocallyControlled() || !IsValid(StatWindowClass))
+    {
+        return;
+    }
+
+    APlayerController* PlayerController = Cast<APlayerController>(GetController());
+
+    if (!IsValid(PlayerController))
+    {
+        return;
+    }
+
+    StatWindowInstance = CreateWidget<UStatWindowWidget>(PlayerController, StatWindowClass);
+
+    if (!IsValid(StatWindowInstance))
+    {
+        return;
+    }
+
+    StatWindowInstance->AddToViewport();
+    StatWindowInstance->RefreshStats();
+}
+
+void APlayerCharacter::CloseStatWindow()
+{
+    if (!IsValid(StatWindowInstance))
+    {
+        return;
+    }
+
+    StatWindowInstance->RemoveFromParent();
+    StatWindowInstance = nullptr;
 }
 
 UStatComponent* APlayerCharacter::GetStatComponent_Implementation() const
@@ -281,6 +331,8 @@ void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
         TestMainUIInstance = nullptr;
     }
 
+    CloseStatWindow();
+
     Super::EndPlay(EndPlayReason);
 }
 
@@ -312,6 +364,10 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &APlayerCharacter::SwapWeaponInput);
     EnhancedInput->BindAction(InventoryAction, ETriggerEvent::Started, this, &APlayerCharacter::ToggleInventory);
+    if (IsValid(StatWindowAction))
+    {
+        EnhancedInput->BindAction(StatWindowAction, ETriggerEvent::Started, this, &APlayerCharacter::ToggleStatWindow);
+    }
     EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &APlayerCharacter::InteractInput);
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Started, this, &APlayerCharacter::StartZoomInput);
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopZoomInput);
@@ -628,20 +684,12 @@ void APlayerCharacter::AddDefaultTestWeapons()
         }
         else if (!InventoryComponent->HasItem(TestGunData->GetItemId()))
         {
-            const int32 AddedQuantity = InventoryComponent->AddItem(TestGunData, 1);
+            FItemInstance TestGunInstance;
+            TestGunInstance.ItemData = TestGunData;
+            TestGunInstance.Quantity = 1;
+            TestGunInstance.CurrentAmmo = FMath::Max(0, TestGunData->GetMaxAmmo());
 
-            if (AddedQuantity > 0)
-            {
-                const int32 GunSlot = InventoryComponent->FindItemSlot(TestGunData->GetItemId());
-
-                FItemInstance TestGunInstance;
-
-                if (GunSlot != INDEX_NONE && InventoryComponent->GetItemAtSlot(GunSlot, TestGunInstance))
-                {
-                    TestGunInstance.CurrentAmmo = FMath::Max(0, TestGunData->GetMaxAmmo());
-                    InventoryComponent->UpdataItemAtSlot(GunSlot, TestGunInstance);
-                }
-            }
+            InventoryComponent->AddItemInstance(TestGunInstance);
         }
 	}
 
