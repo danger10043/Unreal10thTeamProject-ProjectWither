@@ -69,5 +69,8 @@ protected:
     float HeightAboveFloor = 0.f;
     UPROPERTY(EditAnywhere, Category = "Movement")
     float TraceOffsetRadius = 800.f;
+    // 목표 높이로 보정하는 속도. AI 이동이 아래로 끌어당기는 힘보다 커야 높이가 밀리지 않음
+    UPROPERTY(EditAnywhere, Category = "Movement")
+    float HeightCorrectionSpeed = 10.f;
     void SnapToFloor(float DeltaTime);
 };
