@@ -82,13 +82,6 @@ void UMonsterWorldHealthBarComponent::BeginPlay()
 	{
 		StatComponent = IStatComponentUserInterface::Execute_GetStatComponent(OwnerActor);
 	}
-	if (!IsValid(StatComponent))
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[%s] MonsterWorldHealthBar: StatComponent was not found."),
-			*GetNameSafe(OwnerActor));
-	}
-
 	MonsterComponent = OwnerActor->FindComponentByClass<UMonsterComponent>();
 	OwnerActor->OnTakeAnyDamage.AddUniqueDynamic(
 		this, &UMonsterWorldHealthBarComponent::HandleOwnerDamaged);
@@ -105,12 +98,6 @@ void UMonsterWorldHealthBarComponent::BeginPlay()
 		MonsterComponent->OnMonsterDied.AddUniqueDynamic(
 			this, &UMonsterWorldHealthBarComponent::HandleMonsterDied);
 	}
-
-	UE_LOG(LogTemp, Display,
-		TEXT("[%s] MonsterWorldHealthBar initialized. Widget=%s Stat=%s"),
-		*GetNameSafe(OwnerActor),
-		*GetNameSafe(GetUserWidgetObject()),
-		*GetNameSafe(StatComponent));
 
 	HideHealthBar();
 }
@@ -150,10 +137,6 @@ void UMonsterWorldHealthBarComponent::HandleOwnerDamaged(
 	AController* InstigatedBy,
 	AActor* DamageCauser)
 {
-	UE_LOG(LogTemp, Display,
-		TEXT("[%s] MonsterWorldHealthBar owner damaged: %.1f"),
-		*GetNameSafe(DamagedActor), Damage);
-
 	if (Damage > 0.0f && IsValid(StatComponent) &&
 		(!IsValid(MonsterComponent) || !MonsterComponent->IsDead()))
 	{
@@ -164,10 +147,6 @@ void UMonsterWorldHealthBarComponent::HandleOwnerDamaged(
 void UMonsterWorldHealthBarComponent::HandleHealthChanged(
 	float CurrentHealth, float MaxHealth, float ChangedAmount)
 {
-	UE_LOG(LogTemp, Display,
-		TEXT("[%s] MonsterWorldHealthBar health changed: %.1f / %.1f (change %.1f)"),
-		*GetNameSafe(GetOwner()), CurrentHealth, MaxHealth, ChangedAmount);
-
 	RefreshHealth(CurrentHealth, MaxHealth);
 
 	if (ChangedAmount < 0.0f && CurrentHealth > 0.0f)
@@ -197,10 +176,6 @@ void UMonsterWorldHealthBarComponent::RefreshHealth(float CurrentHealth, float M
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning,
-		TEXT("[%s] MonsterWorldHealthBar: Widget Class is empty or is not derived from MonsterWorldHealthBarWidget. Current widget: %s"),
-		*GetNameSafe(GetOwner()),
-		*GetNameSafe(UserWidget));
 }
 
 void UMonsterWorldHealthBarComponent::ShowTemporarily()
@@ -227,13 +202,6 @@ void UMonsterWorldHealthBarComponent::ShowTemporarily()
 	}
 
 	MarkRenderStateDirty();
-
-	UE_LOG(LogTemp, Display,
-		TEXT("[%s] MonsterWorldHealthBar shown. Visible=%s Hidden=%s Widget=%s"),
-		*GetNameSafe(GetOwner()),
-		IsVisible() ? TEXT("true") : TEXT("false"),
-		bHiddenInGame ? TEXT("true") : TEXT("false"),
-		*GetNameSafe(GetUserWidgetObject()));
 
 	UWorld* World = GetWorld();
 	if (!IsValid(World))

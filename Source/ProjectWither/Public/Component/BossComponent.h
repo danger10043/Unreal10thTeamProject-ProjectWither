@@ -45,8 +45,17 @@ public:
         return CurrentPhase == EBossPhase::Transition;
     }
 
+    UFUNCTION(BlueprintPure, Category = "Boss")
+    bool IsPlayingEntrance() const { return bEntrancePlaying; }
+
     UFUNCTION(BlueprintCallable, Category = "Boss")
     void StartEncounter();
+
+    // Resets a pooled boss and starts its entrance sequence again.
+    void RestartEncounterFromPool();
+
+    // Clears encounter-only state before the boss returns to the pool.
+    void PrepareForPoolReturn();
 
     UFUNCTION(BlueprintCallable, Category = "Boss")
     void FinishPhaseTransition();
@@ -77,6 +86,11 @@ private:
 
     void SetPhase(EBossPhase NewPhase);
     void HandlePhaseTransitionTimeout();
+    void FinishEntrance();
+    void HandleEntranceTimeout();
+    void PlayEntranceMontage();
+    void StopEntranceMontage();
+    void HandleEntranceMontageEnded(UAnimMontage* Montage, bool bInterrupted);
     void PlayPhaseTransitionMontage();
     void StopPhaseTransitionMontage();
     void HandleTransitionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
@@ -84,6 +98,7 @@ private:
     void ReleaseTransitionMovement(bool bRestore);
     UBossDataAsset* GetBossData() const;
     UAnimMontage* GetPhaseTransitionMontage() const;
+    UAnimMontage* GetEntranceMontage() const;
     const FBossPhaseSettings* GetPhaseSettings(EBossPhase Phase) const;
     void ApplyPhaseSettings(EBossPhase Phase);
     void InitializeDynamicMaterials();
@@ -96,6 +111,7 @@ private:
     UPROPERTY(EditDefaultsOnly, Category = "Boss|Phase", meta = (ClampMin = "0.1", Units = "s"))
     float PhaseTransitionTimeout = 10.0f;
 
+    TWeakObjectPtr<UAnimInstance> EntranceAnimInstance;
     TWeakObjectPtr<UAnimInstance> TransitionAnimInstance;
     TWeakObjectPtr<UCharacterMovementComponent> TransitionMovement;
     TWeakObjectPtr<UBrainComponent> TransitionBrain;
@@ -104,6 +120,8 @@ private:
 
     FTimerHandle PhaseTransitionTimerHandle;
 
+    FTimerHandle EntranceTimerHandle;
+
     UPROPERTY(Transient)
     TArray<TObjectPtr<UMaterialInstanceDynamic>> BodyDynamicMaterials;
 
@@ -111,4 +129,6 @@ private:
     TArray<TObjectPtr<UMaterialInstanceDynamic>> FurDynamicMaterials;
 
     bool bPhase2Triggered = false;
+    bool bEncounterStarted = false;
+    bool bEntrancePlaying = false;
 };

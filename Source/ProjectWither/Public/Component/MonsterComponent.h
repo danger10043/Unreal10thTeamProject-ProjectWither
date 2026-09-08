@@ -54,6 +54,7 @@ public:
 	void SetAttackCooldown(float NewCooldown) { AttackCooldown = FMath::Max(0.0f, NewCooldown); }
 	void SetAttackRange(float NewRange) { AttackRange = FMath::Max(0.0f, NewRange); }
 	void SetAllowRange(float NewRange) { AllowRange = FMath::Max(0.0f, NewRange); }
+	void SetAdditionalAttackMontage(UAnimMontage* NewMontage) { AdditionalAttackMontage = NewMontage; }
 
 	UFUNCTION(BlueprintPure, Category = "Monster")
 	bool IsDead() const { return bIsDead; }
@@ -69,6 +70,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Monster")
 	float GetAllowRange() const { return AllowRange; }
+
+	UFUNCTION(BlueprintPure, Category = "Monster")
+	float GetAttackCooldown() const { return AttackCooldown; }
 
 	UPROPERTY(BlueprintAssignable, Category = "Monster")
 	FOnMonsterDied OnMonsterDied;
@@ -158,7 +162,8 @@ private:
 	UFUNCTION()
 	void HandleDeath();
 
-	FName SelectAttackSection() const;	// 공격 애니메이션 섹션 랜덤 선택 함수
+	FName SelectAttackSection(UAnimMontage* Montage) const;	// 공격 애니메이션 섹션 랜덤 선택 함수
+	UAnimMontage* SelectAttackMontage() const;
 
 	void DisableAllAttackHitboxes();	// 모든 공격 히트 박스 비활성화
 
@@ -192,7 +197,7 @@ private:
 
 	void FinishDeath(); 	// 사망 후처리
 
-	void ScheduleFinishDeath();	// FinishDeath 타이머걸기
+	void ScheduleFinishDeath(float MinimumDelay = 0.0f);	// FinishDeath 타이머걸기
 
 	void ClearRuntimeTimers();	// 타이머 초기화
 	void ResetRuntimeState();	// 변수들 초기화
@@ -285,6 +290,12 @@ protected:
 	// Montage -----------------------------------------------------------------
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	TObjectPtr<UAnimMontage> AttackMontage = nullptr;	// 공격 몽타주
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> AdditionalAttackMontage = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveAttackMontage = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	FString AttackSectionPrefix = TEXT("Attack_");

@@ -172,7 +172,7 @@ void UMonsterComponent::HandleDeath()
 
 	OnMonsterDied.Broadcast();
 
-	ScheduleFinishDeath();
+	PlayDeathMontage();
 }
 
 void UMonsterComponent::SetMonsterState(EMonsterState NewState)
@@ -274,8 +274,6 @@ bool UMonsterComponent::IsInAttackRange()
 {
 	if (!IsValid(TargetActor) || !IsValid(GetOwner()))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("IsInAttackRange: TargetActor 또는 Owner 무효 (TargetActor=%s)"),
-			*GetNameSafe(TargetActor));
 		bWasInAttackRange = false;
 		return false;
 	}
@@ -291,9 +289,6 @@ bool UMonsterComponent::IsInAttackRange()
 
 	const bool bResult = Distance >= 0.0f && Distance <= EffectiveRange;
 	bWasInAttackRange = bResult;
-
-	UE_LOG(LogTemp, Warning, TEXT("IsInAttackRange: Distance=%.1f, AttackRange=%.1f, EffectiveRange=%.1f, Result=%s"),
-		Distance, AttackRange, EffectiveRange, bResult ? TEXT("true") : TEXT("false"));
 
 	return bResult;
 }
@@ -322,10 +317,13 @@ bool UMonsterComponent::CanAttack()
 
 bool UMonsterComponent::Attack()
 {
-	if (!CanAttack() || !IsValid(AttackMontage))
+	if (!CanAttack())
 	{
 		return false;
 	}
+
+	UAnimMontage* SelectedMontage = SelectAttackMontage();
+	if (!IsValid(SelectedMontage)) return false;
 
 	USkeletalMeshComponent* Mesh =
 		GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
@@ -335,7 +333,7 @@ bool UMonsterComponent::Attack()
 
 	if (!IsValid(AnimInstance)) return false;
 
-	const FName SelectedSection = SelectAttackSection();
+	const FName SelectedSection = SelectAttackSection(SelectedMontage);
 	if (SelectedSection.IsNone()) return false;
 
 	const EMonsterState PreviousState = MonsterState;
@@ -345,7 +343,7 @@ bool UMonsterComponent::Attack()
 	LockMovementForMontage();
 
 	const float PlayedLength =
-		AnimInstance->Montage_Play(AttackMontage);
+		AnimInstance->Montage_Play(SelectedMontage);
 
 
 	if (PlayedLength <= 0.0f)
@@ -364,12 +362,13 @@ bool UMonsterComponent::Attack()
 
 	AnimInstance->Montage_SetEndDelegate(
 		EndDelegate,
-		AttackMontage);
+		SelectedMontage);
 
 	AnimInstance->Montage_JumpToSection(
-		SelectedSection, AttackMontage);
+		SelectedSection, SelectedMontage);
 
 	// 재생에 성공한 경우에만 직전 공격으로 기록
+	ActiveAttackMontage = SelectedMontage;
 	LastAttackSection = SelectedSection;
 
 	return true;
@@ -378,6 +377,7 @@ bool UMonsterComponent::Attack()
 void UMonsterComponent::FinishAttack()
 {
 	DisableAllAttackHitboxes();
+	ActiveAttackMontage = nullptr;
 	if (!bIsDead)
 	{
 		UnlockMovementAfterMontage();
@@ -470,20 +470,14 @@ void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultipl
 
 void UMonsterComponent::FireProjectileAtTarget()
 {
-	UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 호출됨: %s"), *GetNameSafe(GetOwner()));
-
 	if (bIsDead || !IsValid(ProjectileClass))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 중단: bIsDead=%d, ProjectileClass=%s"),
-			bIsDead, *GetNameSafe(ProjectileClass));
 		return;
 	}
 
 	AActor* Owner = GetOwner();
 	if (!IsValid(Owner) || !IsValid(TargetActor))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 중단: Owner=%s, TargetActor=%s"),
-			*GetNameSafe(Owner), *GetNameSafe(TargetActor));
 		return;
 	}
 
@@ -504,8 +498,6 @@ void UMonsterComponent::FireProjectileAtTarget()
 
 	if (LaunchDirection.IsNearlyZero())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 중단: LaunchDirection이 0벡터 (Muzzle=%s, Target=%s)"),
-			*MuzzleLocation.ToString(), *TargetActor->GetActorLocation().ToString());
 		return;
 	}
 
@@ -519,8 +511,6 @@ void UMonsterComponent::FireProjectileAtTarget()
 		MuzzleLocation,
 		LaunchDirection.Rotation(),
 		SpawnParams);
-
-	UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 스폰 결과: %s"), *GetNameSafe(Projectile));
 
 	if (IsValid(Projectile))
 	{
@@ -638,9 +628,10 @@ void UMonsterComponent::CancelAttack()
 		{
 			if (UAnimInstance* AnimInstance = Mesh->GetAnimInstance())
 			{
-				if (AnimInstance->Montage_IsPlaying(AttackMontage))
+				if (IsValid(ActiveAttackMontage) &&
+					AnimInstance->Montage_IsPlaying(ActiveAttackMontage))
 				{
-					AnimInstance->Montage_Stop(0.15f, AttackMontage);
+					AnimInstance->Montage_Stop(0.15f, ActiveAttackMontage);
 				}
 			}
 		}
@@ -787,14 +778,16 @@ void UMonsterComponent::CancelSearch()
 	}
 }
 
-void UMonsterComponent::ScheduleFinishDeath()
+void UMonsterComponent::ScheduleFinishDeath(float MinimumDelay)
 {
 	if (DespawnPolicy == EMonsterDespawnPolicy::KeepCorpse)
 	{
 		return;
 	}
 
-	if (DespawnDelay <= 0.0f)
+	const float EffectiveDelay = FMath::Max(DespawnDelay, MinimumDelay);
+
+	if (EffectiveDelay <= 0.0f)
 	{
 		FinishDeath();
 		return;
@@ -806,24 +799,34 @@ void UMonsterComponent::ScheduleFinishDeath()
 			DespawnTimerHandle,
 			this,
 			&UMonsterComponent::FinishDeath,
-			DespawnDelay,
+			EffectiveDelay,
 			false
 		);
 	}
 }
 
-FName UMonsterComponent::SelectAttackSection() const
+UAnimMontage* UMonsterComponent::SelectAttackMontage() const
 {
-	if (!IsValid(AttackMontage))
+	if (IsValid(AttackMontage) && IsValid(AdditionalAttackMontage))
+	{
+		return FMath::RandBool() ? AttackMontage.Get() : AdditionalAttackMontage.Get();
+	}
+
+	return IsValid(AttackMontage) ? AttackMontage.Get() : AdditionalAttackMontage.Get();
+}
+
+FName UMonsterComponent::SelectAttackSection(UAnimMontage* Montage) const
+{
+	if (!IsValid(Montage))
 	{
 		return NAME_None;
 	}
 
 	TArray<FName> Candidates;
 
-	for (int32 Index = 0; Index < AttackMontage->GetNumSections(); Index++)
+	for (int32 Index = 0; Index < Montage->GetNumSections(); Index++)
 	{
-		const FName SectionName = AttackMontage->GetSectionName(Index);
+		const FName SectionName = Montage->GetSectionName(Index);
 
 		if (!SectionName.ToString().StartsWith(AttackSectionPrefix))
 		{
@@ -842,11 +845,11 @@ FName UMonsterComponent::SelectAttackSection() const
 	if (Candidates.IsEmpty())
 	{
 		for (int32 Index = 0;
-			Index < AttackMontage->GetNumSections();
+			Index < Montage->GetNumSections();
 			++Index)
 		{
 			const FName SectionName =
-				AttackMontage->GetSectionName(Index);
+				Montage->GetSectionName(Index);
 
 			if (SectionName.ToString().StartsWith(
 				AttackSectionPrefix))
@@ -947,7 +950,7 @@ void UMonsterComponent::ProcessAttackOverlap(AActor* OtherActor)
 
 void UMonsterComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-	if (Montage != AttackMontage) return;
+	if (Montage != ActiveAttackMontage) return;
 
 	FinishAttack();
 	OnMonsterAttackFinished.Broadcast(bInterrupted);
@@ -1028,6 +1031,10 @@ void UMonsterComponent::PlayDeathMontage()
 		ScheduleFinishDeath();
 		return;
 	}
+
+	// Auto Blend Out이 꺼진 몽타주는 종료 델리게이트가 호출되지 않을 수
+	// 있으므로 재생 시작 시점에도 풀 반환/파괴를 예약한다.
+	ScheduleFinishDeath(PlayedLength);
 
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(
@@ -1277,7 +1284,6 @@ void UMonsterComponent::LockMovementForMontage()
 		{
 			bMontageMovementWasActive = LockedMontageMovement->IsActive();
 			LockedMontageMovement->StopMovementImmediately();
-			LockedMontageMovement->Deactivate();
 		}
 	}
 
@@ -1286,11 +1292,6 @@ void UMonsterComponent::LockMovementForMontage()
 
 void UMonsterComponent::UnlockMovementAfterMontage()
 {
-	if (IsValid(LockedMontageMovement) && bMontageMovementWasActive)
-	{
-		LockedMontageMovement->Activate(true);
-	}
-
 	LockedMontageMovement = nullptr;
 	bMontageMovementWasActive = false;
 }
