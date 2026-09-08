@@ -9,6 +9,7 @@
 
 class UInventoryComponent;
 class UCraftingRecipeDataAsset;
+class UEnhancementDataAsset;
 
 // 제작 요청 결과
 UENUM(BlueprintType)
@@ -55,4 +56,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Blacksmith|Crafting", meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<UCraftingRecipeDataAsset>> CraftingRecipes;
 		
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Blacksmith|Enhancement", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEnhancementDataAsset> EnhancementData;
 };
