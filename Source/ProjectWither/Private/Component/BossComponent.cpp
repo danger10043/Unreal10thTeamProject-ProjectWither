@@ -385,8 +385,6 @@ void UBossComponent::LockTransitionMovement()
 	APawn* Pawn = Cast<APawn>(GetOwner());
 	if (!IsValid(Pawn)) return;
 
-	// Disable Character movement, including root motion, independently of the
-	// common montage callbacks that may reactivate the movement component.
 	if (UCharacterMovementComponent* Movement = Cast<UCharacterMovementComponent>(Pawn->GetMovementComponent()))
 	{
 		if (!TransitionMovement.IsValid())
@@ -432,7 +430,7 @@ void UBossComponent::ReleaseTransitionMovement(bool bRestore)
 	{
 		Movement->SetMovementMode(PreviousMovementMode, PreviousCustomMovementMode);
 	}
-	// Resume only logic that this component paused. Never restart stopped AI.
+
 	if (IsValid(Brain) && Brain->IsPaused())
 	{
 		Brain->ResumeLogic(TEXT("Boss phase transition finished"));
