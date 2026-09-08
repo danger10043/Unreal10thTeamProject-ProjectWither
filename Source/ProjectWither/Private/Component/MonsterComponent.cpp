@@ -172,7 +172,7 @@ void UMonsterComponent::HandleDeath()
 
 	OnMonsterDied.Broadcast();
 
-	ScheduleFinishDeath();
+	PlayDeathMontage();
 }
 
 void UMonsterComponent::SetMonsterState(EMonsterState NewState)
@@ -778,14 +778,16 @@ void UMonsterComponent::CancelSearch()
 	}
 }
 
-void UMonsterComponent::ScheduleFinishDeath()
+void UMonsterComponent::ScheduleFinishDeath(float MinimumDelay)
 {
 	if (DespawnPolicy == EMonsterDespawnPolicy::KeepCorpse)
 	{
 		return;
 	}
 
-	if (DespawnDelay <= 0.0f)
+	const float EffectiveDelay = FMath::Max(DespawnDelay, MinimumDelay);
+
+	if (EffectiveDelay <= 0.0f)
 	{
 		FinishDeath();
 		return;
@@ -797,7 +799,7 @@ void UMonsterComponent::ScheduleFinishDeath()
 			DespawnTimerHandle,
 			this,
 			&UMonsterComponent::FinishDeath,
-			DespawnDelay,
+			EffectiveDelay,
 			false
 		);
 	}
@@ -1029,6 +1031,10 @@ void UMonsterComponent::PlayDeathMontage()
 		ScheduleFinishDeath();
 		return;
 	}
+
+	// Auto Blend Out이 꺼진 몽타주는 종료 델리게이트가 호출되지 않을 수
+	// 있으므로 재생 시작 시점에도 풀 반환/파괴를 예약한다.
+	ScheduleFinishDeath(PlayedLength);
 
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(

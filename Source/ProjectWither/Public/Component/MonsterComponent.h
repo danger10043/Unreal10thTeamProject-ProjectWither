@@ -194,7 +194,7 @@ private:
 
 	void FinishDeath(); 	// 사망 후처리
 
-	void ScheduleFinishDeath();	// FinishDeath 타이머걸기
+	void ScheduleFinishDeath(float MinimumDelay = 0.0f);	// FinishDeath 타이머걸기
 
 	void ClearRuntimeTimers();	// 타이머 초기화
 	void ResetRuntimeState();	// 변수들 초기화
