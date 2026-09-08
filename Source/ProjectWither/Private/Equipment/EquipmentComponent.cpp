@@ -57,6 +57,8 @@ bool UEquipmentComponent::EquipItemFromInventorySlot(int32 SlotIndex)
 	}
 
 	FItemInstance* TargetEquipmentSlot = nullptr;
+	UWeaponComponent* WeaponComponent = nullptr;
+	bool bShouldActivateWeapon = false;
 
 	switch (InventoryItem.ItemData->GetItemType())
 	{
@@ -69,37 +71,27 @@ bool UEquipmentComponent::EquipItemFromInventorySlot(int32 SlotIndex)
 			return false;
 		}
 
-		switch (WeaponData->GetWeaponType())
+		WeaponComponent = OwnerActor->FindComponentByClass<UWeaponComponent>();
+
+		if (!IsValid(WeaponComponent))																// 무기를 실제 손에 장착하려면 WeaponComponent가 필요하다.
 		{
-		case EWeaponType::Sword:
-		{
-			UWeaponComponent* WeaponComponent = OwnerActor->FindComponentByClass<UWeaponComponent>();
-
-			if (!IsValid(WeaponComponent) || !WeaponComponent->EquipWeapon(WeaponData))				// 무기 실제 장착은 기존 WeaponComponent에 맡긴다.
-			{
-				return false;
-			}
-
-			EquippedSword = InventoryItem;															// WeaponComponent 구조 유지를 위해 무기는 인벤토리 슬롯에서 제거하지 않는다.
-			OnEquipmentChanged.Broadcast();															// 장비 슬롯 UI가 갱신될 수 있도록 장착 변경을 알린다.
-			return true;
-		}
-		case EWeaponType::Gun:
-		{
-			UWeaponComponent* WeaponComponent = OwnerActor->FindComponentByClass<UWeaponComponent>();
-
-			if (!IsValid(WeaponComponent) || !WeaponComponent->EquipWeapon(WeaponData))				// 무기 실제 장착은 기존 WeaponComponent에 맡긴다.
-			{
-				return false;
-			}
-
-			EquippedGun = InventoryItem;															// WeaponComponent 구조 유지를 위해 무기는 인벤토리 슬롯에서 제거하지 않는다.
-			OnEquipmentChanged.Broadcast();															// 장비 슬롯 UI가 갱신될 수 있도록 장착 변경을 알린다.
-			return true;
-		}
-		default:
 			return false;
 		}
+
+		if (FItemInstance* CurrentWeapon = WeaponComponent->GetCurrentWeapon())
+		{
+			UpdateEquippedWeaponState(*CurrentWeapon);
+		}
+
+		TargetEquipmentSlot = GetWeaponEquipmentSlot(WeaponData->GetWeaponType());
+
+		if (TargetEquipmentSlot == nullptr)
+		{
+			return false;
+		}
+
+		bShouldActivateWeapon = true;
+		break;
 	}
 	case EItemType::Armor:
 	{
@@ -145,6 +137,15 @@ bool UEquipmentComponent::EquipItemFromInventorySlot(int32 SlotIndex)
 	if (!InventoryComponent->SetItemAtSlot(SlotIndex, PreviousEquippedItem))						// 기존 장비가 있으면 인벤토리로 되돌리고, 없으면 인벤토리 슬롯을 비운다.
 	{
 		*TargetEquipmentSlot = PreviousEquippedItem;
+		return false;
+	}
+
+	if (bShouldActivateWeapon &&
+		(!IsValid(WeaponComponent) || !WeaponComponent->EquipWeaponInstance(*TargetEquipmentSlot)))	// 장비 슬롯에 들어간 무기를 실제 손에 장착한다.
+	{
+		InventoryComponent->SetItemAtSlot(SlotIndex, InventoryItem);
+		*TargetEquipmentSlot = PreviousEquippedItem;
+		OnEquipmentChanged.Broadcast();
 		return false;
 	}
 
@@ -194,17 +195,25 @@ bool UEquipmentComponent::UnequipItem(const FItemInstance& EquipmentItem)
 			return false;
 		}
 
+		if (FItemInstance* CurrentWeapon = WeaponComponent->GetCurrentWeapon())
+		{
+			UpdateEquippedWeaponState(*CurrentWeapon);
+		}
+
+		UInventoryComponent* InventoryComponent = OwnerActor->FindComponentByClass<UInventoryComponent>();
+
+		if (!IsValid(InventoryComponent) ||
+			!InventoryComponent->AddItemInstanceToEmptySlot(*TargetEquipmentSlot))					// 빈 인벤토리 슬롯이 없으면 장비 슬롯을 비우지 않는다.
+		{
+			return false;
+		}
+
 		if (WeaponComponent->GetWeaponType() == WeaponData->GetWeaponType())
 		{
 			WeaponComponent->UnequipWeapon();														// 현재 사용 중인 무기라면 실제 무기 액터도 해제한다.
-
-			if (WeaponComponent->GetWeaponType() == WeaponData->GetWeaponType())
-			{
-				return false;
-			}
 		}
 
-		*TargetEquipmentSlot = FItemInstance();														// 무기는 인벤토리에 남아 있으므로 장비 표시 슬롯만 비운다.
+		*TargetEquipmentSlot = FItemInstance();
 		OnEquipmentChanged.Broadcast();
 		return true;
 	}
@@ -242,6 +251,30 @@ bool UEquipmentComponent::UnequipItem(const FItemInstance& EquipmentItem)
 	default:
 		return false;
 	}
+}
+
+bool UEquipmentComponent::UpdateEquippedWeaponState(const FItemInstance& WeaponItem)
+{
+	UWeaponDataAsset* WeaponData = Cast<UWeaponDataAsset>(WeaponItem.ItemData.Get());
+
+	if (!IsValid(WeaponData) || WeaponItem.Quantity <= 0)
+	{
+		return false;
+	}
+
+	FItemInstance* TargetEquipmentSlot = GetWeaponEquipmentSlot(WeaponData->GetWeaponType());
+
+	if (TargetEquipmentSlot == nullptr ||
+		!IsValid(TargetEquipmentSlot->ItemData) ||
+		TargetEquipmentSlot->Quantity <= 0 ||
+		TargetEquipmentSlot->ItemData.Get() != WeaponItem.ItemData.Get())
+	{
+		return false;
+	}
+
+	*TargetEquipmentSlot = WeaponItem;
+	OnEquipmentChanged.Broadcast();
+	return true;
 }
 
 FItemInstance* UEquipmentComponent::GetWeaponEquipmentSlot(EWeaponType WeaponType)
