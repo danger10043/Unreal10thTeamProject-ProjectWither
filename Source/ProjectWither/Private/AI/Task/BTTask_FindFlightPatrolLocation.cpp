@@ -92,7 +92,11 @@ EBTNodeResult::Type UBTTask_FindFlightPatrolLocation::ExecuteTask(
 
     if (!bFoundClearLocation)
     {
-        return EBTNodeResult::Failed;
+        // 빈 공간을 못 찾아도 실패시키지 않고 스폰 위치 바로 위로 폴백.
+        // 실패를 반환하면 다음 틱에 딜레이 없이 즉시 재시도되어 지형이
+        // 복잡한 맵에서 매 프레임 재시도하며 깜빡이는 현상이 생김
+        PatrolLocation = SpawnLocation +
+            FVector(0.0f, 0.0f, (MinFlightHeight + MaxFlightHeight) * 0.5f);
     }
 
     Blackboard->SetValueAsVector(

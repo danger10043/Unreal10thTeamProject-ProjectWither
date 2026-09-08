@@ -13,10 +13,10 @@ class UStatComponent;
 
 UCLASS()
 class PROJECTWITHER_API AMonsterPawnBase :
-    public APawn, 
-    public IStatComponentUserInterface, 
+    public APawn,
+    public IStatComponentUserInterface,
     public IPoolableInterface,
-	public IEnemyInterface
+    public IEnemyInterface
 {
     GENERATED_BODY()
 
@@ -69,7 +69,9 @@ protected:
     float HeightAboveFloor = 0.f;
     UPROPERTY(EditAnywhere, Category = "Movement")
     float TraceOffsetRadius = 800.f;
-    // 목표 높이로 보정하는 속도. AI 이동이 아래로 끌어당기는 힘보다 커야 높이가 밀리지 않음
+    // 목표 높이로 오르내리는 초당 속도(유닛/초). AI 이동이 아래로 끌어당기는 힘보다
+    // 커야 높이가 밀리지 않고, 격차가 커도(바위/몬스터 위 통과 등) 이 속도로만
+    // 부드럽게 이동하므로 갑자기 튀지 않음
     UPROPERTY(EditAnywhere, Category = "Movement")
     float HeightCorrectionSpeed = 10.f;
     void SnapToFloor(float DeltaTime);
