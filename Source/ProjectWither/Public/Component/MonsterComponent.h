@@ -71,6 +71,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Monster")
 	float GetAllowRange() const { return AllowRange; }
 
+	UFUNCTION(BlueprintPure, Category = "Monster")
+	float GetAttackCooldown() const { return AttackCooldown; }
+
 	UPROPERTY(BlueprintAssignable, Category = "Monster")
 	FOnMonsterDied OnMonsterDied;
 
