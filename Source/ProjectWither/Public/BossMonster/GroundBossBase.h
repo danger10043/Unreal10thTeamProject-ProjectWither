@@ -18,6 +18,8 @@ class PROJECTWITHER_API AGroundBossBase : public AMonsterCharacterBase
 
 public:
     AGroundBossBase();
+	virtual void OnSpawnFromPool_Implementation() override;
+	virtual void OnReturnToPool_Implementation() override;
 
     UFUNCTION(BlueprintPure, Category = "Boss")
     UBossComponent* GetBossComponent() const { return BossComponent; }

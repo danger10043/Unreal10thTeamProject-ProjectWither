@@ -13,8 +13,6 @@ void UMonsterRangedAttackNotify::Notify(
 {
 	Super::Notify(MeshComp, Animation, EventReference);
 
-	UE_LOG(LogTemp, Warning, TEXT("MonsterRangedAttackNotify 발동됨: %s"), *GetNameSafe(MeshComp));
-
 	if (!IsValid(MeshComp)) return;
 
 	AActor* Owner = MeshComp->GetOwner();

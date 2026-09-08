@@ -65,11 +65,6 @@ void AMonsterProjectile::InitializeProjectile(
 		ProjectileMovement->Velocity = SafeDirection * ProjectileMovement->InitialSpeed;
 	}
 
-	UE_LOG(LogTemp, Warning,
-		TEXT("InitializeProjectile: SpawnLocation=%s, Velocity=%s (Speed=%.1f)"),
-		*GetActorLocation().ToString(),
-		*ProjectileMovement->Velocity.ToString(),
-		ProjectileMovement->InitialSpeed);
 }
 
 void AMonsterProjectile::OnProjectileHit(
@@ -79,13 +74,6 @@ void AMonsterProjectile::OnProjectileHit(
 	FVector NormalImpulse,
 	const FHitResult& Hit)
 {
-	UE_LOG(LogTemp, Warning,
-		TEXT("OnProjectileHit: OtherActor=%s, OtherComp=%s, ImpactPoint=%s, Owner=%s"),
-		*GetNameSafe(OtherActor),
-		*GetNameSafe(OtherComp),
-		*Hit.ImpactPoint.ToString(),
-		*GetNameSafe(GetOwner()));
-
 	if (!IsValid(OtherActor) || OtherActor == GetOwner())
 	{
 		Destroy();

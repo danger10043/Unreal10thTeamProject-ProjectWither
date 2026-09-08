@@ -54,6 +54,7 @@ public:
 	void SetAttackCooldown(float NewCooldown) { AttackCooldown = FMath::Max(0.0f, NewCooldown); }
 	void SetAttackRange(float NewRange) { AttackRange = FMath::Max(0.0f, NewRange); }
 	void SetAllowRange(float NewRange) { AllowRange = FMath::Max(0.0f, NewRange); }
+	void SetAdditionalAttackMontage(UAnimMontage* NewMontage) { AdditionalAttackMontage = NewMontage; }
 
 	UFUNCTION(BlueprintPure, Category = "Monster")
 	bool IsDead() const { return bIsDead; }
@@ -158,7 +159,8 @@ private:
 	UFUNCTION()
 	void HandleDeath();
 
-	FName SelectAttackSection() const;	// 공격 애니메이션 섹션 랜덤 선택 함수
+	FName SelectAttackSection(UAnimMontage* Montage) const;	// 공격 애니메이션 섹션 랜덤 선택 함수
+	UAnimMontage* SelectAttackMontage() const;
 
 	void DisableAllAttackHitboxes();	// 모든 공격 히트 박스 비활성화
 
@@ -285,6 +287,12 @@ protected:
 	// Montage -----------------------------------------------------------------
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	TObjectPtr<UAnimMontage> AttackMontage = nullptr;	// 공격 몽타주
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> AdditionalAttackMontage = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveAttackMontage = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Montage")
 	FString AttackSectionPrefix = TEXT("Attack_");
