@@ -202,12 +202,12 @@ bool UWeaponComponent::FireGun()
 		return false;
 	}
 
-	if (GetCurrentAmmo() <= 0)
+	if (GetCurrentAmmo() <= 0 && !Reload())
 	{
 		UE_LOG(
 			LogTemp,
 			Warning,
-			TEXT("WeaponComponent::FireGun - 현재 총의 탄약 개수가 0입니다.")
+			TEXT("WeaponComponent::FireGun - 장전된 탄약이 없고 재장전할 탄약도 없습니다.")
 		);
 		return false;
 	}
@@ -331,7 +331,17 @@ bool UWeaponComponent::FireGun()
 		return false;
 	}
 
-	return ConsumeAmmo();
+	if (!ConsumeAmmo())
+	{
+		return false;
+	}
+
+	if (GetCurrentAmmo() <= 0)
+	{
+		Reload();
+	}
+
+	return true;
 }
 
 bool UWeaponComponent::ConsumeAmmo()

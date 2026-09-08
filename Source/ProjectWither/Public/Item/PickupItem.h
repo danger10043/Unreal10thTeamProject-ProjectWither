@@ -51,7 +51,7 @@ private:
 	bool IsPickupEffectAssetReady() const;
 
 protected:
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Item")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Item")
 	FItemInstance ItemInstance; // 픽업시 획득할 아이템 데이터 에셋
 
 	// 메시의 기본 위치
