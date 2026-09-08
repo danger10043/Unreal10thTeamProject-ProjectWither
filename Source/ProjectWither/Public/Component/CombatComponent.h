@@ -51,6 +51,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void SwordAttack();
 
+	void BeginNextAttackWindow(FName SectionName);
+	void EndNextAttackWindow(FName SectionName);
+	void ReachAttackCheckpoint(FName SectionName);
+
 	UFUNCTION(BlueprintCallable, Category = "Combat|Sword")
 	void BeginSwordDamageWindow();
 	
@@ -132,6 +136,28 @@ private:
 
 	void StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActionState AttackState, float StaminaCost);
 
+	bool IsCurrentComboSection(FName SectionName) const;
+	void TryAdvanceSwordCombo();
+	void ResetSwordCombo();
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Combo")
+	TArray<FName> SwordComboSections =
+	{
+		FName(TEXT("Attack1")),
+		FName(TEXT("Attack2")),
+		FName(TEXT("Attack3")),
+		FName(TEXT("Attack4")),
+
+	};
+
+	int32 CurrentComboIndex = INDEX_NONE;
+	bool bNextAttackWindowOpen = false;
+	bool bNextAttackQueued = false;
+	bool bAttackCheckpointReached = false;
+
+	// 새 공격 시작마다 증가, ResetSwordCombo 에서는 증가하지 않음.
+	uint64 SwordAttackExecutionId = 0;
+
 	void OpenParryWindow();
 
 	void CloseParryWindow();
@@ -140,7 +166,11 @@ private:
 
 	void OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
-	void OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void OnAttackMontageEnded(
+		UAnimMontage* Montage,
+		bool bInterrupted,
+		uint64 ExecutionId
+	);
 
 	UFUNCTION()
 	void HandleSwordCollisionBeginOverlap(
