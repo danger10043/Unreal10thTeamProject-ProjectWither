@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Monster/MonsterCharacterBase.h"
+#include "TimerManager.h"
 #include "GroundBossBase.generated.h"
 
 /**
@@ -27,4 +28,7 @@ public:
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss")
     TObjectPtr<UBossComponent> BossComponent;
+
+private:
+	FTimerHandle SpawnRevealTimerHandle;
 };
