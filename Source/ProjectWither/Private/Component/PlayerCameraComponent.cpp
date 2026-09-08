@@ -441,15 +441,14 @@ void UPlayerCameraComponent::UpdateLockOnRotation(float DeltaTime)
 
 	FRotator DesiredRotation = ToTarget.Rotation();
 	
-	APlayerCameraManager* CameraManager = PC->PlayerCameraManager;
-	if (IsValid(CameraManager))
-	{
-		CameraManager->LimitViewPitch(
-			DesiredRotation,
-			CameraManager->ViewPitchMin,
-			CameraManager->ViewPitchMax
-		);
-	}
+	const float MinPitch = FMath::Clamp(LockOnPitchMin, -89.0f, 0.0f);
+	const float MaxPitch = FMath::Clamp(LockOnPitchMax, 0.0f, 89.0f);
+
+	DesiredRotation.Pitch = FMath::Clamp(
+		FRotator::NormalizeAxis(DesiredRotation.Pitch),
+		MinPitch,
+		MaxPitch
+	);
 
 	FRotator NewRotation = FMath::RInterpTo(
 		PC->GetControlRotation(),
@@ -457,6 +456,22 @@ void UPlayerCameraComponent::UpdateLockOnRotation(float DeltaTime)
 		DeltaTime,
 		LockOnRotationInterpSpeed
 	);
+
+	NewRotation.Pitch = FMath::Clamp(
+		FRotator::NormalizeAxis(NewRotation.Pitch),
+		MinPitch,
+		MaxPitch
+	);
+
+	APlayerCameraManager* CameraManager = PC->PlayerCameraManager;
+	if (IsValid(CameraManager))
+	{
+		CameraManager->LimitViewPitch(
+			NewRotation,
+			CameraManager->ViewPitchMin,
+			CameraManager->ViewPitchMax
+		);
+	}
 
 	NewRotation.Roll = 0.0f;
 	PC->SetControlRotation(NewRotation);
