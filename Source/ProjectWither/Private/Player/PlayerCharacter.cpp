@@ -84,6 +84,10 @@ void APlayerCharacter::RefreshMovementForCameraState()
 
 void APlayerCharacter::ToggleInventory()
 {
+    if (IsValid(CombatComponent))
+    {
+        CombatComponent->CancelSwordRecovery();
+    }
     if (bIsInventoryOpen)
     {
         CloseInventory();
@@ -336,6 +340,12 @@ void APlayerCharacter::Move(const FInputActionValue& Value)
 	const FVector2D Input = Value.Get<FVector2D>();
 
 	if (Input.IsNearlyZero()) { return; }
+
+    if (IsValid(CombatComponent))
+    {
+        CombatComponent->CancelSwordRecovery();
+    }
+
     const FRotator ControlRotation = Controller->GetControlRotation();
     const FRotator YawRotation( 0.0f, ControlRotation.Yaw, 0.0f);
     const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
@@ -374,6 +384,11 @@ void APlayerCharacter::Look(const FInputActionValue& Value)
 
 void APlayerCharacter::StartRun()
 {
+    if (IsValid(CombatComponent))
+    {
+        CombatComponent->CancelSwordRecovery();
+    }
+
     if (!bCanMove || !IsValid(StatComponent)) return;
 
     if (IsValid(PlayerCameraComponent) && PlayerCameraComponent->IsZooming())
@@ -476,6 +491,7 @@ void APlayerCharacter::StartRoll()
         UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::StartRoll - CombatComponent가 유효하지 않습니다."));
         return;
     }
+    CombatComponent->CancelSwordRecovery();
     CombatComponent->Roll();
 }
 
@@ -492,6 +508,7 @@ void APlayerCharacter::AttackInput()
 void APlayerCharacter::StartBlockInput()
 {
     if (!IsValid(CombatComponent)) { return; }
+    CombatComponent->CancelSwordRecovery();
     CombatComponent->StartBlock();
 }
 
@@ -503,6 +520,11 @@ void APlayerCharacter::StopBlockInput()
 
 void APlayerCharacter::StartZoomInput()
 {
+    if (IsValid(CombatComponent))
+    {
+        CombatComponent->CancelSwordRecovery();
+    }
+
     if (!IsValid(WeaponComponent))
     {
         UE_LOG(
@@ -555,12 +577,22 @@ void APlayerCharacter::LockOnInput()
 {
     if (!IsValid(PlayerCameraComponent)) return;
 
+    if (IsValid(CombatComponent))
+    {
+        CombatComponent->CancelSwordRecovery();
+    }
+
     PlayerCameraComponent->ToggleLockOn();
 }
 
 void APlayerCharacter::SwapWeaponInput()
 {
     if (!IsValid(WeaponComponent)) return;
+
+    if (IsValid(CombatComponent))
+    {
+        CombatComponent->CancelSwordRecovery();
+    }
 
     if (!WeaponComponent->SwapWeapon())
     {
@@ -624,6 +656,11 @@ void APlayerCharacter::AddDefaultTestWeapons()
 
 void APlayerCharacter::InteractInput()
 {
+    if (IsValid(CombatComponent))
+    {
+        CombatComponent->CancelSwordRecovery();
+    }
+
     if (IsValid(InteractionComponent))
     {
         InteractionComponent->TryInteract();

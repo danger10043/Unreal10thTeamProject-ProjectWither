@@ -55,6 +55,8 @@ public:
 	void EndNextAttackWindow(FName SectionName);
 	void ReachAttackCheckpoint(FName SectionName);
 
+	void CancelSwordRecovery();
+
 	UFUNCTION(BlueprintCallable, Category = "Combat|Sword")
 	void BeginSwordDamageWindow();
 	
@@ -154,6 +156,8 @@ private:
 	bool bNextAttackWindowOpen = false;
 	bool bNextAttackQueued = false;
 	bool bAttackCheckpointReached = false;
+
+	bool bSwordRecovery = false;
 
 	// 새 공격 시작마다 증가, ResetSwordCombo 에서는 증가하지 않음.
 	uint64 SwordAttackExecutionId = 0;

@@ -110,24 +110,25 @@ void UCombatComponent::Attack()
 
 void UCombatComponent::SwordAttack()
 {
-	if (ActionState == EPlayerActionState::AttackingWithSword)
+	const bool bHasCurrentCombo =
+		SwordComboSections.IsValidIndex(CurrentComboIndex) &&
+		IsCurrentComboSection(SwordComboSections[CurrentComboIndex]);
+
+	if (bHasCurrentCombo &&
+		bNextAttackWindowOpen &&
+		SwordComboSections.IsValidIndex(CurrentComboIndex + 1))
 	{
-		if (!SwordComboSections.IsValidIndex(CurrentComboIndex) ||
-			!SwordComboSections.IsValidIndex(CurrentComboIndex + 1))
-		{
-			return;
-		}
-
-		if (!bNextAttackWindowOpen ||
-			!IsCurrentComboSection(SwordComboSections[CurrentComboIndex]))
-		{
-			return;
-		}
-
 		bNextAttackQueued = true;
 		TryAdvanceSwordCombo();
 		return;
 	}
+
+	if (ActionState == EPlayerActionState::AttackingWithSword)
+	{
+		return;
+	}
+
+	CancelSwordRecovery();
 
 	StartAttack(
 		ECombatWeaponType::Sword,
@@ -163,8 +164,51 @@ void UCombatComponent::ReachAttackCheckpoint(FName SectionName)
 		return;
 	}
 
+	const int32 CheckpointComboIndex = CurrentComboIndex;
+	const uint64 ExecutionId = SwordAttackExecutionId;
+
 	bAttackCheckpointReached = true;
 	TryAdvanceSwordCombo();
+
+	// 예약된 다음 공격이 시작되었거나 현재 공격이 중단되었다면 새 공격에 후딜 적용 안함
+	if (ExecutionId != SwordAttackExecutionId ||
+		CurrentComboIndex != CheckpointComboIndex ||
+		!IsCurrentComboSection(SectionName))
+	{
+		return;
+	}
+
+	EndSwordDamageWindow();
+
+	bSwordRecovery = true;
+	OwnerPlayer->SetCanMove(true);
+	SetActionState(EPlayerActionState::None);
+}
+
+void UCombatComponent::CancelSwordRecovery()
+{
+	if (!bSwordRecovery)
+	{
+		return;
+	}
+	
+	++SwordAttackExecutionId;
+
+	ResetSwordCombo();
+	EndSwordDamageWindow();
+
+	USkeletalMeshComponent* Mesh = IsValid(OwnerPlayer)
+		? OwnerPlayer->GetMesh()
+		: nullptr;
+
+	UAnimInstance* AnimInstance = IsValid(Mesh)
+		? Mesh->GetAnimInstance()
+		: nullptr;
+
+	if (IsValid(AnimInstance) && IsValid(SwordAttackMontage))
+	{
+		AnimInstance->Montage_Stop(0.2f, SwordAttackMontage);
+	}
 }
 
 void UCombatComponent::BeginSwordDamageWindow()
@@ -354,6 +398,7 @@ void UCombatComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterru
 
 	// NotifyEnd가 호출되지 않고 몽타주가 종료됨을 대비
 	EndSwordDamageWindow();
+	ResetSwordCombo();
 
 	if (ActionState != EPlayerActionState::AttackingWithSword) { return; }
 
@@ -824,7 +869,12 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 
 bool UCombatComponent::IsCurrentComboSection(FName SectionName) const
 {
-	if (ActionState != EPlayerActionState::AttackingWithSword ||
+
+	const bool bCanContinueCombo =
+		ActionState == EPlayerActionState::AttackingWithSword ||
+		(ActionState == EPlayerActionState::None && bSwordRecovery);
+
+	if (!bCanContinueCombo ||
 		!IsOwnerAlive() ||
 		!IsValid(WeaponComponent) ||
 		!WeaponComponent->IsSwordEquipped() ||
@@ -880,6 +930,9 @@ void UCombatComponent::TryAdvanceSwordCombo()
 	ResetSwordCombo();
 	CurrentComboIndex = NextIndex;
 
+	OwnerPlayer->SetCanMove(false);
+	SetActionState(EPlayerActionState::AttackingWithSword);
+
 	AnimInstance->Montage_JumpToSection(
 		SwordComboSections[CurrentComboIndex],
 		SwordAttackMontage
@@ -892,6 +945,7 @@ void UCombatComponent::ResetSwordCombo()
 	bNextAttackWindowOpen = false;
 	bNextAttackQueued = false;
 	bAttackCheckpointReached = false;
+	bSwordRecovery = false;
 }
 
 void UCombatComponent::OpenParryWindow()
@@ -949,7 +1003,17 @@ void UCombatComponent::SetActionState(EPlayerActionState State)
 
 	const EPlayerActionState PreviousState = ActionState;
 
-	if (PreviousState == EPlayerActionState::AttackingWithSword)
+	const bool bEnteringSwordRecovery =
+		PreviousState == EPlayerActionState::AttackingWithSword &&
+		State == EPlayerActionState::None &&
+		bSwordRecovery;
+
+	if (bSwordRecovery && !bEnteringSwordRecovery)
+	{
+		CancelSwordRecovery();
+	}
+
+	if (PreviousState == EPlayerActionState::AttackingWithSword && !bEnteringSwordRecovery)
 	{
 		ResetSwordCombo();
 		EndSwordDamageWindow();
