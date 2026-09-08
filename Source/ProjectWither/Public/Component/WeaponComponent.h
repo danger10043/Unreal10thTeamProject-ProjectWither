@@ -33,6 +33,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	bool EquipWeapon(UWeaponDataAsset* WeaponData);
 
+	bool EquipWeaponInstance(const FItemInstance& WeaponInstance);
+
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void UnequipWeapon();
 
@@ -70,6 +72,7 @@ public:
 
 private:
 	bool SaveCurrentWeaponToInventory();
+	void SyncCurrentWeaponToEquipment();
 
 	AActor* SpawnWeaponActor(const UWeaponDataAsset* WeaponData) const;
 	

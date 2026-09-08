@@ -26,6 +26,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	bool UnequipItem(const FItemInstance& EquipmentItem);										// 지정한 장비 아이템을 해제한다.
 
+	bool UpdateEquippedWeaponState(const FItemInstance& WeaponItem);
+
 	UFUNCTION(BlueprintPure, Category = "Equipment|Weapon")
 	FItemInstance GetEquippedSword() const;														// 현재 장착 중인 근접 무기 반환
 
