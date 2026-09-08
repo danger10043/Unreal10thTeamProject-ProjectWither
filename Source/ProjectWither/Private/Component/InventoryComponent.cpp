@@ -17,6 +17,19 @@ UInventoryComponent::UInventoryComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
+namespace
+{
+	bool CanStackItemInstances(const FItemInstance& ExistingItem, const FItemInstance& NewItem)
+	{
+		return
+			IsValid(ExistingItem.ItemData) &&
+			IsValid(NewItem.ItemData) &&
+			ExistingItem.ItemData->GetItemId() == NewItem.ItemData->GetItemId() &&
+			ExistingItem.EnhanceLevel == NewItem.EnhanceLevel &&
+			ExistingItem.CurrentAmmo == NewItem.CurrentAmmo;
+	}
+}
+
 
 void UInventoryComponent::BeginPlay()
 {
@@ -33,20 +46,25 @@ void UInventoryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 
 int32 UInventoryComponent::AddItem(UItemDataAsset* Item, int32 AddQuantity)
 {
-	if (Item == nullptr || AddQuantity <= 0)
-	{
-		return 0;
-	}
+	FItemInstance NewItemInstance;
+	NewItemInstance.ItemData = Item;
+	NewItemInstance.Quantity = AddQuantity;
 
-	const int32 ItemId = Item->GetItemId();
-	const int32 MaxStack = FMath::Max(1, Item->GetMaxStack());
-	int32 RemainingAddQuantity = AddQuantity;
+	return AddItemInstance(NewItemInstance);
+}
+
+int32 UInventoryComponent::AddItemInstance(const FItemInstance& NewItemInstance)
+{
+	if (!IsValid(NewItemInstance.ItemData) || NewItemInstance.Quantity <= 0) return 0;
+
+	const int32 MaxStack = FMath::Max(1, NewItemInstance.ItemData->GetMaxStack());
+	int32 RemainingAddQuantity = NewItemInstance.Quantity;
 	int32 TotalAddedQuantity = 0;
 
 	// 기존 슬롯부터 채우기
 	for (FItemInstance& InventoryItem : InventoryItems)												// 기존 슬롯을 순회하며 아이템을 추가할 수 있는지 확인
 	{
-		if (InventoryItem.ItemData == nullptr || InventoryItem.ItemData->GetItemId() != ItemId)		// 아이템이 없거나 아이템 ID가 다르면 건너뛴다.
+		if (!CanStackItemInstances(InventoryItem, NewItemInstance))									// 아이템 ID와 인스턴스 상태가 다르면 같은 스택으로 합치지 않는다.
 		{
 			continue;
 		}
@@ -73,7 +91,7 @@ int32 UInventoryComponent::AddItem(UItemDataAsset* Item, int32 AddQuantity)
 			continue;
 		}
 
-		InventoryItem.ItemData = Item;																// 비어있는 슬롯에 아이템 정보 설정
+		InventoryItem = NewItemInstance;															// 비어있는 슬롯에 인스턴스 상태까지 포함한 아이템 정보 설정
 		InventoryItem.Quantity = FMath::Min(RemainingAddQuantity, MaxStack);						// 한 슬롯에 들어갈 수 있는 수량만큼 추가
 
 		RemainingAddQuantity -= InventoryItem.Quantity;												// 추가해야 할 남은 수량 감소

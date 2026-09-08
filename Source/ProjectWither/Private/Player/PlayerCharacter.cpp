@@ -650,20 +650,12 @@ void APlayerCharacter::AddDefaultTestWeapons()
         }
         else if (!InventoryComponent->HasItem(TestGunData->GetItemId()))
         {
-            const int32 AddedQuantity = InventoryComponent->AddItem(TestGunData, 1);
+            FItemInstance TestGunInstance;
+            TestGunInstance.ItemData = TestGunData;
+            TestGunInstance.Quantity = 1;
+            TestGunInstance.CurrentAmmo = FMath::Max(0, TestGunData->GetMaxAmmo());
 
-            if (AddedQuantity > 0)
-            {
-                const int32 GunSlot = InventoryComponent->FindItemSlot(TestGunData->GetItemId());
-
-                FItemInstance TestGunInstance;
-
-                if (GunSlot != INDEX_NONE && InventoryComponent->GetItemAtSlot(GunSlot, TestGunInstance))
-                {
-                    TestGunInstance.CurrentAmmo = FMath::Max(0, TestGunData->GetMaxAmmo());
-                    InventoryComponent->UpdataItemAtSlot(GunSlot, TestGunInstance);
-                }
-            }
+            InventoryComponent->AddItemInstance(TestGunInstance);
         }
 	}
 
