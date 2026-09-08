@@ -44,6 +44,12 @@ protected:
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	virtual void TickComponent(
+		float DeltaTime,
+		ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction
+	) override;
+
 public:	
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void Attack();
@@ -141,6 +147,29 @@ private:
 	bool IsCurrentComboSection(FName SectionName) const;
 	void TryAdvanceSwordCombo();
 	void ResetSwordCombo();
+
+	bool IsAttackAssistTarget(AActor* Target) const;
+	AActor* FindAttackAssistTarget() const;
+	bool IsAttackApproachPathClear(const FVector& Start, const FVector& End) const;
+
+	void BeginSwordApproach();
+	void FinishSwordApproach(bool bResumeAttack);
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Approach", meta = (ClampMin = "0.0", Units = "cm"))
+	float AttackSearchRadius = 600.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Approach", meta = (ClampMin = "1.0"))
+	float AttackApproachSpeed = 1800.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Approach", meta = (ClampMin = "0.0", Units = "cm"))
+	float AttackApproachGap = 50.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Approach", meta = (ClampMin = "0.0", Units = "cm"))
+	float AttackTargetHeightTolerance = 100.0f;
+
+	bool bSwordApproaching = false;
+	TWeakObjectPtr<AActor> AttackApproachTarget;
+	FVector AttackApproachDestination = FVector::ZeroVector;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Sword|Combo")
 	TArray<FName> SwordComboSections =

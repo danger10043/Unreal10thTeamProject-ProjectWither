@@ -10,6 +10,9 @@
 #include "Interface/WeaponComponentUserInterface.h"
 #include "Component/WeaponComponent.h"
 #include "Component/MonsterComponent.h"
+#include "Component/PlayerCameraComponent.h"
+#include "CollisionQueryParams.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -24,7 +27,9 @@ namespace
 
 UCombatComponent::UCombatComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
+	PrimaryComponentTick.TickGroup = TG_PostPhysics;
 }
 
 void UCombatComponent::BeginPlay()
@@ -70,6 +75,8 @@ void UCombatComponent::BeginPlay()
 
 void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	FinishSwordApproach(false);
+
 	EndSwordDamageWindow();
 
 	if (UWorld* World = GetWorld())
@@ -88,6 +95,57 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!bSwordApproaching)
+	{
+		return;
+	}
+
+	if (!IsOwnerAlive() ||
+		ActionState != EPlayerActionState::AttackingWithSword)
+	{
+		FinishSwordApproach(false);
+		return;
+	}
+
+	if (!IsValid(WeaponComponent) ||
+		!WeaponComponent->IsSwordEquipped() ||
+		!IsAttackAssistTarget(AttackApproachTarget.Get()))
+	{
+		FinishSwordApproach(true);
+		return;
+	}
+
+	const FVector Start = OwnerPlayer->GetActorLocation();
+	const FVector Next = FMath::VInterpConstantTo(
+		Start,
+		AttackApproachDestination,
+		DeltaTime,
+		FMath::Max(1.0f, AttackApproachSpeed)
+	);
+
+	if (!IsAttackApproachPathClear(Start, Next))
+	{
+		FinishSwordApproach(true);
+		return;
+	}
+
+	FHitResult MoveHit;
+	OwnerPlayer->SetActorLocation(Next, true, &MoveHit);
+
+	if (MoveHit.bBlockingHit ||
+		FVector::DistSquared(
+			OwnerPlayer->GetActorLocation(),
+			AttackApproachDestination
+		) <= FMath::Square(5.0f))
+	{
+		FinishSwordApproach(true);
+	}
 }
 
 void UCombatComponent::Attack()
@@ -213,6 +271,11 @@ void UCombatComponent::CancelSwordRecovery()
 
 void UCombatComponent::BeginSwordDamageWindow()
 {
+	if (bSwordApproaching)
+	{
+		return;
+	}
+
 	EndSwordDamageWindow();
 
 	if (ActionState != EPlayerActionState::AttackingWithSword 
@@ -865,6 +928,8 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 	}
 
 	OnAttackStarted(RequiredWeapon);
+
+	BeginSwordApproach();
 }
 
 bool UCombatComponent::IsCurrentComboSection(FName SectionName) const
@@ -874,7 +939,8 @@ bool UCombatComponent::IsCurrentComboSection(FName SectionName) const
 		ActionState == EPlayerActionState::AttackingWithSword ||
 		(ActionState == EPlayerActionState::None && bSwordRecovery);
 
-	if (!bCanContinueCombo ||
+	if (bSwordApproaching ||
+		!bCanContinueCombo ||
 		!IsOwnerAlive() ||
 		!IsValid(WeaponComponent) ||
 		!WeaponComponent->IsSwordEquipped() ||
@@ -937,6 +1003,8 @@ void UCombatComponent::TryAdvanceSwordCombo()
 		SwordComboSections[CurrentComboIndex],
 		SwordAttackMontage
 	);
+
+	BeginSwordApproach();
 }
 
 void UCombatComponent::ResetSwordCombo()
@@ -946,6 +1014,299 @@ void UCombatComponent::ResetSwordCombo()
 	bNextAttackQueued = false;
 	bAttackCheckpointReached = false;
 	bSwordRecovery = false;
+}
+
+bool UCombatComponent::IsAttackAssistTarget(AActor* Target) const
+{
+	if (!IsValid(OwnerPlayer) ||
+		!IsValid(Target) ||
+		Target == OwnerPlayer.Get() ||
+		Target->IsHidden() ||
+		!Target->GetActorEnableCollision() ||
+		!Target->GetClass()->ImplementsInterface(UEnemyInterface::StaticClass()))
+	{
+		return false;
+	}
+
+	const UMonsterComponent* Monster =
+		Target->FindComponentByClass<UMonsterComponent>();
+
+	if (IsValid(Monster) && Monster->IsDead())
+	{
+		return false;
+	}
+
+	const FVector Difference =
+		Target->GetActorLocation() - OwnerPlayer->GetActorLocation();
+
+	return AttackSearchRadius > 0.0f &&
+		Difference.SizeSquared() <= FMath::Square(AttackSearchRadius) &&
+		FMath::Abs(Difference.Z) <= AttackTargetHeightTolerance;
+}
+
+AActor* UCombatComponent::FindAttackAssistTarget() const
+{
+	if (!IsValid(OwnerPlayer) || !GetWorld() || AttackSearchRadius <= 0.0f)
+	{
+		return nullptr;
+	}
+
+	const UPlayerCameraComponent* Camera =
+		OwnerPlayer->FindComponentByClass<UPlayerCameraComponent>();
+
+	if (IsValid(Camera))
+	{
+		AActor* LockedTarget = Camera->GetLockOnTarget();
+		if (IsAttackAssistTarget(LockedTarget))
+		{
+			return LockedTarget;
+		}
+	}
+
+	TArray<FOverlapResult> Overlaps;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(OwnerPlayer.Get());
+
+	GetWorld()->OverlapMultiByObjectType(
+		Overlaps,
+		OwnerPlayer->GetActorLocation(),
+		FQuat::Identity,
+		FCollisionObjectQueryParams::AllObjects,
+		FCollisionShape::MakeSphere(AttackSearchRadius),
+		Params
+	);
+
+	AActor* ClosestTarget = nullptr;
+	double ClosetDistanceSquared = TNumericLimits<double>::Max();
+
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* Candidate = Overlap.GetActor();
+		if (!IsAttackAssistTarget(Candidate))
+		{
+			continue;
+		}
+
+		const double DistanceSquared = FVector::DistSquared(
+			OwnerPlayer->GetActorLocation(),
+			Candidate->GetActorLocation()
+		);
+
+		if (DistanceSquared < ClosetDistanceSquared)
+		{
+			ClosetDistanceSquared = DistanceSquared;
+			ClosestTarget = Candidate;
+		}
+	}
+
+	return ClosestTarget;
+}
+
+bool UCombatComponent::IsAttackApproachPathClear(const FVector& Start, const FVector& End) const
+{
+	if (!IsValid(OwnerPlayer) || !GetWorld())
+	{
+		return false;
+	}
+
+	const UCapsuleComponent* Capsule = OwnerPlayer->GetCapsuleComponent();
+	const UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement();
+
+	if (!IsValid(Capsule) ||
+		!IsValid(Movement) ||
+		!OwnerPlayer->GetActorEnableCollision() ||
+		!Capsule->IsQueryCollisionEnabled())
+	{
+		return false;
+	}
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(OwnerPlayer.Get());
+
+	if (IsValid(WeaponComponent))
+	{
+		if (AActor* Weapon = WeaponComponent->GetWeaponActor())
+		{
+			Params.AddIgnoredActor(Weapon);
+		}
+	}
+
+	const FCollisionResponseParams Responses(Capsule->GetCollisionResponseToChannels());
+
+	const float Radius = Capsule->GetScaledCapsuleRadius();
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+
+	FHitResult BodyHit;
+	if (GetWorld()->SweepSingleByChannel(
+		BodyHit,
+		Start,
+		End,
+		Capsule->GetComponentQuat(),
+		Capsule->GetCollisionObjectType(),
+		FCollisionShape::MakeCapsule(Radius, HalfHeight),
+		Params,
+		Responses
+	))
+	{
+		return false;
+	}
+
+	const int32 Samples = FMath::Max(1, FMath::CeilToInt(FVector::Distance(Start, End) / 20.0f));
+
+	for (int32 Index = 0; Index <= Samples; ++Index)
+	{
+		const FVector Position = FMath::Lerp(
+			Start,
+			End,
+			static_cast<float>(Index) / Samples
+		);
+
+		const FVector Feet = Position - FVector(0.0f, 0.0f, HalfHeight);
+		FHitResult FloorHit;
+
+		if (!GetWorld()->LineTraceSingleByChannel(
+			FloorHit,
+			Feet + FVector(0.0f, 0.0f, 10.0f),
+			Feet - FVector(0.0f, 0.0f, 15.0f),
+			Capsule->GetCollisionObjectType(),
+			Params,
+			Responses
+		) || !Movement->IsWalkable(FloorHit))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void UCombatComponent::BeginSwordApproach()
+{
+	if (!IsOwnerAlive() ||
+		ActionState != EPlayerActionState::AttackingWithSword ||
+		!IsValid(SwordAttackMontage))
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* Mesh = OwnerPlayer->GetMesh();
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+	UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement();
+
+	if (!IsValid(AnimInstance) ||
+		!IsValid(Movement) ||
+		!Movement->IsWalking() ||
+		!AnimInstance->Montage_IsPlaying(SwordAttackMontage))
+	{
+		return;
+	}
+
+	AActor* Target = FindAttackAssistTarget();
+	if (!IsValid(Target))
+	{
+		return;
+	}
+
+	const FVector Start = OwnerPlayer->GetActorLocation();
+	const FVector ToTarget = Target->GetActorLocation() - Start;
+	const FVector Direction = ToTarget.GetSafeNormal2D();
+
+	if (Direction.IsNearlyZero())
+	{
+		return;
+	}
+
+	float TargetRadius = 0.0f;
+	float TargetHalfHeight = 0.0f;
+	Target->GetSimpleCollisionCylinder(TargetRadius, TargetHalfHeight);
+
+	const float StopDistance =
+		OwnerPlayer->GetCapsuleComponent()->GetScaledCapsuleRadius() +
+		TargetRadius +
+		FMath::Max(0.0f, AttackApproachGap);
+
+	const float TravelDistance =
+		FMath::Max(0.0f, static_cast<float>(ToTarget.Size2D()) - StopDistance);
+
+	if (TravelDistance <= 5.0f)
+	{
+		OwnerPlayer->SetActorRotation(
+			FRotator(0.0f, Direction.Rotation().Yaw, 0.0f)
+		);
+		return;
+	}
+	
+	const FVector Destination = Start + Direction * TravelDistance;
+	if (!IsAttackApproachPathClear(Start, Destination))
+	{
+		return;
+	}
+	EndSwordDamageWindow();
+
+	AttackApproachTarget = Target;
+	AttackApproachDestination = Destination;
+	bSwordApproaching = true;
+
+	AnimInstance->Montage_Pause(SwordAttackMontage);
+	Movement->StopMovementImmediately();
+	Movement->DisableMovement();
+	
+	SetComponentTickEnabled(true);
+}
+
+void UCombatComponent::FinishSwordApproach(bool bResumeAttack)
+{
+	if (!bSwordApproaching)
+	{
+		return;
+	}
+
+	bSwordApproaching = false;
+	SetComponentTickEnabled(false);
+
+	AActor* Target = AttackApproachTarget.Get();
+	AttackApproachTarget.Reset();
+
+	if (!IsValid(OwnerPlayer))
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement();
+	if (IsValid(Movement) && Movement->MovementMode == MOVE_None)
+	{
+		Movement->SetMovementMode(MOVE_Walking);
+	}
+
+	USkeletalMeshComponent* Mesh = OwnerPlayer->GetMesh();
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+
+	if (!IsValid(AnimInstance) || !IsValid(SwordAttackMontage))
+	{
+		return;
+	}
+
+	if (!bResumeAttack)
+	{
+		++SwordAttackExecutionId;
+		AnimInstance->Montage_Stop(0.0f, SwordAttackMontage);
+		return;
+	}
+
+	if (IsAttackAssistTarget(Target))
+	{
+		const FVector Direction =
+			(Target->GetActorLocation() - OwnerPlayer->GetActorLocation()).GetSafeNormal2D();
+
+		if (!Direction.IsNearlyZero())
+		{
+			OwnerPlayer->SetActorRotation(
+				FRotator(0.0f, Direction.Rotation().Yaw, 0.0f)
+			);
+		}
+	}
+
+	AnimInstance->Montage_Resume(SwordAttackMontage);
 }
 
 void UCombatComponent::OpenParryWindow()
@@ -1002,6 +1363,11 @@ void UCombatComponent::SetActionState(EPlayerActionState State)
 	if (ActionState == State) return;
 
 	const EPlayerActionState PreviousState = ActionState;
+
+	if (bSwordApproaching && State != EPlayerActionState::AttackingWithSword)
+	{
+		FinishSwordApproach(false);
+	}
 
 	const bool bEnteringSwordRecovery =
 		PreviousState == EPlayerActionState::AttackingWithSword &&
