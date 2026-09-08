@@ -8,6 +8,7 @@
 #include "Component/InventoryComponent.h"
 #include "Component/InteractionComponent.h"
 #include "Component/PlayerCameraComponent.h"
+#include "Component/StatUpgradeComponent.h"
 #include "Equipment/EquipmentComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "Widget/TestMainUIWidget.h"
@@ -57,6 +58,7 @@ APlayerCharacter::APlayerCharacter()
     WeaponComponent = CreateDefaultSubobject<UWeaponComponent>(TEXT("WeaponComponent"));
     EquipmentComponent = CreateDefaultSubobject<UEquipmentComponent>(TEXT("EquipmentComponent"));
     InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
+    StatUpgradeComponent = CreateDefaultSubobject<UStatUpgradeComponent>(TEXT("StatUpgradeComponent"));
     InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
     PlayerCameraComponent = CreateDefaultSubobject<UPlayerCameraComponent>(TEXT("PlayerCameraComponent"));
 }

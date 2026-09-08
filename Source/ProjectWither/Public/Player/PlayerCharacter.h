@@ -22,6 +22,7 @@ class UStatComponent;
 class UWeaponComponent;
 class UEquipmentComponent;
 class UInventoryComponent;
+class UStatUpgradeComponent;
 class UWeaponDataAsset;
 class UUserWidget;
 class UTestMainUIWidget;
@@ -85,6 +86,9 @@ public:
 
 	virtual UCombatComponent* GetCombatComponent_Implementation() const override;
 
+	UFUNCTION(BlueprintPure, Category = "Player|Stat Upgrade")
+	UStatUpgradeComponent* GetStatUpgradeComponent() const { return StatUpgradeComponent; }
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -140,6 +144,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInventoryComponent> InventoryComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStatUpgradeComponent> StatUpgradeComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInteractionComponent> InteractionComponent;

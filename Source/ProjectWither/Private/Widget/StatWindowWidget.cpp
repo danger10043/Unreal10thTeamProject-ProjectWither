@@ -254,6 +254,10 @@ void UStatWindowWidget::BindPlayerComponents()
 		StatComponent->OnHealthChanged.AddUniqueDynamic(
 			this,
 			&UStatWindowWidget::HandleHealthChanged);
+
+		StatComponent->OnStatsChanged.AddUniqueDynamic(
+			this,
+			&UStatWindowWidget::RefreshStats);
 	}
 
 	if (IsValid(EquipmentComponent))
@@ -278,6 +282,10 @@ void UStatWindowWidget::UnbindPlayerComponents()
 		StatComponent->OnHealthChanged.RemoveDynamic(
 			this,
 			&UStatWindowWidget::HandleHealthChanged);
+
+		StatComponent->OnStatsChanged.RemoveDynamic(
+			this,
+			&UStatWindowWidget::RefreshStats);
 	}
 
 	if (IsValid(EquipmentComponent))
