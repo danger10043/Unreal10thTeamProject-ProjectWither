@@ -6,6 +6,7 @@
 #include "Data/ItemDropTable.h"
 #include "Item/PickupItem.h"
 #include "Monster/MonsterAIController.h"
+#include "Monster/MonsterProjectile.h"
 #include "Interface/PlayerInterface.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Framework/SubSystem/ObjectPoolSubsystem.h"
@@ -26,25 +27,25 @@
 
 UMonsterComponent::UMonsterComponent()
 {
-    PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = false;
 }
 
 void UMonsterComponent::BeginPlay()
 {
-    Super::BeginPlay();
-    if (AActor* Owner = GetOwner())
-    {
-        SpawnLocation = Owner->GetActorLocation();
-        StatComponent = Owner->FindComponentByClass<UStatComponent>();
-        if (StatComponent)
-        {
-            StatComponent->OnHealthZero.AddUniqueDynamic(this, &UMonsterComponent::HandleDeath);
-        }
+	Super::BeginPlay();
+	if (AActor* Owner = GetOwner())
+	{
+		SpawnLocation = Owner->GetActorLocation();
+		StatComponent = Owner->FindComponentByClass<UStatComponent>();
+		if (StatComponent)
+		{
+			StatComponent->OnHealthZero.AddUniqueDynamic(this, &UMonsterComponent::HandleDeath);
+		}
 
 		ApplyMonsterData();
 
 		CachePawnCollisionResponses();
-    }
+	}
 }
 
 void UMonsterComponent::ApplyMonsterData()
@@ -90,10 +91,10 @@ void UMonsterComponent::ApplyMonsterData()
 
 void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    if (IsValid(StatComponent))
-    {
-        StatComponent->OnHealthZero.RemoveDynamic(this, &UMonsterComponent::HandleDeath);
-    }
+	if (IsValid(StatComponent))
+	{
+		StatComponent->OnHealthZero.RemoveDynamic(this, &UMonsterComponent::HandleDeath);
+	}
 	ClearRuntimeTimers();
 
 	DisableAllAttackHitboxes();
@@ -110,7 +111,7 @@ void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	AttackHitboxes.Reset();
 
-    Super::EndPlay(EndPlayReason);
+	Super::EndPlay(EndPlayReason);
 }
 
 float UMonsterComponent::ApplyMonsterDamage(float Damage)
@@ -119,15 +120,15 @@ float UMonsterComponent::ApplyMonsterDamage(float Damage)
 	{
 		return 0.0f;
 	}
-    
+
 	const float AppliedDamage = StatComponent->ApplyDamage(Damage);
-    
+
 	if (!bIsDead && AppliedDamage > 0.0f)
 	{
 		PlayHitReaction();
 	}
-	
-    return AppliedDamage;
+
+	return AppliedDamage;
 }
 
 void UMonsterComponent::HandleDeath()
@@ -171,10 +172,7 @@ void UMonsterComponent::HandleDeath()
 
 	OnMonsterDied.Broadcast();
 
-	// Prefer the configured death montage. If no montage is assigned or it
-	// cannot be played, PlayDeathMontage falls back to the AnimBP Dead state
-	// while the normal despawn timer runs.
-	PlayDeathMontage();
+	ScheduleFinishDeath();
 }
 
 void UMonsterComponent::SetMonsterState(EMonsterState NewState)
@@ -223,7 +221,7 @@ void UMonsterComponent::CalculateDrops()
 		if (FMath::FRand() > Row->DropRate) continue;
 
 		int32 Quantity = FMath::RandRange(Row->MinQuantity, Row->MaxQuantity);
-		
+
 		DropItem.FindOrAdd(Row->ItemData) += Quantity;
 	}
 }
@@ -276,12 +274,28 @@ bool UMonsterComponent::IsInAttackRange()
 {
 	if (!IsValid(TargetActor) || !IsValid(GetOwner()))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("IsInAttackRange: TargetActor 또는 Owner 무효 (TargetActor=%s)"),
+			*GetNameSafe(TargetActor));
+		bWasInAttackRange = false;
 		return false;
 	}
 
 	const float Distance = GetDistanceToTarget();
 
-	return Distance >= 0.0f && Distance <= AttackRange;
+	// 경계선 근처에서 짧은 시간에 여러 번 뒤집히면 BT 블랙보드 옵저버가
+	// 전환을 놓칠 수 있어서, 진입(AttackRange)과 이탈(AttackRange + Hysteresis)
+	// 기준을 다르게 둬서 경계 근처의 미세한 움직임으로는 값이 안 뒤집히게 함
+	const float EffectiveRange = bWasInAttackRange
+		? (AttackRange + AttackRangeHysteresis)
+		: AttackRange;
+
+	const bool bResult = Distance >= 0.0f && Distance <= EffectiveRange;
+	bWasInAttackRange = bResult;
+
+	UE_LOG(LogTemp, Warning, TEXT("IsInAttackRange: Distance=%.1f, AttackRange=%.1f, EffectiveRange=%.1f, Result=%s"),
+		Distance, AttackRange, EffectiveRange, bResult ? TEXT("true") : TEXT("false"));
+
+	return bResult;
 }
 
 bool UMonsterComponent::CanAttack()
@@ -441,7 +455,7 @@ void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultipl
 
 	const float DefenseMultiplier = DefenseScalingConstant / (DefenseScalingConstant + Defense);
 
-	const float FinalDamage = FMath::Max(1.0f, 
+	const float FinalDamage = FMath::Max(1.0f,
 		BaseDamage *
 		FMath::Max(0.0f, AttackMultiplier) *
 		DefenseMultiplier);
@@ -452,6 +466,66 @@ void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultipl
 		GetOwner()->GetInstigatorController(),
 		GetOwner(),
 		UDamageType::StaticClass());
+}
+
+void UMonsterComponent::FireProjectileAtTarget()
+{
+	UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 호출됨: %s"), *GetNameSafe(GetOwner()));
+
+	if (bIsDead || !IsValid(ProjectileClass))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 중단: bIsDead=%d, ProjectileClass=%s"),
+			bIsDead, *GetNameSafe(ProjectileClass));
+		return;
+	}
+
+	AActor* Owner = GetOwner();
+	if (!IsValid(Owner) || !IsValid(TargetActor))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 중단: Owner=%s, TargetActor=%s"),
+			*GetNameSafe(Owner), *GetNameSafe(TargetActor));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* Mesh = Owner->FindComponentByClass<USkeletalMeshComponent>();
+
+	const FVector MuzzleLocation =
+		(IsValid(Mesh) && Mesh->DoesSocketExist(ProjectileMuzzleSocketName))
+		? Mesh->GetSocketLocation(ProjectileMuzzleSocketName)
+		: Owner->GetActorLocation();
+
+	const FVector LaunchDirection = (TargetActor->GetActorLocation() - MuzzleLocation).GetSafeNormal();
+
+	if (LaunchDirection.IsNearlyZero())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 중단: LaunchDirection이 0벡터 (Muzzle=%s, Target=%s)"),
+			*MuzzleLocation.ToString(), *TargetActor->GetActorLocation().ToString());
+		return;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = Owner;
+	SpawnParams.Instigator = Owner->GetInstigator();
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	AMonsterProjectile* Projectile = World->SpawnActor<AMonsterProjectile>(
+		ProjectileClass,
+		MuzzleLocation,
+		LaunchDirection.Rotation(),
+		SpawnParams);
+
+	UE_LOG(LogTemp, Warning, TEXT("FireProjectileAtTarget 스폰 결과: %s"), *GetNameSafe(Projectile));
+
+	if (IsValid(Projectile))
+	{
+		Projectile->InitializeProjectile(this, LaunchDirection, ProjectileAttackMultiplier);
+	}
 }
 
 void UMonsterComponent::RegisterAttackHitbox(FName HitboxName, UPrimitiveComponent* Hitbox)
@@ -605,8 +679,8 @@ void UMonsterComponent::ActivateFromPool()
 	const AActor* Owner = GetOwner();
 	ResetForReuse(
 		IsValid(Owner)
-			? Owner->GetActorLocation()
-			: FVector::ZeroVector);
+		? Owner->GetActorLocation()
+		: FVector::ZeroVector);
 }
 
 void UMonsterComponent::DeactivateForPool()
@@ -713,16 +787,14 @@ void UMonsterComponent::CancelSearch()
 	}
 }
 
-void UMonsterComponent::ScheduleFinishDeath(float MinimumDelay)
+void UMonsterComponent::ScheduleFinishDeath()
 {
 	if (DespawnPolicy == EMonsterDespawnPolicy::KeepCorpse)
 	{
 		return;
 	}
 
-	const float EffectiveDelay = FMath::Max(DespawnDelay, MinimumDelay);
-
-	if (EffectiveDelay <= 0.0f)
+	if (DespawnDelay <= 0.0f)
 	{
 		FinishDeath();
 		return;
@@ -734,7 +806,7 @@ void UMonsterComponent::ScheduleFinishDeath(float MinimumDelay)
 			DespawnTimerHandle,
 			this,
 			&UMonsterComponent::FinishDeath,
-			EffectiveDelay,
+			DespawnDelay,
 			false
 		);
 	}
@@ -926,7 +998,7 @@ void UMonsterComponent::OnReactionMontageEnded(UAnimMontage* Montage, bool bInte
 
 	if (MonsterState == EMonsterState::Hit)
 	{
-		SetMonsterState(IsValid(GetTargetActor()) ? 
+		SetMonsterState(IsValid(GetTargetActor()) ?
 			EMonsterState::Chase : EMonsterState::Idle);
 	}
 }
@@ -957,11 +1029,6 @@ void UMonsterComponent::PlayDeathMontage()
 		return;
 	}
 
-	// Auto Blend Out may be disabled to hold the final death pose. In that
-	// case the montage-ended delegate does not fire, so despawn must be
-	// scheduled as soon as playback starts.
-	ScheduleFinishDeath(PlayedLength);
-
 	FOnMontageEnded EndDelegate;
 	EndDelegate.BindUObject(
 		this,
@@ -977,8 +1044,7 @@ void UMonsterComponent::OnDeathMontageEnded(UAnimMontage* Montage, bool bInterru
 		return;
 	}
 
-	// Despawn was already scheduled when the montage started. Do not restart
-	// the delay here, otherwise the corpse lingers for an extra full delay.
+	ScheduleFinishDeath();
 }
 
 void UMonsterComponent::OnSearchMontageEnded(UAnimMontage* Montage, bool bInterrupted)

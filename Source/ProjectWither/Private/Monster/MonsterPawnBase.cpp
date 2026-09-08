@@ -149,7 +149,7 @@ void AMonsterPawnBase::SnapToFloor(float DeltaTime)
 	{
 		float TargetZ = FMath::Max(HitHeights);
 		FVector TargetLocation = FVector(Origin.X, Origin.Y, TargetZ + HeightAboveFloor);
-		FVector NewLocation = FMath::VInterpTo(Origin, TargetLocation, DeltaTime, 10.f);
+		FVector NewLocation = FMath::VInterpTo(Origin, TargetLocation, DeltaTime, HeightCorrectionSpeed);
 		SetActorLocation(NewLocation, true);
 	}
 }
