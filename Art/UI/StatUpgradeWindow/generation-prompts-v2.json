@@ -1,0 +1,29 @@
+{
+  "tool": "image_gen.imagegen (built-in)",
+  "editTarget": "T_StatUpgradeWindow_Frame_v1.png",
+  "selectedAsset": "T_StatUpgradeWindow_Frame_v2.png",
+  "nativeSize": [
+    1565,
+    1005
+  ],
+  "designSize": [
+    1120,
+    720
+  ],
+  "format": "RGBA PNG",
+  "validation": {
+    "exteriorSampleAlpha": 0,
+    "canvasEdgeMaximumAlpha": 1,
+    "centerSampleAlpha": 252
+  },
+  "attempts": [
+    {
+      "status": "rejected: flattened RGB with painted checkerboard",
+      "prompt": "Use case: background-extraction\nAsset type: production game UI PNG, an edited texture, not a new design.\nEdit target: the attached silver-bordered dark rectangular panel texture.\nThe user likes this EXACT frame design. Make ONLY the area OUTSIDE the outermost silver outline transparent, using REAL alpha transparency in a PNG. This is a precise exterior background-removal task.\nKeep the whole dark charcoal center INSIDE the silver frame solid and intact. The center is part of the foreground panel, NOT background to remove. Preserve all of its original pixels as much as possible. Preserve the very fine silver double-line border and the existing tiny corner joins, their size, position, color, wear and sharpness. Keep dark gaps between the two silver outlines.\nRemove only the thin black margin OUTSIDE the outermost metallic contour, including the black outer corner wedges beyond the small stepped corners. This exterior must be alpha=0, and the silhouette's edge must have clean antialiasing. No dark rectangular matte must remain outside the rim. No checkerboard painted into the image; empty exterior is genuine transparent alpha, with no visible background color. No white halo.\nPreserve the source canvas dimensions of 1564 x 1006 and the frame geometry. Keep enough transparent canvas to preserve its alignment. Do not crop to a different ratio or enlarge the rim. Target usage is unchanged, 1120x720 in Unreal UMG with 30 units of content padding.\nNo redrawing or redesign, no extra filigree or symbols, no added panels, no text, no glow, no cast shadow. The deliverable is the same dark-filled panel with only its exterior made transparent. Export an RGBA PNG with real transparent exterior and opaque dark interior."
+    },
+    {
+      "status": "selected: actual transparent exterior and retained dark center",
+      "prompt": "Remove the background outside this game UI panel. Use actual transparent-background output with an alpha channel. Deliver a transparent PNG cutout, not a picture of a transparent PNG.\n\nThe entire silver-bordered rectangle INCLUDING its filled black interior is the foreground object to keep. Remove only the small outside black margin. Preserve the supplied artwork and thin silver edges. No white or gray checkerboard pattern anywhere. Outside the metallic silhouette must be genuinely empty/transparent, not colored pixels. Do not remove the black center contained by the frame. Keep this exact panel design.\n\nThe image output must contain RGBA alpha transparency. A flattened RGB image is not acceptable. Use the transparent-background image capability."
+    }
+  ]
+}
