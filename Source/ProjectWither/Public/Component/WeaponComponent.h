@@ -70,6 +70,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon|Gun")
 	int32 GetCurrentAmmo() const;
 
+	// 인벤토리 탄약을 소모하지 않고 장착 중인 총의 탄창을 최대치로 채운다 (세이브 포인트 휴식 등에서 사용)
+	UFUNCTION(BlueprintCallable, Category = "Weapon|Gun")
+	bool RefillCurrentWeaponAmmo();
+
 private:
 	bool SaveCurrentWeaponToInventory();
 	void SyncCurrentWeaponToEquipment();
