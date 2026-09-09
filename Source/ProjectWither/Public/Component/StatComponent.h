@@ -174,6 +174,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float DefensePower = 0.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stat|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "1.0"))
+	float DefenseScalingConstant = 100.0f;
+
 	float AttackPowerMultiplier = 1.0f;
 	float DefenseMultiplier = 1.0f;
 
