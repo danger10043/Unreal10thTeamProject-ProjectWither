@@ -22,6 +22,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/RootMotionSource.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraFunctionLibrary.h"
 
 namespace
 {
@@ -343,6 +344,16 @@ void UCombatComponent::GunAttack()
 		return;
 	}
 
+	const UPlayerCameraComponent* Camera =
+		IsValid(OwnerPlayer)
+		? OwnerPlayer->FindComponentByClass<UPlayerCameraComponent>()
+		: nullptr;
+
+	if (!IsValid(Camera) || !Camera->IsZooming())
+	{
+		return;
+	}
+
 	if (!TrySpendStamina(GunAttackStaminaCost))
 	{
 		UE_LOG(
@@ -363,6 +374,27 @@ void UCombatComponent::GunAttack()
 			TEXT("UCombatComponent::GunAttack - 총기 발사에 실패했습니다.")
 		);
 		return;
+	}
+
+	if (!IsValid(OwnerPlayer) || !IsValid(GunAttackMontage))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - OwnerPlayer 또는 GunAttackMontage가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	const float PlayedLength = OwnerPlayer->PlayAnimMontage(GunAttackMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - 발사 몽타주 재생에 실패했습니다.")
+		);
 	}
 }
 
@@ -497,14 +529,57 @@ void UCombatComponent::HandleSwordCollisionBeginOverlap(
 	if (SwordDamage <= 0.0f) return;
 
 	SwordHitActors.Add(OtherActor);
+	
+	const UWeaponDataAsset* WeaponData =
+		IsValid(WeaponComponent)
+		? WeaponComponent->GetCurrentWeaponData()
+		: nullptr;
 
-	UGameplayStatics::ApplyDamage(
+	UNiagaraSystem* HitEffect =
+		IsValid(WeaponData) ? WeaponData->GetWeaponHitEffect() : nullptr;
+
+	FVector EffectLocation = IsValid(OverlappedComponent)
+		? OverlappedComponent->GetComponentLocation()
+		: OtherActor->GetActorLocation();
+
+	if (bFromSweep && !SweepResult.bStartPenetrating)
+	{
+		EffectLocation = SweepResult.ImpactPoint;
+	}
+	else if (IsValid(OtherComponent))
+	{
+		FVector ClosestPoint;
+		const float Distance = OtherComponent->GetClosestPointOnCollision(
+			EffectLocation,
+			ClosestPoint
+		);
+
+		if (Distance > 0.0f)
+		{
+			EffectLocation = ClosestPoint;
+		}
+	}
+
+	const float AppliedDamage = UGameplayStatics::ApplyDamage(
 		OtherActor,
 		SwordDamage,
 		IsValid(OwnerPlayer) ? OwnerPlayer->GetController() : nullptr,
 		OwnerPlayer,
 		UDamageType::StaticClass()
 	);
+
+	if (AppliedDamage > 0.0f && IsValid(HitEffect))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			HitEffect,
+			EffectLocation,
+			FRotator::ZeroRotator,
+			FVector::OneVector,
+			true,
+			true
+		);
+	}
 }
 
 UCapsuleComponent* UCombatComponent::FindSwordCollision() const
@@ -592,6 +667,11 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 {
 	if (!IsOwnerAlive() || DamageAmount <= 0.0f) { return 0.0f; }
 
+	if (ActionState == EPlayerActionState::Rolling)
+	{
+		return 0.0f;
+	}
+
 	if (ActionState == EPlayerActionState::Blocking)
 	{
 		const bool bWasParry = bParryWindowOpen;
@@ -601,6 +681,20 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 			if (bWasParry)
 			{
 				CloseParryWindow();
+
+				if (IsValid(OwnerPlayer) && IsValid(ParryMontage))
+				{
+					const float PlayedLength = OwnerPlayer->PlayAnimMontage(ParryMontage);
+
+					if (PlayedLength <= 0.0f)
+					{
+						UE_LOG(
+							LogTemp,
+							Warning,
+							TEXT("UCombatComponent::ReceiveHit - 패링 몽타주 재생에 실패했습니다.")
+						);
+					}
+				}
 
 				OnParrySucceeded();
 
@@ -626,7 +720,12 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 				StopBlock();
 			}
 
-			return 0.0f;
+			if (bWasParry)
+			{
+				return 0.0f;
+			}
+
+			return StatComponent->ApplyDamage(DamageAmount, 0.5f);
 		}
 
 		// 공격을 막을 비용이 부족하므로 가드 실패
@@ -647,8 +746,6 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 		StartHitReaction();
 		OnHitReceived();
 	}
-
-	OnHitReceived();
 
 	return AppliedDamage;
 }
