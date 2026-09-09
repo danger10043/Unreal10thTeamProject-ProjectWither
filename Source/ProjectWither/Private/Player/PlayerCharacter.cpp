@@ -76,8 +76,23 @@ void APlayerCharacter::SetCanMove(bool bNewCanMove)
 
 void APlayerCharacter::RefreshMovementForCameraState()
 {
-    if (IsValid(PlayerCameraComponent) && PlayerCameraComponent->IsZooming())
+    const bool bIsZooming =
+        IsValid(PlayerCameraComponent) && PlayerCameraComponent->IsZooming();
+
+    bUseControllerRotationYaw = bIsZooming;
+
+    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
     {
+        Movement->bOrientRotationToMovement = !bIsZooming;
+    }
+
+    if (bIsZooming)
+    {
+        if (IsValid(Controller))
+        {
+            SetActorRotation(FRotator(0.0f, Controller->GetControlRotation().Yaw, 0.0f));
+        }
+
         StopRun();
         return;
     }

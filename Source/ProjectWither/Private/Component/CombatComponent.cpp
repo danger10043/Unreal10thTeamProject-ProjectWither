@@ -360,6 +360,27 @@ void UCombatComponent::GunAttack()
 		);
 		return;
 	}
+
+	if (!IsValid(OwnerPlayer) || !IsValid(GunAttackMontage))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - OwnerPlayer 또는 GunAttackMontage가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	const float PlayedLength = OwnerPlayer->PlayAnimMontage(GunAttackMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - 발사 몽타주 재생에 실패했습니다.")
+		);
+	}
 }
 
 void UCombatComponent::Roll()
@@ -643,8 +664,6 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 		StartHitReaction();
 		OnHitReceived();
 	}
-
-	OnHitReceived();
 
 	return AppliedDamage;
 }
