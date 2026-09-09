@@ -672,7 +672,12 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 				StopBlock();
 			}
 
-			return 0.0f;
+			if (bWasParry)
+			{
+				return 0.0f;
+			}
+
+			return StatComponent->ApplyDamage(DamageAmount, 0.5f);
 		}
 
 		// 공격을 막을 비용이 부족하므로 가드 실패

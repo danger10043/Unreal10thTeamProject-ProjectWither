@@ -55,7 +55,7 @@ public:
 	*	@return 실제로 감소한 체력
 	*/
 	UFUNCTION(BlueprintCallable, Category = "Stat|Health")
-	float ApplyDamage(float DamageAmount);
+	float ApplyDamage(float DamageAmount, float FinalDamageMultiplier = 1.0f);
 
 	/*
 	*	Amount 만큼 스태미나를 회복합니다.
