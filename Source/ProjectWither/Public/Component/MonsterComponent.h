@@ -161,6 +161,7 @@ public:
 private:
 	UFUNCTION()
 	void HandleDeath();
+	void GrantGoldReward();	// 데이터 에셋에 설정된 골드를 플레이어에게 지급
 
 	FName SelectAttackSection(UAnimMontage* Montage) const;	// 공격 애니메이션 섹션 랜덤 선택 함수
 	UAnimMontage* SelectAttackMontage() const;
