@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/PlayerCharacter.h"
 #include "Widget/StatUpgradeWindowWidget.h"
 
 AStatUpgradeNPC::AStatUpgradeNPC()
@@ -21,7 +22,7 @@ void AStatUpgradeNPC::HandleInteraction(AActor* Interactor)
 		return;
 	}
 
-	const APawn* InteractingPawn = Cast<APawn>(Interactor);
+	APawn* InteractingPawn = Cast<APawn>(Interactor);
 
 	if (!IsValid(InteractingPawn) || !InteractingPawn->IsLocallyControlled())
 	{
@@ -46,6 +47,13 @@ void AStatUpgradeNPC::HandleInteraction(AActor* Interactor)
 	{
 		return;
 	}
+
+	if (APlayerCharacter* PlayerCharacter = Cast<APlayerCharacter>(InteractingPawn))
+	{
+		PlayerCharacter->SetCanMove(false);
+	}
+
+	PlayerController->FlushPressedKeys();
 
 	if (!StatUpgradeWindowInstance->IsInViewport())
 	{
