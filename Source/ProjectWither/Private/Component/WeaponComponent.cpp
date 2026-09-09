@@ -459,6 +459,29 @@ int32 UWeaponComponent::GetCurrentAmmo() const
 	return IsGunEquipped() ? FMath::Max(0, CurrentWeapon.CurrentAmmo) : 0;
 }
 
+bool UWeaponComponent::RefillCurrentWeaponAmmo()
+{
+	const UWeaponDataAsset* WeaponData = GetCurrentWeaponData();
+
+	if (!WeaponData || WeaponData->GetWeaponType() != EWeaponType::Gun)
+	{
+		return false;
+	}
+
+	const int32 MaxAmmo = FMath::Max(0, WeaponData->GetMaxAmmo());
+
+	if (CurrentWeapon.CurrentAmmo >= MaxAmmo)
+	{
+		return false;
+	}
+
+	CurrentWeapon.CurrentAmmo = MaxAmmo;
+	SyncCurrentWeaponToEquipment();
+	OnWeaponChanged.Broadcast();
+
+	return true;
+}
+
 bool UWeaponComponent::SaveCurrentWeaponToInventory()
 {
 	if (!GetCurrentWeapon())

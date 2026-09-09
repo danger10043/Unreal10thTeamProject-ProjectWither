@@ -31,12 +31,12 @@ class UCurveFloat;
 class UCapsuleComponent;
 class UPrimitiveComponent;
 
-UCLASS( ClassGroup=(Custom), Blueprintable, meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup = (Custom), Blueprintable, meta = (BlueprintSpawnableComponent))
 class PROJECTWITHER_API UCombatComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
+public:
 	UCombatComponent();
 
 protected:
@@ -50,7 +50,7 @@ protected:
 		FActorComponentTickFunction* ThisTickFunction
 	) override;
 
-public:	
+public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void Attack();
 
@@ -65,7 +65,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Combat|Sword")
 	void BeginSwordDamageWindow();
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Combat|Sword")
 	void EndSwordDamageWindow();
 
@@ -82,7 +82,7 @@ public:
 	void StopBlock();
 
 	UFUNCTION(BlueprintCallable, Category = "Combat")
-	float ReceiveHit(float DamageAmount, AActor* DamageCauser, AController* EventInstigator );
+	float ReceiveHit(float DamageAmount, AActor* DamageCauser, AController* EventInstigator);
 
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void Die();
@@ -199,6 +199,14 @@ private:
 
 	void OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
+	void OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	// 마지막(현재) 세이브 포인트에서 부활 처리. 활성화된 세이브 포인트가 없으면 현재 위치에서 그대로 부활한다.
+	void HandleRespawn();
+
+	// Die()의 동기 호출 스택(ApplyDamage -> OnHealthZero)에서 벗어난 뒤 HandleRespawn을 실행하도록 예약
+	void ScheduleRespawn();
+
 	void OnAttackMontageEnded(
 		UAnimMontage* Montage,
 		bool bInterrupted,
@@ -253,6 +261,12 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimMontage> SwordAttackMontage;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Attack", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> GunAttackMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Parry", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAnimMontage> ParryMontage;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|HitReact", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAnimMontage> HitReactMontage;
 
@@ -289,7 +303,7 @@ private:
 	// 가드 유지 스태미나 소모 주기
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.01", Units = "s"))
 	float BlockHoldStaminaInterval = 0.2f;
-	
+
 	// 가드를 유지하면서 한 번에 소모하는 스태미나
 	UPROPERTY(EditDefaultsOnly, Category = "Combat|Stamina", meta = (ClampMin = "0.0"))
 	float BlockHoldStaminaCost = 1.0f;
@@ -302,5 +316,8 @@ private:
 
 	FTimerHandle ParryCooldownTimerHandle;
 
-	FTimerHandle BlockStaminaTimerHandle; 
+	FTimerHandle BlockStaminaTimerHandle;
+
+	// 사망 몽타주가 자연 종료되지 않는 경우(마지막 프레임 홀드/루프 등)를 대비한 부활 백업 타이머
+	FTimerHandle RespawnTimerHandle;
 };

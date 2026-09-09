@@ -11,14 +11,18 @@
 #include "Component/WeaponComponent.h"
 #include "Component/MonsterComponent.h"
 #include "Component/PlayerCameraComponent.h"
+#include "Engine/GameInstance.h"
+#include "Framework/SubSystem/SavePointSubsystem.h"
 #include "CollisionQueryParams.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerStart.h"
 #include "GameFramework/RootMotionSource.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraFunctionLibrary.h"
 
 namespace
 {
@@ -84,6 +88,7 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(ParryTimerHandle);
 		World->GetTimerManager().ClearTimer(ParryCooldownTimerHandle);
 		World->GetTimerManager().ClearTimer(BlockStaminaTimerHandle);
+		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
 	}
 
 	if (IsValid(StatComponent))
@@ -249,7 +254,7 @@ void UCombatComponent::CancelSwordRecovery()
 	{
 		return;
 	}
-	
+
 	++SwordAttackExecutionId;
 
 	ResetSwordCombo();
@@ -278,8 +283,8 @@ void UCombatComponent::BeginSwordDamageWindow()
 
 	EndSwordDamageWindow();
 
-	if (ActionState != EPlayerActionState::AttackingWithSword 
-		|| !IsValid(WeaponComponent) 
+	if (ActionState != EPlayerActionState::AttackingWithSword
+		|| !IsValid(WeaponComponent)
 		|| !WeaponComponent->IsSwordEquipped()) return;
 
 	UCapsuleComponent* SwordCollision = FindSwordCollision();
@@ -339,6 +344,16 @@ void UCombatComponent::GunAttack()
 		return;
 	}
 
+	const UPlayerCameraComponent* Camera =
+		IsValid(OwnerPlayer)
+		? OwnerPlayer->FindComponentByClass<UPlayerCameraComponent>()
+		: nullptr;
+
+	if (!IsValid(Camera) || !Camera->IsZooming())
+	{
+		return;
+	}
+
 	if (!TrySpendStamina(GunAttackStaminaCost))
 	{
 		UE_LOG(
@@ -359,6 +374,27 @@ void UCombatComponent::GunAttack()
 			TEXT("UCombatComponent::GunAttack - 총기 발사에 실패했습니다.")
 		);
 		return;
+	}
+
+	if (!IsValid(OwnerPlayer) || !IsValid(GunAttackMontage))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - OwnerPlayer 또는 GunAttackMontage가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	const float PlayedLength = OwnerPlayer->PlayAnimMontage(GunAttackMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - 발사 몽타주 재생에 실패했습니다.")
+		);
 	}
 }
 
@@ -397,7 +433,7 @@ void UCombatComponent::Roll()
 	{
 		RollDirection = OwnerPlayer->GetActorForwardVector().GetSafeNormal2D();
 	}
-	
+
 	OwnerPlayer->SetActorRotation(RollDirection.Rotation());
 	OwnerPlayer->SetCanMove(false);
 	SetActionState(EPlayerActionState::Rolling);
@@ -478,7 +514,7 @@ void UCombatComponent::HandleSwordCollisionBeginOverlap(
 	AActor* OtherActor,
 	UPrimitiveComponent* OtherComponent,
 	int32 OtherBodyIndex,
-	bool bFromSweep, 
+	bool bFromSweep,
 	const FHitResult& SweepResult)
 {
 	if (ActionState != EPlayerActionState::AttackingWithSword ||
@@ -494,13 +530,56 @@ void UCombatComponent::HandleSwordCollisionBeginOverlap(
 
 	SwordHitActors.Add(OtherActor);
 	
-	UGameplayStatics::ApplyDamage(
+	const UWeaponDataAsset* WeaponData =
+		IsValid(WeaponComponent)
+		? WeaponComponent->GetCurrentWeaponData()
+		: nullptr;
+
+	UNiagaraSystem* HitEffect =
+		IsValid(WeaponData) ? WeaponData->GetWeaponHitEffect() : nullptr;
+
+	FVector EffectLocation = IsValid(OverlappedComponent)
+		? OverlappedComponent->GetComponentLocation()
+		: OtherActor->GetActorLocation();
+
+	if (bFromSweep && !SweepResult.bStartPenetrating)
+	{
+		EffectLocation = SweepResult.ImpactPoint;
+	}
+	else if (IsValid(OtherComponent))
+	{
+		FVector ClosestPoint;
+		const float Distance = OtherComponent->GetClosestPointOnCollision(
+			EffectLocation,
+			ClosestPoint
+		);
+
+		if (Distance > 0.0f)
+		{
+			EffectLocation = ClosestPoint;
+		}
+	}
+
+	const float AppliedDamage = UGameplayStatics::ApplyDamage(
 		OtherActor,
 		SwordDamage,
 		IsValid(OwnerPlayer) ? OwnerPlayer->GetController() : nullptr,
 		OwnerPlayer,
 		UDamageType::StaticClass()
 	);
+
+	if (AppliedDamage > 0.0f && IsValid(HitEffect))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			HitEffect,
+			EffectLocation,
+			FRotator::ZeroRotator,
+			FVector::OneVector,
+			true,
+			true
+		);
+	}
 }
 
 UCapsuleComponent* UCombatComponent::FindSwordCollision() const
@@ -597,6 +676,11 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 {
 	if (!IsOwnerAlive() || DamageAmount <= 0.0f) { return 0.0f; }
 
+	if (ActionState == EPlayerActionState::Rolling)
+	{
+		return 0.0f;
+	}
+
 	if (ActionState == EPlayerActionState::Blocking)
 	{
 		const bool bWasParry = bParryWindowOpen;
@@ -606,6 +690,20 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 			if (bWasParry)
 			{
 				CloseParryWindow();
+
+				if (IsValid(OwnerPlayer) && IsValid(ParryMontage))
+				{
+					const float PlayedLength = OwnerPlayer->PlayAnimMontage(ParryMontage);
+
+					if (PlayedLength <= 0.0f)
+					{
+						UE_LOG(
+							LogTemp,
+							Warning,
+							TEXT("UCombatComponent::ReceiveHit - 패링 몽타주 재생에 실패했습니다.")
+						);
+					}
+				}
 
 				OnParrySucceeded();
 
@@ -631,7 +729,12 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 				StopBlock();
 			}
 
-			return 0.0f;
+			if (bWasParry)
+			{
+				return 0.0f;
+			}
+
+			return StatComponent->ApplyDamage(DamageAmount, 0.5f);
 		}
 
 		// 공격을 막을 비용이 부족하므로 가드 실패
@@ -652,8 +755,6 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 		StartHitReaction();
 		OnHitReceived();
 	}
-
-	OnHitReceived();
 
 	return AppliedDamage;
 }
@@ -693,6 +794,7 @@ void UCombatComponent::Die()
 	if (!IsValid(AnimInstance))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("CombatComponent::Die - AnimInstance가 유효하지 않습니다."));
+		ScheduleRespawn();
 		return;
 	}
 
@@ -701,6 +803,7 @@ void UCombatComponent::Die()
 	if (!IsValid(DeathMontage))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("CombatComponent::Die - Death Montage가 유효하지 않습니다."));
+		ScheduleRespawn();
 		return;
 	}
 
@@ -708,8 +811,122 @@ void UCombatComponent::Die()
 	if (PlayedLength <= 0.0f)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("CombatComponent::Die - Death Montage 재생에 실패했습니다."));
+		ScheduleRespawn();
 		return;
 	}
+
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(this, &UCombatComponent::OnDeathMontageEnded);
+
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, DeathMontage);
+
+	// 사망 몽타주 마지막 프레임을 홀드/루프하도록 만들어서 Montage_SetEndDelegate가
+	// 끝내 호출되지 않는 경우를 대비한 백업 타이머. 델리게이트가 먼저 호출되면
+	// HandleRespawn의 ActionState 검사로 인해 이 타이머는 아무 효과 없이 무시된다.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			RespawnTimerHandle,
+			this,
+			&UCombatComponent::HandleRespawn,
+			PlayedLength,
+			false
+		);
+	}
+}
+
+void UCombatComponent::OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != DeathMontage) return;
+	if (ActionState != EPlayerActionState::Dead) return;
+
+	HandleRespawn();
+}
+
+void UCombatComponent::ScheduleRespawn()
+{
+	UWorld* World = GetWorld();
+
+	if (!IsValid(World))
+	{
+		HandleRespawn();
+		return;
+	}
+
+	// Die()는 StatComponent::ApplyDamage() 안에서 OnHealthZero 델리게이트로 동기 호출된다.
+	// 여기서 바로 HandleRespawn()을 부르면 ApplyDamage()가 아직 실행 중인 상태에서
+	// 체력/행동 상태가 되돌아가 버려서, 뒤이은 피격 처리(히트 리액션 등)가 방금 되돌린
+	// 상태를 다시 덮어쓰는 문제가 생긴다. 다음 틱으로 미뤄서 호출 스택을 완전히 빠져나온 뒤 부활시킨다.
+	World->GetTimerManager().SetTimerForNextTick(this, &UCombatComponent::HandleRespawn);
+}
+
+void UCombatComponent::HandleRespawn()
+{
+	if (!IsValid(OwnerPlayer)) return;
+
+	// 몽타주 종료 델리게이트와 백업 타이머 중 먼저 호출된 쪽만 실제로 부활을 처리하도록 방지
+	if (ActionState != EPlayerActionState::Dead) return;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
+	}
+
+	// 사망 몽타주가 자연 종료되지 않고 마지막 프레임을 계속 재생 중일 수 있으므로
+	// 로코모션으로 되돌아갈 수 있도록 명시적으로 멈춘다.
+	if (UAnimInstance* AnimInstance = OwnerPlayer->GetMesh() ? OwnerPlayer->GetMesh()->GetAnimInstance() : nullptr)
+	{
+		AnimInstance->StopAllMontages(0.0f);
+	}
+
+	FTransform RespawnTransform;
+	bool bHasRespawnTransform = false;
+
+	if (UGameInstance* GameInstance = OwnerPlayer->GetGameInstance())
+	{
+		if (USavePointSubsystem* SavePointSubsystem = GameInstance->GetSubsystem<USavePointSubsystem>())
+		{
+			if (SavePointSubsystem->HasCurrentSavePoint())
+			{
+				RespawnTransform = SavePointSubsystem->GetCurrentSavePointTransform();
+				bHasRespawnTransform = true;
+			}
+		}
+	}
+
+	// 활성화된 세이브 포인트가 아직 없으면 죽은 자리 대신 레벨의 PlayerStart로 부활한다.
+	if (!bHasRespawnTransform)
+	{
+		if (AActor* PlayerStart = UGameplayStatics::GetActorOfClass(this, APlayerStart::StaticClass()))
+		{
+			RespawnTransform = PlayerStart->GetActorTransform();
+			bHasRespawnTransform = true;
+		}
+	}
+
+	if (bHasRespawnTransform)
+	{
+		if (UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement())
+		{
+			Movement->StopMovementImmediately();
+		}
+
+		OwnerPlayer->SetActorLocationAndRotation(
+			RespawnTransform.GetLocation(),
+			RespawnTransform.GetRotation(),
+			false,
+			nullptr,
+			ETeleportType::TeleportPhysics);
+	}
+	// PlayerStart조차 없으면 최후의 수단으로 죽은 자리에서 그대로 부활한다.
+
+	if (IsValid(StatComponent))
+	{
+		StatComponent->ResetStat();
+	}
+
+	OwnerPlayer->SetCanMove(true);
+	SetActionState(EPlayerActionState::None);
 }
 
 void UCombatComponent::FinishAction(EPlayerActionState ExpectedState)
@@ -890,7 +1107,7 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 
 	if (!TrySpendStamina(StaminaCost))
 	{
-		UE_LOG( LogTemp, Warning, TEXT("공격에 필요한 스태미나가 부족합니다."));
+		UE_LOG(LogTemp, Warning, TEXT("공격에 필요한 스태미나가 부족합니다."));
 		return;
 	}
 
@@ -902,7 +1119,7 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 
 	ResetSwordCombo();
 	CurrentComboIndex = 0;
-	
+
 	const float PlayedLength = OwnerPlayer->PlayAnimMontage(
 		SwordAttackMontage,
 		1.0f,
@@ -925,7 +1142,7 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 		ExecutionId
 	);
 
-	AnimInstance->Montage_SetEndDelegate( EndDelegate, SwordAttackMontage);
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, SwordAttackMontage);
 
 	for (const FName SectionName : SwordComboSections)
 	{
@@ -1244,7 +1461,7 @@ void UCombatComponent::BeginSwordApproach()
 		);
 		return;
 	}
-	
+
 	const FVector Destination = Start + Direction * TravelDistance;
 	if (!IsAttackApproachPathClear(Start, Destination))
 	{
@@ -1259,7 +1476,7 @@ void UCombatComponent::BeginSwordApproach()
 	AnimInstance->Montage_Pause(SwordAttackMontage);
 	Movement->StopMovementImmediately();
 	Movement->DisableMovement();
-	
+
 	SetComponentTickEnabled(true);
 }
 

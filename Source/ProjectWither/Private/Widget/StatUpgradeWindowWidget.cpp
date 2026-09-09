@@ -7,6 +7,7 @@
 #include "Components/TextBlock.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/PlayerCharacter.h"
 
 namespace
 {
@@ -335,15 +336,21 @@ void UStatUpgradeWindowWidget::HandleDefensePowerUpgradeClicked()
 
 void UStatUpgradeWindowWidget::HandleCloseClicked()
 {
-	RemoveFromParent();
-
 	APlayerController* PlayerController = GetOwningPlayer();
+
+	if (APlayerCharacter* PlayerCharacter = Cast<APlayerCharacter>(GetOwningPlayerPawn()))
+	{
+		PlayerCharacter->SetCanMove(true);
+	}
+
+	RemoveFromParent();
 
 	if (!IsValid(PlayerController))
 	{
 		return;
 	}
 
+	PlayerController->FlushPressedKeys();
 	PlayerController->bShowMouseCursor = false;
 
 	FInputModeGameOnly InputMode;
