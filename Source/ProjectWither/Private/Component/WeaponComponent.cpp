@@ -221,6 +221,11 @@ FItemInstance* UWeaponComponent::GetCurrentWeapon()
 	return IsValid(GetCurrentWeaponData()) ? &CurrentWeapon : nullptr;
 }
 
+const FItemInstance* UWeaponComponent::GetCurrentWeapon() const
+{
+	return IsValid(GetCurrentWeaponData()) ? &CurrentWeapon : nullptr;
+}
+
 UWeaponDataAsset* UWeaponComponent::GetCurrentWeaponData() const
 {
 	if (CurrentWeapon.Quantity <= 0 || !IsValid(CurrentWeapon.ItemData.Get()))
@@ -383,7 +388,7 @@ bool UWeaponComponent::FireGun()
 			FMath::FRandRange(
 				MinAttackPower,
 				MaxAttackPower
-			) + WeaponData->GetWeaponPower()
+			) + WeaponData->GetEnhancedWeaponPower(CurrentWeapon.EnhanceLevel)
 		);
 
 	if (!RangedWeapon->Fire(FireContext))

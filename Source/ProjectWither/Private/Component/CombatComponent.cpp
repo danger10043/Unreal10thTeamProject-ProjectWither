@@ -606,17 +606,26 @@ UCapsuleComponent* UCombatComponent::FindSwordCollision() const
 
 float UCombatComponent::CalculateSwordDamage() const
 {
-	if (!IsValid(StatComponent) || !IsValid(WeaponComponent)) return 0.0f;
+	if (!IsValid(StatComponent) || !IsValid(WeaponComponent)) { return 0.0f; }
 
-	const UWeaponDataAsset* WeaponData = WeaponComponent->GetCurrentWeaponData();
+	// 데이터 에셋뿐 아니라 강화 단계가 들어 있는 아이템 인스턴스를 가져온다.
+	const FItemInstance* CurrentWeapon = WeaponComponent->GetCurrentWeapon();
 
-	if (!IsValid(WeaponData) || WeaponData->GetWeaponType() != EWeaponType::Sword) return 0.0f;
+	if (CurrentWeapon == nullptr || !IsValid(CurrentWeapon->ItemData) || CurrentWeapon->Quantity <= 0) { return 0.0f; }
+
+	const UWeaponDataAsset* WeaponData = Cast<UWeaponDataAsset>(CurrentWeapon->ItemData.Get());
+
+	if (!IsValid(WeaponData) || WeaponData->GetWeaponType() != EWeaponType::Sword) { return 0.0f; }
 
 	const float MinAttackPower = FMath::Min(StatComponent->GetMinAttackPower(), StatComponent->GetMaxAttackPower());
+	
 	const float MaxAttackPower = FMath::Max(StatComponent->GetMinAttackPower(), StatComponent->GetMaxAttackPower());
+
 	const float CharacterAttackPower = FMath::FRandRange(MinAttackPower, MaxAttackPower);
 
-	return FMath::Max(0.0f, CharacterAttackPower + WeaponData->GetWeaponPower());
+	const float EnhancedWeaponPower = WeaponData->GetEnhancedWeaponPower(CurrentWeapon->EnhanceLevel);
+
+	return FMath::Max(0.0f, CharacterAttackPower + EnhancedWeaponPower);
 }
 
 void UCombatComponent::StartBlock()
