@@ -551,3 +551,29 @@ void UInventoryComponent::ClearInventory()
 
 	OnInventoryChanged.Broadcast();																	// 인벤토리 아이템 목록 변경 이벤트 호출
 }
+
+int32 UInventoryComponent::RefillPotionsToMax()
+{
+	int32 TotalRefilledQuantity = 0;
+
+	for (FItemInstance& InventoryItem : InventoryItems)
+	{
+		if (!IsValid(InventoryItem.ItemData) || InventoryItem.ItemData->GetItemType() != EItemType::Potion)
+		{
+			continue;
+		}
+
+		const int32 MaxStack = FMath::Max(1, InventoryItem.ItemData->GetMaxStack());
+		const int32 RefilledQuantity = FMath::Max(0, MaxStack - InventoryItem.Quantity);
+
+		InventoryItem.Quantity = MaxStack;
+		TotalRefilledQuantity += RefilledQuantity;
+	}
+
+	if (TotalRefilledQuantity > 0)
+	{
+		OnInventoryChanged.Broadcast();
+	}
+
+	return TotalRefilledQuantity;
+}

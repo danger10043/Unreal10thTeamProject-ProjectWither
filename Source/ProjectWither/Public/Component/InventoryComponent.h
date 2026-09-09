@@ -98,6 +98,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void ClearInventory();																			// 인벤토리 전체 초기화
 
+	// 보유 중인 물약(EItemType::Potion) 슬롯의 수량을 각 아이템의 최대 스택 수량으로 채운다 (세이브 포인트 휴식 등에서 사용)
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 RefillPotionsToMax();
+
 	UFUNCTION(BlueprintPure, Category = "Inventory|Gold")
 	FORCEINLINE bool HasEnoughGold(int32 Amount) const { return Amount >= 0 && Gold >= Amount; }	// 가지고 있는 골드가 지정한 금액에 대해 충분한 지 반환
 
