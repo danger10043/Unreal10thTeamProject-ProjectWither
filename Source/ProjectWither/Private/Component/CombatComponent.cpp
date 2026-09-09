@@ -339,6 +339,16 @@ void UCombatComponent::GunAttack()
 		return;
 	}
 
+	const UPlayerCameraComponent* Camera =
+		IsValid(OwnerPlayer)
+		? OwnerPlayer->FindComponentByClass<UPlayerCameraComponent>()
+		: nullptr;
+
+	if (!IsValid(Camera) || !Camera->IsZooming())
+	{
+		return;
+	}
+
 	if (!TrySpendStamina(GunAttackStaminaCost))
 	{
 		UE_LOG(
