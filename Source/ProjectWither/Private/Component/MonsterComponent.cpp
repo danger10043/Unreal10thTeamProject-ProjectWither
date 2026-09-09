@@ -24,6 +24,7 @@
 #include "Components/PrimitiveComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/DamageType.h"
+#include "Equipment/EquipmentComponent.h"
 
 UMonsterComponent::UMonsterComponent()
 {
@@ -451,7 +452,11 @@ void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultipl
 
 	const float BaseDamage = FMath::FRandRange(MinPower, MaxPower);
 
-	const float Defense = FMath::Max(0.0f, TargetStat->GetDefensePower());
+	const UEquipmentComponent* TargetEquipment = HitTarget->FindComponentByClass<UEquipmentComponent>();
+
+	const float ArmorDefense = IsValid(TargetEquipment) ? TargetEquipment->GetArmorDefensePowerBonus() : 0.0f;
+
+	const float Defense = FMath::Max(0.0f, TargetStat->GetDefensePower() + ArmorDefense);
 
 	const float DefenseMultiplier = DefenseScalingConstant / (DefenseScalingConstant + Defense);
 

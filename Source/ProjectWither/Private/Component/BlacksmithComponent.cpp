@@ -7,6 +7,10 @@
 #include "DataAsset/CraftingRecipeDataAsset.h"
 #include "DataAsset/ItemDataAsset.h"
 
+#include "DataAsset/EnhancementDataAsset.h"
+#include "Item/ItemInstance.h"
+#include "CommonHeader/ItemTypeEnums.h"
+
 UBlacksmithComponent::UBlacksmithComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -106,6 +110,167 @@ TArray<UCraftingRecipeDataAsset*> UBlacksmithComponent::GetCraftingRecipes() con
 	return Result;
 }
 
+EEnhancementResult UBlacksmithComponent::CheckEnhancement(UInventoryComponent* Inventory, int32 SlotIndex) const
+{
+	if (!IsValid(Inventory)) { return EEnhancementResult::InvalidInventory; }
+
+	FItemInstance ItemInstance;
+
+	if (!Inventory->GetItemAtSlot(SlotIndex, ItemInstance) || !IsValid(ItemInstance.ItemData) || ItemInstance.Quantity <= 0)
+	{
+		return EEnhancementResult::InvalidItem;
+	}
+
+	const EItemType ItemType = ItemInstance.ItemData->GetItemType();
+
+	// 무기와 방어구만 강화 가능
+	if (ItemType != EItemType::Weapon && ItemType != EItemType::Armor)
+	{
+		return EEnhancementResult::NotEnhanceable;
+	}
+
+	const UEnhancementDataAsset* ActiveEnhancementData = ResolveEnhancementData(ItemInstance);
+
+	if (!IsValid(ActiveEnhancementData))
+	{
+		return EEnhancementResult::InvalidEnhancementData;
+	}
+
+	const int32 CurrentLevel = FMath::Max(0, ItemInstance.EnhanceLevel);
+
+	if (CurrentLevel >= ActiveEnhancementData->MaxEnhanceLevel)
+	{
+		return EEnhancementResult::MaxLevelReached;
+	}
+
+	const int32 TargetLevel = CurrentLevel + 1;
+
+	const FEnhancementLevelCost* EnhancementCost = ActiveEnhancementData->FindCostForTargetLevel(TargetLevel);
+
+	if (EnhancementCost == nullptr || EnhancementCost->GoldCost < 0)
+	{
+		return EEnhancementResult::InvalidEnhancementData;
+	}
+
+	// 같은 재료가 여러 번 등록된 경우 수량을 합친다.
+	TMap<int32, int32> RequiredMaterialCounts;
+
+	for (const FCraftingIngredient& Ingredient : EnhancementCost->RequiredMaterials)
+	{
+		if (!IsValid(Ingredient.ItemData) || Ingredient.Quantity <= 0)
+		{
+			return EEnhancementResult::InvalidEnhancementData;
+		}
+
+		const int32 MaterialId = Ingredient.ItemData->GetItemId();
+
+		RequiredMaterialCounts.FindOrAdd(MaterialId) += Ingredient.Quantity;
+	}
+
+	for (const TPair<int32, int32>& Required : RequiredMaterialCounts)
+	{
+		if (Inventory->GetItemCount(Required.Key) < Required.Value)
+		{
+			return EEnhancementResult::NotEnoughMaterials;
+		}
+	}
+
+	if (!Inventory->HasEnoughGold(EnhancementCost->GoldCost))
+	{
+		return EEnhancementResult::NotEnoughGold;
+	}
+
+	return EEnhancementResult::Success;
+}
+
+EEnhancementResult UBlacksmithComponent::EnhanceItem(UInventoryComponent* Inventory, int32 SlotIndex)
+{
+	const EEnhancementResult CheckResult = CheckEnhancement(Inventory, SlotIndex);
+
+	if (CheckResult != EEnhancementResult::Success)
+	{
+		return CheckResult;
+	}
+
+	FItemInstance ItemInstance;
+
+	if (!Inventory->GetItemAtSlot(SlotIndex, ItemInstance))
+	{
+		return EEnhancementResult::TransactionFailed;
+	}
+
+	const UEnhancementDataAsset* ActiveEnhancementData = ResolveEnhancementData(ItemInstance);
+
+	if (!IsValid(ActiveEnhancementData))
+	{
+		return EEnhancementResult::InvalidEnhancementData;
+	}
+
+	const int32 TargetLevel = FMath::Max(0, ItemInstance.EnhanceLevel) + 1;
+
+	const FEnhancementLevelCost* EnhancementCost = ActiveEnhancementData->FindCostForTargetLevel(TargetLevel);
+
+	if (EnhancementCost == nullptr)
+	{
+		return EEnhancementResult::InvalidEnhancementData;
+	}
+
+	// 강화 재료 소비
+	for (const FCraftingIngredient& Ingredient : EnhancementCost->RequiredMaterials)
+	{
+		const int32 MaterialId = Ingredient.ItemData->GetItemId();
+
+		if (!Inventory->RemoveItem(MaterialId, Ingredient.Quantity))
+		{
+			return EEnhancementResult::TransactionFailed;
+		}
+	}
+
+	// 0골드 강화도 허용
+	if (EnhancementCost->GoldCost > 0 && !Inventory->SpendGold(EnhancementCost->GoldCost))
+	{
+		return EEnhancementResult::TransactionFailed;
+	}
+
+	ItemInstance.EnhanceLevel = TargetLevel;
+
+	if (!Inventory->UpdataItemAtSlot(SlotIndex, ItemInstance))
+	{
+		return EEnhancementResult::TransactionFailed;
+	}
+
+	return EEnhancementResult::Success;
+}
+
+bool UBlacksmithComponent::GetEnhancementCostForSlot(UInventoryComponent* Inventory, int32 SlotIndex, FEnhancementLevelCost& OutCost) const
+{
+	OutCost = FEnhancementLevelCost();
+
+	if (!IsValid(Inventory)) { return false; }
+
+	FItemInstance ItemInstance;
+
+	if (!Inventory->GetItemAtSlot(SlotIndex, ItemInstance)) { return false; }
+
+	const UEnhancementDataAsset* ActiveEnhancementData = ResolveEnhancementData(ItemInstance);
+
+	if (!IsValid(ActiveEnhancementData)) { return false; }
+
+	if (!IsValid(ItemInstance.ItemData) || ItemInstance.Quantity <= 0) { return false; }
+
+	const EItemType ItemType = ItemInstance.ItemData->GetItemType();
+
+	if (ItemType != EItemType::Weapon && ItemType != EItemType::Armor) { return false; }
+
+	const int32 CurrentLevel = FMath::Max(0, ItemInstance.EnhanceLevel);
+
+	if (CurrentLevel >= ActiveEnhancementData->MaxEnhanceLevel) { return false; }
+
+	const int32 TargetLevel = CurrentLevel + 1;
+
+	return ActiveEnhancementData->GetCostForTargetLevel(TargetLevel, OutCost);
+}
+
 void UBlacksmithComponent::BeginPlay()
 {
 	Super::BeginPlay();
@@ -136,5 +301,17 @@ bool UBlacksmithComponent::BuildRequiredMaterialCounts(UCraftingRecipeDataAsset*
 	}
 
 	return true;
+}
+
+const UEnhancementDataAsset* UBlacksmithComponent::ResolveEnhancementData(const FItemInstance& ItemInstance) const
+{
+	if (IsValid(ItemInstance.ItemData))
+	{
+		UEnhancementDataAsset* ItemProfile = ItemInstance.ItemData->GetEnhancementProfile();
+
+		if (IsValid(ItemProfile)) { return ItemProfile; }
+	}
+
+	return IsValid(EnhancementData) ? EnhancementData.Get() : nullptr;
 }
 

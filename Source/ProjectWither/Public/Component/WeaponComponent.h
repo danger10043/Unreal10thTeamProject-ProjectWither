@@ -44,6 +44,8 @@ public:
 	// C++ 전용
 	FItemInstance* GetCurrentWeapon();
 
+	const FItemInstance* GetCurrentWeapon() const;
+
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UWeaponDataAsset* GetCurrentWeaponData() const;
 

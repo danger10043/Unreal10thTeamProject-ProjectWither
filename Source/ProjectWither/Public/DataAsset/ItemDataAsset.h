@@ -7,6 +7,7 @@
 #include "CommonHeader/ItemTypeEnums.h"
 #include "ItemDataAsset.generated.h"
 
+class UEnhancementDataAsset;
 /**
  * 
  */
@@ -40,6 +41,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item" , meta = (ClampMin = "1") )
 	int32 MaxStack = 1;
 
+	// 이 아이템 전용 강화 비용 정보, 설정하지 않으면 대장장이의 기본 강화 데이터를 사용한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item|Enhancement")
+	TObjectPtr<UEnhancementDataAsset> EnhancementProfile = nullptr;
+
 public:
 	UFUNCTION(BlueprintPure, Category = "Item")
 	int32 GetItemId() const;
@@ -64,4 +69,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Item")
 	int32 GetMaxStack() const;
+
+	UFUNCTION(BlueprintPure, Category = "Item|Enhancement")
+	UEnhancementDataAsset* GetEnhancementProfile() const;
 };

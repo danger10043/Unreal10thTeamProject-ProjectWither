@@ -31,6 +31,13 @@ float UWeaponDataAsset::GetWeaponPower() const
 	return WeaponPower;
 }
 
+float UWeaponDataAsset::GetEnhancedWeaponPower(int32 EnhanceLevel) const
+{
+	const int32 SafeEnhanceLevel = FMath::Max(0, EnhanceLevel);
+
+	return FMath::Max(0.0f, WeaponPower + WeaponPowerPerEnhanceLevel * SafeEnhanceLevel);
+}
+
 TSubclassOf<AActor> UWeaponDataAsset::GetWeaponActorClass() const
 {
 	return WeaponActorClass;
