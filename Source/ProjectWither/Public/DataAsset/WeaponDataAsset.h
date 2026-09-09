@@ -34,6 +34,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (ClampMin = "0.0"))	// 무기 공격력
 	float WeaponPower = 0.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Enhancement", meta = (ClampMin = "0.0")) // 강화 단계당 증가하는 공격력
+	float WeaponPowerPerEnhanceLevel = 0.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Actor")
 	TSubclassOf<AActor> WeaponActorClass = nullptr;
 
@@ -67,6 +70,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	float GetWeaponPower() const;
+
+	UFUNCTION(BlueprintPure, Category = "Weapon|Enhancement")
+	float GetEnhancedWeaponPower(int32 EnhanceLevel) const;
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|Actor")
 	TSubclassOf<AActor> GetWeaponActorClass() const;

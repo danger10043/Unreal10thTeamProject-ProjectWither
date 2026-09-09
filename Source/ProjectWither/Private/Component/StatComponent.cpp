@@ -101,12 +101,18 @@ float UStatComponent::RecoverHealth(float Amount)
 	return RecoveredAmount;
 }
 
-float UStatComponent::ApplyDamage(float DamageAmount)
+float UStatComponent::ApplyDamage(float DamageAmount, float FinalDamageMultiplier)
 {
-	if (DamageAmount <= 0.0f || IsHealthZero()) return 0.0f;
+	if (DamageAmount <= 0.0f || FinalDamageMultiplier <= 0.0f || IsHealthZero()) return 0.0f;
+
+	const float Defense = FMath::Max(0.0f, GetDefensePower());
+	const float ScalingConstant = FMath::Max(1.0f, DefenseScalingConstant);
+	const float DamageMultiplier = ScalingConstant / (ScalingConstant + Defense);
+	const float FinalDamage =
+		FMath::Max(1.0f, DamageAmount * DamageMultiplier) * FinalDamageMultiplier;
 
 	const float PreviousHealth = CurrentHealth;
-	CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.0f, MaxHealth);
+	CurrentHealth = FMath::Clamp(CurrentHealth - FinalDamage, 0.0f, MaxHealth);
 
 	const float AppliedDamage = PreviousHealth - CurrentHealth;
 

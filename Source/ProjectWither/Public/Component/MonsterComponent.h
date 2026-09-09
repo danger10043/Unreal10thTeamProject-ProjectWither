@@ -270,10 +270,7 @@ protected:
 	float AttackRangeHysteresis = 100.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
-	float AttackCooldown = 1.0f;	// 공격 간격
-
-	UPROPERTY(EditDefaultsOnly, Category = "Combat", meta = (ClampMin = "1.0"))
-	float DefenseScalingConstant = 100.0f;
+	float AttackCooldown = 1.0f;	// 공격 간격;
 	// -------------------------------------------------------------------------
 
 	// Ranged Attack -------------------------------------------------------------

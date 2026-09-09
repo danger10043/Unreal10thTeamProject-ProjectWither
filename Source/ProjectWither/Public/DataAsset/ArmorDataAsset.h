@@ -27,10 +27,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Armor", meta = (ClampMin = "0.0"))
 	float ArmorDefense = 0.0f;
 
+	// 강화 단계당 증가하는 방어력
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Armor|Enhancement", meta = (ClampMin = "0.0"))
+	float ArmorDefensePerEnhanceLevel = 0.0f;
+
 public:
 	UFUNCTION(BlueprintPure, Category = "Armor")
 	EArmorType GetArmorType() const;
 
 	UFUNCTION(BlueprintPure, Category = "Armor")
 	float GetArmorDefense() const;
+
+	UFUNCTION(BlueprintPure, Category = "Armor|Enhancement")
+	float GetEnhancedArmorDefense(int32 EnhanceLevel) const;
 };

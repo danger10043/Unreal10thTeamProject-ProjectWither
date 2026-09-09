@@ -3,18 +3,26 @@
 #include "Player/PlayerCharacter.h"
 #include "Component/StatComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "Interface/EnemyInterface.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Interface/WeaponComponentUserInterface.h"
 #include "Component/WeaponComponent.h"
 #include "Component/MonsterComponent.h"
+#include "Component/PlayerCameraComponent.h"
+#include "Engine/GameInstance.h"
+#include "Framework/SubSystem/SavePointSubsystem.h"
+#include "CollisionQueryParams.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerStart.h"
 #include "GameFramework/RootMotionSource.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraFunctionLibrary.h"
 
 namespace
 {
@@ -23,7 +31,9 @@ namespace
 
 UCombatComponent::UCombatComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
+	PrimaryComponentTick.TickGroup = TG_PostPhysics;
 }
 
 void UCombatComponent::BeginPlay()
@@ -69,6 +79,8 @@ void UCombatComponent::BeginPlay()
 
 void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	FinishSwordApproach(false);
+
 	EndSwordDamageWindow();
 
 	if (UWorld* World = GetWorld())
@@ -76,6 +88,7 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(ParryTimerHandle);
 		World->GetTimerManager().ClearTimer(ParryCooldownTimerHandle);
 		World->GetTimerManager().ClearTimer(BlockStaminaTimerHandle);
+		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
 	}
 
 	if (IsValid(StatComponent))
@@ -87,6 +100,57 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!bSwordApproaching)
+	{
+		return;
+	}
+
+	if (!IsOwnerAlive() ||
+		ActionState != EPlayerActionState::AttackingWithSword)
+	{
+		FinishSwordApproach(false);
+		return;
+	}
+
+	if (!IsValid(WeaponComponent) ||
+		!WeaponComponent->IsSwordEquipped() ||
+		!IsAttackAssistTarget(AttackApproachTarget.Get()))
+	{
+		FinishSwordApproach(true);
+		return;
+	}
+
+	const FVector Start = OwnerPlayer->GetActorLocation();
+	const FVector Next = FMath::VInterpConstantTo(
+		Start,
+		AttackApproachDestination,
+		DeltaTime,
+		FMath::Max(1.0f, AttackApproachSpeed)
+	);
+
+	if (!IsAttackApproachPathClear(Start, Next))
+	{
+		FinishSwordApproach(true);
+		return;
+	}
+
+	FHitResult MoveHit;
+	OwnerPlayer->SetActorLocation(Next, true, &MoveHit);
+
+	if (MoveHit.bBlockingHit ||
+		FVector::DistSquared(
+			OwnerPlayer->GetActorLocation(),
+			AttackApproachDestination
+		) <= FMath::Square(5.0f))
+	{
+		FinishSwordApproach(true);
+	}
 }
 
 void UCombatComponent::Attack()
@@ -109,15 +173,118 @@ void UCombatComponent::Attack()
 
 void UCombatComponent::SwordAttack()
 {
-	StartAttack(ECombatWeaponType::Sword, EPlayerActionState::AttackingWithSword, SwordAttackStaminaCost);
+	const bool bHasCurrentCombo =
+		SwordComboSections.IsValidIndex(CurrentComboIndex) &&
+		IsCurrentComboSection(SwordComboSections[CurrentComboIndex]);
+
+	if (bHasCurrentCombo &&
+		bNextAttackWindowOpen &&
+		SwordComboSections.IsValidIndex(CurrentComboIndex + 1))
+	{
+		bNextAttackQueued = true;
+		TryAdvanceSwordCombo();
+		return;
+	}
+
+	if (ActionState == EPlayerActionState::AttackingWithSword)
+	{
+		return;
+	}
+
+	CancelSwordRecovery();
+
+	StartAttack(
+		ECombatWeaponType::Sword,
+		EPlayerActionState::AttackingWithSword,
+		SwordAttackStaminaCost
+	);
+}
+
+void UCombatComponent::BeginNextAttackWindow(FName SectionName)
+{
+	if (!IsCurrentComboSection(SectionName))
+	{
+		return;
+	}
+
+	bNextAttackWindowOpen = true;
+}
+
+void UCombatComponent::EndNextAttackWindow(FName SectionName)
+{
+	if (!IsCurrentComboSection(SectionName))
+	{
+		return;
+	}
+
+	bNextAttackWindowOpen = false;
+}
+
+void UCombatComponent::ReachAttackCheckpoint(FName SectionName)
+{
+	if (!IsCurrentComboSection(SectionName))
+	{
+		return;
+	}
+
+	const int32 CheckpointComboIndex = CurrentComboIndex;
+	const uint64 ExecutionId = SwordAttackExecutionId;
+
+	bAttackCheckpointReached = true;
+	TryAdvanceSwordCombo();
+
+	// 예약된 다음 공격이 시작되었거나 현재 공격이 중단되었다면 새 공격에 후딜 적용 안함
+	if (ExecutionId != SwordAttackExecutionId ||
+		CurrentComboIndex != CheckpointComboIndex ||
+		!IsCurrentComboSection(SectionName))
+	{
+		return;
+	}
+
+	EndSwordDamageWindow();
+
+	bSwordRecovery = true;
+	OwnerPlayer->SetCanMove(true);
+	SetActionState(EPlayerActionState::None);
+}
+
+void UCombatComponent::CancelSwordRecovery()
+{
+	if (!bSwordRecovery)
+	{
+		return;
+	}
+
+	++SwordAttackExecutionId;
+
+	ResetSwordCombo();
+	EndSwordDamageWindow();
+
+	USkeletalMeshComponent* Mesh = IsValid(OwnerPlayer)
+		? OwnerPlayer->GetMesh()
+		: nullptr;
+
+	UAnimInstance* AnimInstance = IsValid(Mesh)
+		? Mesh->GetAnimInstance()
+		: nullptr;
+
+	if (IsValid(AnimInstance) && IsValid(SwordAttackMontage))
+	{
+		AnimInstance->Montage_Stop(0.2f, SwordAttackMontage);
+	}
 }
 
 void UCombatComponent::BeginSwordDamageWindow()
 {
+	if (bSwordApproaching)
+	{
+		return;
+	}
+
 	EndSwordDamageWindow();
 
-	if (ActionState != EPlayerActionState::AttackingWithSword 
-		|| !IsValid(WeaponComponent) 
+	if (ActionState != EPlayerActionState::AttackingWithSword
+		|| !IsValid(WeaponComponent)
 		|| !WeaponComponent->IsSwordEquipped()) return;
 
 	UCapsuleComponent* SwordCollision = FindSwordCollision();
@@ -177,6 +344,16 @@ void UCombatComponent::GunAttack()
 		return;
 	}
 
+	const UPlayerCameraComponent* Camera =
+		IsValid(OwnerPlayer)
+		? OwnerPlayer->FindComponentByClass<UPlayerCameraComponent>()
+		: nullptr;
+
+	if (!IsValid(Camera) || !Camera->IsZooming())
+	{
+		return;
+	}
+
 	if (!TrySpendStamina(GunAttackStaminaCost))
 	{
 		UE_LOG(
@@ -197,6 +374,27 @@ void UCombatComponent::GunAttack()
 			TEXT("UCombatComponent::GunAttack - 총기 발사에 실패했습니다.")
 		);
 		return;
+	}
+
+	if (!IsValid(OwnerPlayer) || !IsValid(GunAttackMontage))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - OwnerPlayer 또는 GunAttackMontage가 유효하지 않습니다.")
+		);
+		return;
+	}
+
+	const float PlayedLength = OwnerPlayer->PlayAnimMontage(GunAttackMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("UCombatComponent::GunAttack - 발사 몽타주 재생에 실패했습니다.")
+		);
 	}
 }
 
@@ -235,7 +433,7 @@ void UCombatComponent::Roll()
 	{
 		RollDirection = OwnerPlayer->GetActorForwardVector().GetSafeNormal2D();
 	}
-	
+
 	OwnerPlayer->SetActorRotation(RollDirection.Rotation());
 	OwnerPlayer->SetCanMove(false);
 	SetActionState(EPlayerActionState::Rolling);
@@ -293,12 +491,13 @@ void UCombatComponent::OnRollMontageEnded(UAnimMontage* Montage, bool bInterrupt
 	FinishAction(EPlayerActionState::Rolling);
 }
 
-void UCombatComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+void UCombatComponent::OnAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted, uint64 ExecutionId)
 {
-	if (Montage != SwordAttackMontage) { return; }
+	if (Montage != SwordAttackMontage || ExecutionId != SwordAttackExecutionId) { return; }
 
 	// NotifyEnd가 호출되지 않고 몽타주가 종료됨을 대비
 	EndSwordDamageWindow();
+	ResetSwordCombo();
 
 	if (ActionState != EPlayerActionState::AttackingWithSword) { return; }
 
@@ -315,7 +514,7 @@ void UCombatComponent::HandleSwordCollisionBeginOverlap(
 	AActor* OtherActor,
 	UPrimitiveComponent* OtherComponent,
 	int32 OtherBodyIndex,
-	bool bFromSweep, 
+	bool bFromSweep,
 	const FHitResult& SweepResult)
 {
 	if (ActionState != EPlayerActionState::AttackingWithSword ||
@@ -331,13 +530,56 @@ void UCombatComponent::HandleSwordCollisionBeginOverlap(
 
 	SwordHitActors.Add(OtherActor);
 	
-	UGameplayStatics::ApplyDamage(
+	const UWeaponDataAsset* WeaponData =
+		IsValid(WeaponComponent)
+		? WeaponComponent->GetCurrentWeaponData()
+		: nullptr;
+
+	UNiagaraSystem* HitEffect =
+		IsValid(WeaponData) ? WeaponData->GetWeaponHitEffect() : nullptr;
+
+	FVector EffectLocation = IsValid(OverlappedComponent)
+		? OverlappedComponent->GetComponentLocation()
+		: OtherActor->GetActorLocation();
+
+	if (bFromSweep && !SweepResult.bStartPenetrating)
+	{
+		EffectLocation = SweepResult.ImpactPoint;
+	}
+	else if (IsValid(OtherComponent))
+	{
+		FVector ClosestPoint;
+		const float Distance = OtherComponent->GetClosestPointOnCollision(
+			EffectLocation,
+			ClosestPoint
+		);
+
+		if (Distance > 0.0f)
+		{
+			EffectLocation = ClosestPoint;
+		}
+	}
+
+	const float AppliedDamage = UGameplayStatics::ApplyDamage(
 		OtherActor,
 		SwordDamage,
 		IsValid(OwnerPlayer) ? OwnerPlayer->GetController() : nullptr,
 		OwnerPlayer,
 		UDamageType::StaticClass()
 	);
+
+	if (AppliedDamage > 0.0f && IsValid(HitEffect))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			HitEffect,
+			EffectLocation,
+			FRotator::ZeroRotator,
+			FVector::OneVector,
+			true,
+			true
+		);
+	}
 }
 
 UCapsuleComponent* UCombatComponent::FindSwordCollision() const
@@ -364,17 +606,26 @@ UCapsuleComponent* UCombatComponent::FindSwordCollision() const
 
 float UCombatComponent::CalculateSwordDamage() const
 {
-	if (!IsValid(StatComponent) || !IsValid(WeaponComponent)) return 0.0f;
+	if (!IsValid(StatComponent) || !IsValid(WeaponComponent)) { return 0.0f; }
 
-	const UWeaponDataAsset* WeaponData = WeaponComponent->GetCurrentWeaponData();
+	// 데이터 에셋뿐 아니라 강화 단계가 들어 있는 아이템 인스턴스를 가져온다.
+	const FItemInstance* CurrentWeapon = WeaponComponent->GetCurrentWeapon();
 
-	if (!IsValid(WeaponData) || WeaponData->GetWeaponType() != EWeaponType::Sword) return 0.0f;
+	if (CurrentWeapon == nullptr || !IsValid(CurrentWeapon->ItemData) || CurrentWeapon->Quantity <= 0) { return 0.0f; }
+
+	const UWeaponDataAsset* WeaponData = Cast<UWeaponDataAsset>(CurrentWeapon->ItemData.Get());
+
+	if (!IsValid(WeaponData) || WeaponData->GetWeaponType() != EWeaponType::Sword) { return 0.0f; }
 
 	const float MinAttackPower = FMath::Min(StatComponent->GetMinAttackPower(), StatComponent->GetMaxAttackPower());
+	
 	const float MaxAttackPower = FMath::Max(StatComponent->GetMinAttackPower(), StatComponent->GetMaxAttackPower());
+
 	const float CharacterAttackPower = FMath::FRandRange(MinAttackPower, MaxAttackPower);
 
-	return FMath::Max(0.0f, CharacterAttackPower + WeaponData->GetWeaponPower());
+	const float EnhancedWeaponPower = WeaponData->GetEnhancedWeaponPower(CurrentWeapon->EnhanceLevel);
+
+	return FMath::Max(0.0f, CharacterAttackPower + EnhancedWeaponPower);
 }
 
 void UCombatComponent::StartBlock()
@@ -425,6 +676,11 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 {
 	if (!IsOwnerAlive() || DamageAmount <= 0.0f) { return 0.0f; }
 
+	if (ActionState == EPlayerActionState::Rolling)
+	{
+		return 0.0f;
+	}
+
 	if (ActionState == EPlayerActionState::Blocking)
 	{
 		const bool bWasParry = bParryWindowOpen;
@@ -434,6 +690,20 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 			if (bWasParry)
 			{
 				CloseParryWindow();
+
+				if (IsValid(OwnerPlayer) && IsValid(ParryMontage))
+				{
+					const float PlayedLength = OwnerPlayer->PlayAnimMontage(ParryMontage);
+
+					if (PlayedLength <= 0.0f)
+					{
+						UE_LOG(
+							LogTemp,
+							Warning,
+							TEXT("UCombatComponent::ReceiveHit - 패링 몽타주 재생에 실패했습니다.")
+						);
+					}
+				}
 
 				OnParrySucceeded();
 
@@ -459,7 +729,12 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 				StopBlock();
 			}
 
-			return 0.0f;
+			if (bWasParry)
+			{
+				return 0.0f;
+			}
+
+			return StatComponent->ApplyDamage(DamageAmount, 0.5f);
 		}
 
 		// 공격을 막을 비용이 부족하므로 가드 실패
@@ -480,8 +755,6 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 		StartHitReaction();
 		OnHitReceived();
 	}
-
-	OnHitReceived();
 
 	return AppliedDamage;
 }
@@ -521,6 +794,7 @@ void UCombatComponent::Die()
 	if (!IsValid(AnimInstance))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("CombatComponent::Die - AnimInstance가 유효하지 않습니다."));
+		ScheduleRespawn();
 		return;
 	}
 
@@ -529,6 +803,7 @@ void UCombatComponent::Die()
 	if (!IsValid(DeathMontage))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("CombatComponent::Die - Death Montage가 유효하지 않습니다."));
+		ScheduleRespawn();
 		return;
 	}
 
@@ -536,8 +811,122 @@ void UCombatComponent::Die()
 	if (PlayedLength <= 0.0f)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("CombatComponent::Die - Death Montage 재생에 실패했습니다."));
+		ScheduleRespawn();
 		return;
 	}
+
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(this, &UCombatComponent::OnDeathMontageEnded);
+
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, DeathMontage);
+
+	// 사망 몽타주 마지막 프레임을 홀드/루프하도록 만들어서 Montage_SetEndDelegate가
+	// 끝내 호출되지 않는 경우를 대비한 백업 타이머. 델리게이트가 먼저 호출되면
+	// HandleRespawn의 ActionState 검사로 인해 이 타이머는 아무 효과 없이 무시된다.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			RespawnTimerHandle,
+			this,
+			&UCombatComponent::HandleRespawn,
+			PlayedLength,
+			false
+		);
+	}
+}
+
+void UCombatComponent::OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != DeathMontage) return;
+	if (ActionState != EPlayerActionState::Dead) return;
+
+	HandleRespawn();
+}
+
+void UCombatComponent::ScheduleRespawn()
+{
+	UWorld* World = GetWorld();
+
+	if (!IsValid(World))
+	{
+		HandleRespawn();
+		return;
+	}
+
+	// Die()는 StatComponent::ApplyDamage() 안에서 OnHealthZero 델리게이트로 동기 호출된다.
+	// 여기서 바로 HandleRespawn()을 부르면 ApplyDamage()가 아직 실행 중인 상태에서
+	// 체력/행동 상태가 되돌아가 버려서, 뒤이은 피격 처리(히트 리액션 등)가 방금 되돌린
+	// 상태를 다시 덮어쓰는 문제가 생긴다. 다음 틱으로 미뤄서 호출 스택을 완전히 빠져나온 뒤 부활시킨다.
+	World->GetTimerManager().SetTimerForNextTick(this, &UCombatComponent::HandleRespawn);
+}
+
+void UCombatComponent::HandleRespawn()
+{
+	if (!IsValid(OwnerPlayer)) return;
+
+	// 몽타주 종료 델리게이트와 백업 타이머 중 먼저 호출된 쪽만 실제로 부활을 처리하도록 방지
+	if (ActionState != EPlayerActionState::Dead) return;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RespawnTimerHandle);
+	}
+
+	// 사망 몽타주가 자연 종료되지 않고 마지막 프레임을 계속 재생 중일 수 있으므로
+	// 로코모션으로 되돌아갈 수 있도록 명시적으로 멈춘다.
+	if (UAnimInstance* AnimInstance = OwnerPlayer->GetMesh() ? OwnerPlayer->GetMesh()->GetAnimInstance() : nullptr)
+	{
+		AnimInstance->StopAllMontages(0.0f);
+	}
+
+	FTransform RespawnTransform;
+	bool bHasRespawnTransform = false;
+
+	if (UGameInstance* GameInstance = OwnerPlayer->GetGameInstance())
+	{
+		if (USavePointSubsystem* SavePointSubsystem = GameInstance->GetSubsystem<USavePointSubsystem>())
+		{
+			if (SavePointSubsystem->HasCurrentSavePoint())
+			{
+				RespawnTransform = SavePointSubsystem->GetCurrentSavePointTransform();
+				bHasRespawnTransform = true;
+			}
+		}
+	}
+
+	// 활성화된 세이브 포인트가 아직 없으면 죽은 자리 대신 레벨의 PlayerStart로 부활한다.
+	if (!bHasRespawnTransform)
+	{
+		if (AActor* PlayerStart = UGameplayStatics::GetActorOfClass(this, APlayerStart::StaticClass()))
+		{
+			RespawnTransform = PlayerStart->GetActorTransform();
+			bHasRespawnTransform = true;
+		}
+	}
+
+	if (bHasRespawnTransform)
+	{
+		if (UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement())
+		{
+			Movement->StopMovementImmediately();
+		}
+
+		OwnerPlayer->SetActorLocationAndRotation(
+			RespawnTransform.GetLocation(),
+			RespawnTransform.GetRotation(),
+			false,
+			nullptr,
+			ETeleportType::TeleportPhysics);
+	}
+	// PlayerStart조차 없으면 최후의 수단으로 죽은 자리에서 그대로 부활한다.
+
+	if (IsValid(StatComponent))
+	{
+		StatComponent->ResetStat();
+	}
+
+	OwnerPlayer->SetCanMove(true);
+	SetActionState(EPlayerActionState::None);
 }
 
 void UCombatComponent::FinishAction(EPlayerActionState ExpectedState)
@@ -688,17 +1077,54 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 
 	if (!IsValid(AnimInstance)) { return; }
 
-	if (!TrySpendStamina(StaminaCost))
+	if (SwordComboSections.IsEmpty())
 	{
-		UE_LOG( LogTemp, Warning, TEXT("공격에 필요한 스태미나가 부족합니다."));
 		return;
 	}
+
+	TSet<FName> CheckedSections;
+	for (const FName SectionName : SwordComboSections)
+	{
+		if (SectionName.IsNone() ||
+			CheckedSections.Contains(SectionName) ||
+			SwordAttackMontage->GetSectionIndex(SectionName) == INDEX_NONE)
+		{
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("CombatComponent::StartAttack - 검 콤보 섹션 설정 오류 : %s"),
+				*SectionName.ToString()
+			);
+			return;
+		}
+		CheckedSections.Add(SectionName);
+	}
+
+	if (!IsValid(StatComponent) || !StatComponent->HasEnoughStamina(StaminaCost))
+	{
+		return;
+	}
+
+	if (!TrySpendStamina(StaminaCost))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("공격에 필요한 스태미나가 부족합니다."));
+		return;
+	}
+
+	const uint64 ExecutionId = ++SwordAttackExecutionId;
 
 	// SetCanMove(false) 내부에서 달리기도 종료됩니다.
 	OwnerPlayer->SetCanMove(false);
 	SetActionState(AttackState);
 
-	const float PlayedLength = OwnerPlayer->PlayAnimMontage(SwordAttackMontage);
+	ResetSwordCombo();
+	CurrentComboIndex = 0;
+
+	const float PlayedLength = OwnerPlayer->PlayAnimMontage(
+		SwordAttackMontage,
+		1.0f,
+		SwordComboSections[0]
+	);
 
 	if (PlayedLength <= 0.0f)
 	{
@@ -710,11 +1136,403 @@ void UCombatComponent::StartAttack(ECombatWeaponType RequiredWeapon, EPlayerActi
 
 	FOnMontageEnded EndDelegate;
 
-	EndDelegate.BindUObject( this, &UCombatComponent::OnAttackMontageEnded);
+	EndDelegate.BindUObject(
+		this,
+		&UCombatComponent::OnAttackMontageEnded,
+		ExecutionId
+	);
 
-	AnimInstance->Montage_SetEndDelegate( EndDelegate, SwordAttackMontage);
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, SwordAttackMontage);
+
+	for (const FName SectionName : SwordComboSections)
+	{
+		AnimInstance->Montage_SetNextSection(
+			SectionName,
+			NAME_None,
+			SwordAttackMontage
+		);
+	}
 
 	OnAttackStarted(RequiredWeapon);
+
+	BeginSwordApproach();
+}
+
+bool UCombatComponent::IsCurrentComboSection(FName SectionName) const
+{
+
+	const bool bCanContinueCombo =
+		ActionState == EPlayerActionState::AttackingWithSword ||
+		(ActionState == EPlayerActionState::None && bSwordRecovery);
+
+	if (bSwordApproaching ||
+		!bCanContinueCombo ||
+		!IsOwnerAlive() ||
+		!IsValid(WeaponComponent) ||
+		!WeaponComponent->IsSwordEquipped() ||
+		!IsValid(SwordAttackMontage) ||
+		!SwordComboSections.IsValidIndex(CurrentComboIndex) ||
+		SwordComboSections[CurrentComboIndex] != SectionName)
+	{
+		return false;
+	}
+
+	USkeletalMeshComponent* Mesh = OwnerPlayer->GetMesh();
+	UAnimInstance* AnimInstance = IsValid(Mesh)
+		? Mesh->GetAnimInstance()
+		: nullptr;
+
+	return IsValid(AnimInstance) &&
+		AnimInstance->Montage_IsPlaying(SwordAttackMontage) &&
+		AnimInstance->Montage_GetCurrentSection(SwordAttackMontage) == SectionName;
+}
+
+void UCombatComponent::TryAdvanceSwordCombo()
+{
+	if (!bNextAttackQueued ||
+		!bAttackCheckpointReached ||
+		!SwordComboSections.IsValidIndex(CurrentComboIndex) ||
+		!SwordComboSections.IsValidIndex(CurrentComboIndex + 1))
+	{
+		return;
+	}
+
+	if (!IsCurrentComboSection(SwordComboSections[CurrentComboIndex]))
+	{
+		return;
+	}
+
+	if (!IsValid(StatComponent) || !StatComponent->HasEnoughStamina(SwordAttackStaminaCost))
+	{
+		bNextAttackQueued = false;
+		return;
+	}
+
+	UAnimInstance* AnimInstance = OwnerPlayer->GetMesh()->GetAnimInstance();
+
+	if (!TrySpendStamina(SwordAttackStaminaCost))
+	{
+		bNextAttackQueued = false;
+		return;
+	}
+
+	EndSwordDamageWindow();
+
+	const int32 NextIndex = CurrentComboIndex + 1;
+	ResetSwordCombo();
+	CurrentComboIndex = NextIndex;
+
+	OwnerPlayer->SetCanMove(false);
+	SetActionState(EPlayerActionState::AttackingWithSword);
+
+	AnimInstance->Montage_JumpToSection(
+		SwordComboSections[CurrentComboIndex],
+		SwordAttackMontage
+	);
+
+	BeginSwordApproach();
+}
+
+void UCombatComponent::ResetSwordCombo()
+{
+	CurrentComboIndex = INDEX_NONE;
+	bNextAttackWindowOpen = false;
+	bNextAttackQueued = false;
+	bAttackCheckpointReached = false;
+	bSwordRecovery = false;
+}
+
+bool UCombatComponent::IsAttackAssistTarget(AActor* Target) const
+{
+	if (!IsValid(OwnerPlayer) ||
+		!IsValid(Target) ||
+		Target == OwnerPlayer.Get() ||
+		Target->IsHidden() ||
+		!Target->GetActorEnableCollision() ||
+		!Target->GetClass()->ImplementsInterface(UEnemyInterface::StaticClass()))
+	{
+		return false;
+	}
+
+	const UMonsterComponent* Monster =
+		Target->FindComponentByClass<UMonsterComponent>();
+
+	if (IsValid(Monster) && Monster->IsDead())
+	{
+		return false;
+	}
+
+	const FVector Difference =
+		Target->GetActorLocation() - OwnerPlayer->GetActorLocation();
+
+	return AttackSearchRadius > 0.0f &&
+		Difference.SizeSquared() <= FMath::Square(AttackSearchRadius) &&
+		FMath::Abs(Difference.Z) <= AttackTargetHeightTolerance;
+}
+
+AActor* UCombatComponent::FindAttackAssistTarget() const
+{
+	if (!IsValid(OwnerPlayer) || !GetWorld() || AttackSearchRadius <= 0.0f)
+	{
+		return nullptr;
+	}
+
+	const UPlayerCameraComponent* Camera =
+		OwnerPlayer->FindComponentByClass<UPlayerCameraComponent>();
+
+	if (IsValid(Camera))
+	{
+		AActor* LockedTarget = Camera->GetLockOnTarget();
+		if (IsAttackAssistTarget(LockedTarget))
+		{
+			return LockedTarget;
+		}
+	}
+
+	TArray<FOverlapResult> Overlaps;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(OwnerPlayer.Get());
+
+	GetWorld()->OverlapMultiByObjectType(
+		Overlaps,
+		OwnerPlayer->GetActorLocation(),
+		FQuat::Identity,
+		FCollisionObjectQueryParams::AllObjects,
+		FCollisionShape::MakeSphere(AttackSearchRadius),
+		Params
+	);
+
+	AActor* ClosestTarget = nullptr;
+	double ClosetDistanceSquared = TNumericLimits<double>::Max();
+
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* Candidate = Overlap.GetActor();
+		if (!IsAttackAssistTarget(Candidate))
+		{
+			continue;
+		}
+
+		const double DistanceSquared = FVector::DistSquared(
+			OwnerPlayer->GetActorLocation(),
+			Candidate->GetActorLocation()
+		);
+
+		if (DistanceSquared < ClosetDistanceSquared)
+		{
+			ClosetDistanceSquared = DistanceSquared;
+			ClosestTarget = Candidate;
+		}
+	}
+
+	return ClosestTarget;
+}
+
+bool UCombatComponent::IsAttackApproachPathClear(const FVector& Start, const FVector& End) const
+{
+	if (!IsValid(OwnerPlayer) || !GetWorld())
+	{
+		return false;
+	}
+
+	const UCapsuleComponent* Capsule = OwnerPlayer->GetCapsuleComponent();
+	const UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement();
+
+	if (!IsValid(Capsule) ||
+		!IsValid(Movement) ||
+		!OwnerPlayer->GetActorEnableCollision() ||
+		!Capsule->IsQueryCollisionEnabled())
+	{
+		return false;
+	}
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(OwnerPlayer.Get());
+
+	if (IsValid(WeaponComponent))
+	{
+		if (AActor* Weapon = WeaponComponent->GetWeaponActor())
+		{
+			Params.AddIgnoredActor(Weapon);
+		}
+	}
+
+	const FCollisionResponseParams Responses(Capsule->GetCollisionResponseToChannels());
+
+	const float Radius = Capsule->GetScaledCapsuleRadius();
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+
+	FHitResult BodyHit;
+	if (GetWorld()->SweepSingleByChannel(
+		BodyHit,
+		Start,
+		End,
+		Capsule->GetComponentQuat(),
+		Capsule->GetCollisionObjectType(),
+		FCollisionShape::MakeCapsule(Radius, HalfHeight),
+		Params,
+		Responses
+	))
+	{
+		return false;
+	}
+
+	const int32 Samples = FMath::Max(1, FMath::CeilToInt(FVector::Distance(Start, End) / 20.0f));
+
+	for (int32 Index = 0; Index <= Samples; ++Index)
+	{
+		const FVector Position = FMath::Lerp(
+			Start,
+			End,
+			static_cast<float>(Index) / Samples
+		);
+
+		const FVector Feet = Position - FVector(0.0f, 0.0f, HalfHeight);
+		FHitResult FloorHit;
+
+		if (!GetWorld()->LineTraceSingleByChannel(
+			FloorHit,
+			Feet + FVector(0.0f, 0.0f, 10.0f),
+			Feet - FVector(0.0f, 0.0f, 15.0f),
+			Capsule->GetCollisionObjectType(),
+			Params,
+			Responses
+		) || !Movement->IsWalkable(FloorHit))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void UCombatComponent::BeginSwordApproach()
+{
+	if (!IsOwnerAlive() ||
+		ActionState != EPlayerActionState::AttackingWithSword ||
+		!IsValid(SwordAttackMontage))
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* Mesh = OwnerPlayer->GetMesh();
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+	UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement();
+
+	if (!IsValid(AnimInstance) ||
+		!IsValid(Movement) ||
+		!Movement->IsWalking() ||
+		!AnimInstance->Montage_IsPlaying(SwordAttackMontage))
+	{
+		return;
+	}
+
+	AActor* Target = FindAttackAssistTarget();
+	if (!IsValid(Target))
+	{
+		return;
+	}
+
+	const FVector Start = OwnerPlayer->GetActorLocation();
+	const FVector ToTarget = Target->GetActorLocation() - Start;
+	const FVector Direction = ToTarget.GetSafeNormal2D();
+
+	if (Direction.IsNearlyZero())
+	{
+		return;
+	}
+
+	float TargetRadius = 0.0f;
+	float TargetHalfHeight = 0.0f;
+	Target->GetSimpleCollisionCylinder(TargetRadius, TargetHalfHeight);
+
+	const float StopDistance =
+		OwnerPlayer->GetCapsuleComponent()->GetScaledCapsuleRadius() +
+		TargetRadius +
+		FMath::Max(0.0f, AttackApproachGap);
+
+	const float TravelDistance =
+		FMath::Max(0.0f, static_cast<float>(ToTarget.Size2D()) - StopDistance);
+
+	if (TravelDistance <= 5.0f)
+	{
+		OwnerPlayer->SetActorRotation(
+			FRotator(0.0f, Direction.Rotation().Yaw, 0.0f)
+		);
+		return;
+	}
+
+	const FVector Destination = Start + Direction * TravelDistance;
+	if (!IsAttackApproachPathClear(Start, Destination))
+	{
+		return;
+	}
+	EndSwordDamageWindow();
+
+	AttackApproachTarget = Target;
+	AttackApproachDestination = Destination;
+	bSwordApproaching = true;
+
+	AnimInstance->Montage_Pause(SwordAttackMontage);
+	Movement->StopMovementImmediately();
+	Movement->DisableMovement();
+
+	SetComponentTickEnabled(true);
+}
+
+void UCombatComponent::FinishSwordApproach(bool bResumeAttack)
+{
+	if (!bSwordApproaching)
+	{
+		return;
+	}
+
+	bSwordApproaching = false;
+	SetComponentTickEnabled(false);
+
+	AActor* Target = AttackApproachTarget.Get();
+	AttackApproachTarget.Reset();
+
+	if (!IsValid(OwnerPlayer))
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* Movement = OwnerPlayer->GetCharacterMovement();
+	if (IsValid(Movement) && Movement->MovementMode == MOVE_None)
+	{
+		Movement->SetMovementMode(MOVE_Walking);
+	}
+
+	USkeletalMeshComponent* Mesh = OwnerPlayer->GetMesh();
+	UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+
+	if (!IsValid(AnimInstance) || !IsValid(SwordAttackMontage))
+	{
+		return;
+	}
+
+	if (!bResumeAttack)
+	{
+		++SwordAttackExecutionId;
+		AnimInstance->Montage_Stop(0.0f, SwordAttackMontage);
+		return;
+	}
+
+	if (IsAttackAssistTarget(Target))
+	{
+		const FVector Direction =
+			(Target->GetActorLocation() - OwnerPlayer->GetActorLocation()).GetSafeNormal2D();
+
+		if (!Direction.IsNearlyZero())
+		{
+			OwnerPlayer->SetActorRotation(
+				FRotator(0.0f, Direction.Rotation().Yaw, 0.0f)
+			);
+		}
+	}
+
+	AnimInstance->Montage_Resume(SwordAttackMontage);
 }
 
 void UCombatComponent::OpenParryWindow()
@@ -771,6 +1589,28 @@ void UCombatComponent::SetActionState(EPlayerActionState State)
 	if (ActionState == State) return;
 
 	const EPlayerActionState PreviousState = ActionState;
+
+	if (bSwordApproaching && State != EPlayerActionState::AttackingWithSword)
+	{
+		FinishSwordApproach(false);
+	}
+
+	const bool bEnteringSwordRecovery =
+		PreviousState == EPlayerActionState::AttackingWithSword &&
+		State == EPlayerActionState::None &&
+		bSwordRecovery;
+
+	if (bSwordRecovery && !bEnteringSwordRecovery)
+	{
+		CancelSwordRecovery();
+	}
+
+	if (PreviousState == EPlayerActionState::AttackingWithSword && !bEnteringSwordRecovery)
+	{
+		ResetSwordCombo();
+		EndSwordDamageWindow();
+	}
+
 	ActionState = State;
 
 	OnActionStateChangedEvent.Broadcast(PreviousState, ActionState);

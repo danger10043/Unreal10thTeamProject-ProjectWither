@@ -473,18 +473,11 @@ void UMonsterComponent::ApplyAttackDamage(AActor* HitTarget, float AttackMultipl
 
 	const float BaseDamage = FMath::FRandRange(MinPower, MaxPower);
 
-	const float Defense = FMath::Max(0.0f, TargetStat->GetDefensePower());
-
-	const float DefenseMultiplier = DefenseScalingConstant / (DefenseScalingConstant + Defense);
-
-	const float FinalDamage = FMath::Max(1.0f,
-		BaseDamage *
-		FMath::Max(0.0f, AttackMultiplier) *
-		DefenseMultiplier);
+	const float RawDamage = BaseDamage * FMath::Max(0.0f, AttackMultiplier);
 
 	UGameplayStatics::ApplyDamage(
 		HitTarget,
-		FinalDamage,
+		RawDamage,
 		GetOwner()->GetInstigatorController(),
 		GetOwner(),
 		UDamageType::StaticClass());

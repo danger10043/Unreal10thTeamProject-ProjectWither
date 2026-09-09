@@ -11,6 +11,7 @@
 
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "Blueprint/UserWidget.h"
 
 UInteractionComponent::UInteractionComponent()
 {
@@ -43,24 +44,164 @@ AActor* UInteractionComponent::GetInteractionTarget() const
 	return CurrentTarget.Get();
 }
 
+bool UInteractionComponent::OpenInteractionUI(AActor* Target, TSubclassOf<UUserWidget> WidgetClass)
+{
+	if (IsInteractionUIOpen() || !CanPlayerInteract() || !IsValid(Target) || !IsValid(WidgetClass.Get()))
+	{
+		return false;
+	}
+
+	if (!Target->GetClass()->ImplementsInterface(UInteractableInterface::StaticClass()))
+	{
+		return false;
+	}
+
+	if (!IInteractableInterface::Execute_CanInteract(Target, OwnerPlayer.Get()))
+	{
+		return false;
+	}
+
+	APlayerController* PlayerController = Cast<APlayerController>(OwnerPlayer->GetController());
+
+	if (!IsValid(PlayerController))
+	{
+		return false;
+	}
+
+	UUserWidget* NewWidget = CreateWidget<UUserWidget>(PlayerController, WidgetClass);
+
+	if (!IsValid(NewWidget))
+	{
+		return false;
+	}
+
+	InteractionWidget = NewWidget;
+	ActiveInteractionTarget = Target;
+
+	// 상호작용 안내 문구 숨기기
+	CurrentTarget.Reset();
+
+	// 이동과 달리기 중단
+	OwnerPlayer->SetCanMove(false);
+
+	// Esc 등 키보드 입력을 받을 수 있게 설정
+	InteractionWidget->SetIsFocusable(true);
+	InteractionWidget->AddToViewport(10);
+
+	PlayerController->bShowMouseCursor = true;
+
+	FInputModeUIOnly InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetWidgetToFocus(InteractionWidget->TakeWidget());
+
+	PlayerController->SetInputMode(InputMode);
+
+	return true;
+}
+
+void UInteractionComponent::CloseInteractionUI()
+{
+	if (!IsInteractionUIOpen())
+	{
+		return;
+	}
+
+	// 위젯 제거 중 발생할 수 있는 중복 종료 요청 방지
+	UUserWidget* WidgetToRemove = InteractionWidget.Get();
+
+	InteractionWidget = nullptr;
+	ActiveInteractionTarget.Reset();
+	CurrentTarget.Reset();
+
+	WidgetToRemove->RemoveFromParent();
+
+	if (!IsValid(OwnerPlayer))
+	{
+		return;
+	}
+
+	if (APlayerController* PlayerController = Cast<APlayerController>(OwnerPlayer->GetController()))
+	{
+		PlayerController->bShowMouseCursor = false;
+
+		FInputModeGameOnly InputMode;
+		PlayerController->SetInputMode(InputMode);
+	}
+
+	const UStatComponent* Stat = OwnerPlayer->FindComponentByClass<UStatComponent>();
+
+	const UCombatComponent* Combat = OwnerPlayer->FindComponentByClass<UCombatComponent>();
+
+	// 피격·사망 처리에서 잠근 이동을 임의로 풀지 않는다.
+	if (IsValid(Stat) && !Stat->IsHealthZero() && IsValid(Combat) && Combat->GetActionState() == EPlayerActionState::None)
+	{
+		OwnerPlayer->SetCanMove(true);
+	}
+}
+
+bool UInteractionComponent::IsInteractionUIOpen() const
+{
+	return IsValid(InteractionWidget);
+}
+
 
 void UInteractionComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	
 	OwnerPlayer = Cast<APlayerCharacter>(GetOwner());
+
+	if (IsValid(OwnerPlayer))
+	{
+		if (UStatComponent* Stat = OwnerPlayer->FindComponentByClass<UStatComponent>())
+		{
+			Stat->OnHealthChanged.AddUniqueDynamic(this, &UInteractionComponent::HandleHealthChanged);
+		}
+	}
 }
 
 void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if (IsInteractionUIOpen())
+	{
+		CurrentTarget.Reset();
+
+		AActor* Target = ActiveInteractionTarget.Get();
+
+		// NPC가 사라지거나 상호작용 거리를 벗어나면 종료
+		if (!IsValid(OwnerPlayer) || !IsValid(Target) || !IInteractableInterface::Execute_CanInteract(Target, OwnerPlayer.Get()))
+		{
+			CloseInteractionUI();
+		}
+
+		return;
+	}
+
 	// 감지만 반복하고 상호작용은 실행하지 않는다.
 	CurrentTarget = FindInteractionTarget();
 }
 
+void UInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (IsValid(OwnerPlayer))
+	{
+		if (UStatComponent* Stat = OwnerPlayer->FindComponentByClass<UStatComponent>())
+		{
+			Stat->OnHealthChanged.RemoveDynamic(this, &UInteractionComponent::HandleHealthChanged);
+		}
+	}
+
+	CloseInteractionUI();
+
+	Super::EndPlay(EndPlayReason);
+}
+
 bool UInteractionComponent::CanPlayerInteract() const
 {
+	if (IsInteractionUIOpen())  { return false; }
+
 	if (!IsValid(OwnerPlayer) || !OwnerPlayer->IsLocallyControlled()) { return false; }
 
 	if (!OwnerPlayer->CanMove() || OwnerPlayer->IsInventoryOpen()) { return false; }
@@ -134,5 +275,13 @@ AActor* UInteractionComponent::FindInteractionTarget() const
 	}
 
 	return HitActor;
+}
+
+void UInteractionComponent::HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount)
+{
+	if (ChangedAmount < 0.0f)
+	{
+		CloseInteractionUI();
+	}
 }
 

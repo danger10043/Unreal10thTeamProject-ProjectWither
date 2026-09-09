@@ -221,6 +221,11 @@ FItemInstance* UWeaponComponent::GetCurrentWeapon()
 	return IsValid(GetCurrentWeaponData()) ? &CurrentWeapon : nullptr;
 }
 
+const FItemInstance* UWeaponComponent::GetCurrentWeapon() const
+{
+	return IsValid(GetCurrentWeaponData()) ? &CurrentWeapon : nullptr;
+}
+
 UWeaponDataAsset* UWeaponComponent::GetCurrentWeaponData() const
 {
 	if (CurrentWeapon.Quantity <= 0 || !IsValid(CurrentWeapon.ItemData.Get()))
@@ -383,7 +388,7 @@ bool UWeaponComponent::FireGun()
 			FMath::FRandRange(
 				MinAttackPower,
 				MaxAttackPower
-			) + WeaponData->GetWeaponPower()
+			) + WeaponData->GetEnhancedWeaponPower(CurrentWeapon.EnhanceLevel)
 		);
 
 	if (!RangedWeapon->Fire(FireContext))
@@ -452,6 +457,29 @@ bool UWeaponComponent::Reload()
 int32 UWeaponComponent::GetCurrentAmmo() const
 {
 	return IsGunEquipped() ? FMath::Max(0, CurrentWeapon.CurrentAmmo) : 0;
+}
+
+bool UWeaponComponent::RefillCurrentWeaponAmmo()
+{
+	const UWeaponDataAsset* WeaponData = GetCurrentWeaponData();
+
+	if (!WeaponData || WeaponData->GetWeaponType() != EWeaponType::Gun)
+	{
+		return false;
+	}
+
+	const int32 MaxAmmo = FMath::Max(0, WeaponData->GetMaxAmmo());
+
+	if (CurrentWeapon.CurrentAmmo >= MaxAmmo)
+	{
+		return false;
+	}
+
+	CurrentWeapon.CurrentAmmo = MaxAmmo;
+	SyncCurrentWeaponToEquipment();
+	OnWeaponChanged.Broadcast();
+
+	return true;
 }
 
 bool UWeaponComponent::SaveCurrentWeaponToInventory()

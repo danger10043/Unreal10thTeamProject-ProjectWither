@@ -16,10 +16,9 @@ namespace
 			return 0.0f;
 		}
 
-		const UArmorDataAsset* ArmorData =
-			Cast<UArmorDataAsset>(EquipmentItem.ItemData.Get());
+		const UArmorDataAsset* ArmorData = Cast<UArmorDataAsset>(EquipmentItem.ItemData.Get());
 
-		return IsValid(ArmorData) ? FMath::Max(0.0f, ArmorData->GetArmorDefense()) : 0.0f;
+		return IsValid(ArmorData) ? ArmorData->GetEnhancedArmorDefense(EquipmentItem.EnhanceLevel) : 0.0f;
 	}
 }
 
@@ -340,17 +339,20 @@ FItemInstance UEquipmentComponent::GetEquippedBoots() const
 float UEquipmentComponent::GetWeaponAttackPowerBonus() const
 {
 	const AActor* OwnerActor = GetOwner();
-	const UWeaponComponent* WeaponComponent =
-		IsValid(OwnerActor)
-		? OwnerActor->FindComponentByClass<UWeaponComponent>()
-		: nullptr;
 
-	const UWeaponDataAsset* CurrentWeaponData =
-		IsValid(WeaponComponent)
-		? WeaponComponent->GetCurrentWeaponData()
-		: nullptr;
+	const UWeaponComponent* WeaponComponent = IsValid(OwnerActor) ? OwnerActor->FindComponentByClass<UWeaponComponent>() : nullptr;
 
-	return IsValid(CurrentWeaponData) ? FMath::Max(0.0f, CurrentWeaponData->GetWeaponPower()) : 0.0f;
+	if (!IsValid(WeaponComponent)) { return 0.0f; }
+
+	const FItemInstance* CurrentWeapon = WeaponComponent->GetCurrentWeapon();
+
+	if (CurrentWeapon == nullptr || !IsValid(CurrentWeapon->ItemData) || CurrentWeapon->Quantity <= 0) { return 0.0f; }
+
+	const UWeaponDataAsset* WeaponData = Cast<UWeaponDataAsset>(CurrentWeapon->ItemData.Get());
+
+	if (!IsValid(WeaponData)) { return 0.0f; }
+
+	return WeaponData->GetEnhancedWeaponPower( CurrentWeapon->EnhanceLevel );
 }
 
 float UEquipmentComponent::GetArmorDefensePowerBonus() const

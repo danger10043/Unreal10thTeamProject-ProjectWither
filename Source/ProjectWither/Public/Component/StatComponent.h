@@ -55,7 +55,7 @@ public:
 	*	@return 실제로 감소한 체력
 	*/
 	UFUNCTION(BlueprintCallable, Category = "Stat|Health")
-	float ApplyDamage(float DamageAmount);
+	float ApplyDamage(float DamageAmount, float FinalDamageMultiplier = 1.0f);
 
 	/*
 	*	Amount 만큼 스태미나를 회복합니다.
@@ -173,6 +173,9 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stat|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float DefensePower = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stat|Combat", meta = (AllowPrivateAccess = "true", ClampMin = "1.0"))
+	float DefenseScalingConstant = 100.0f;
 
 	float AttackPowerMultiplier = 1.0f;
 	float DefenseMultiplier = 1.0f;

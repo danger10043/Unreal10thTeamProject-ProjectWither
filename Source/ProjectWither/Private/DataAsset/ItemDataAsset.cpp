@@ -2,7 +2,7 @@
 
 
 #include "DataAsset/ItemDataAsset.h"
-
+#include "DataAsset/EnhancementDataAsset.h"
 
 int32 UItemDataAsset::GetItemId() const		// ItemId를 반환하는 함수
 {
@@ -42,4 +42,9 @@ UStaticMesh* UItemDataAsset::GetItemMesh() const // ItemMesh를 반환하는 함
 int32 UItemDataAsset::GetMaxStack() const	// 가지고 있을 수 있는 최대 개수를 반환하는 함수
 {
 	return MaxStack;
+}
+
+UEnhancementDataAsset* UItemDataAsset::GetEnhancementProfile() const
+{
+	return EnhancementProfile.Get();
 }
