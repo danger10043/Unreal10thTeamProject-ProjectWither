@@ -19,6 +19,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
 #include "Kismet/GameplayStatics.h"
+#include "NiagaraFunctionLibrary.h"
 
 namespace
 {
@@ -525,13 +526,56 @@ void UCombatComponent::HandleSwordCollisionBeginOverlap(
 
 	SwordHitActors.Add(OtherActor);
 	
-	UGameplayStatics::ApplyDamage(
+	const UWeaponDataAsset* WeaponData =
+		IsValid(WeaponComponent)
+		? WeaponComponent->GetCurrentWeaponData()
+		: nullptr;
+
+	UNiagaraSystem* HitEffect =
+		IsValid(WeaponData) ? WeaponData->GetWeaponHitEffect() : nullptr;
+
+	FVector EffectLocation = IsValid(OverlappedComponent)
+		? OverlappedComponent->GetComponentLocation()
+		: OtherActor->GetActorLocation();
+
+	if (bFromSweep && !SweepResult.bStartPenetrating)
+	{
+		EffectLocation = SweepResult.ImpactPoint;
+	}
+	else if (IsValid(OtherComponent))
+	{
+		FVector ClosestPoint;
+		const float Distance = OtherComponent->GetClosestPointOnCollision(
+			EffectLocation,
+			ClosestPoint
+		);
+
+		if (Distance > 0.0f)
+		{
+			EffectLocation = ClosestPoint;
+		}
+	}
+
+	const float AppliedDamage = UGameplayStatics::ApplyDamage(
 		OtherActor,
 		SwordDamage,
 		IsValid(OwnerPlayer) ? OwnerPlayer->GetController() : nullptr,
 		OwnerPlayer,
 		UDamageType::StaticClass()
 	);
+
+	if (AppliedDamage > 0.0f && IsValid(HitEffect))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			HitEffect,
+			EffectLocation,
+			FRotator::ZeroRotator,
+			FVector::OneVector,
+			true,
+			true
+		);
+	}
 }
 
 UCapsuleComponent* UCombatComponent::FindSwordCollision() const
