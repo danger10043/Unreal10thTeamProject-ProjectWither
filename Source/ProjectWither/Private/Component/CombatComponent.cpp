@@ -634,6 +634,20 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 			{
 				CloseParryWindow();
 
+				if (IsValid(OwnerPlayer) && IsValid(ParryMontage))
+				{
+					const float PlayedLength = OwnerPlayer->PlayAnimMontage(ParryMontage);
+
+					if (PlayedLength <= 0.0f)
+					{
+						UE_LOG(
+							LogTemp,
+							Warning,
+							TEXT("UCombatComponent::ReceiveHit - 패링 몽타주 재생에 실패했습니다.")
+						);
+					}
+				}
+
 				OnParrySucceeded();
 
 				// 공격한 적에게 패링 성공 전달
