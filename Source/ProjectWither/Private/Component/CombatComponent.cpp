@@ -609,6 +609,11 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 {
 	if (!IsOwnerAlive() || DamageAmount <= 0.0f) { return 0.0f; }
 
+	if (ActionState == EPlayerActionState::Rolling)
+	{
+		return 0.0f;
+	}
+
 	if (ActionState == EPlayerActionState::Blocking)
 	{
 		const bool bWasParry = bParryWindowOpen;
