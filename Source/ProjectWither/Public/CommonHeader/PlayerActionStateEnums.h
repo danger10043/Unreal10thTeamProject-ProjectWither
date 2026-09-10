@@ -13,5 +13,6 @@ enum class EPlayerActionState : uint8
 	Rolling					UMETA(DisplayName = "구르는 중"),
 	Blocking				UMETA(DisplayName = "검으로 막는 중"),
 	HitReact				UMETA(DisplayName = "적에게 피격당하는 중"),
-	Dead					UMETA(DisplayName = "사망 상태")
+	Dead					UMETA(DisplayName = "사망 상태"),
+	Reload					UMETA(DisplayName = "원거리 무기 재장전 중")
 };

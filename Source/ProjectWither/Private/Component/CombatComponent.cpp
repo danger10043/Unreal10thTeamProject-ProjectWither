@@ -376,6 +376,11 @@ void UCombatComponent::GunAttack()
 		return;
 	}
 
+	if (ActionState == EPlayerActionState::Reload)
+	{
+		return;
+	}
+
 	if (!IsValid(OwnerPlayer) || !IsValid(GunAttackMontage))
 	{
 		UE_LOG(
@@ -934,6 +939,74 @@ void UCombatComponent::FinishAction(EPlayerActionState ExpectedState)
 	if (ActionState != ExpectedState) return;
 
 	SetActionState(EPlayerActionState::None);
+}
+
+bool UCombatComponent::CanReload() const
+{
+	if (!IsOwnerAlive()) return false;
+
+	if (ActionState != EPlayerActionState::None) return false;
+
+	if (!OwnerPlayer->CanMove()) return false;
+
+	if (!IsValid(WeaponComponent) || !WeaponComponent->IsGunEquipped())
+	{
+		return false;
+	}
+
+	if (!IsValid(ReloadMontage)) return false;
+
+	const UAnimInstance* AnimInstance =
+		OwnerPlayer->GetMesh()
+		? OwnerPlayer->GetMesh()->GetAnimInstance()
+		: nullptr;
+
+	return IsValid(AnimInstance);
+}
+
+void UCombatComponent::PlayReloadMontage()
+{
+	if (!CanReload()) return;
+
+	UAnimInstance* AnimInstance = OwnerPlayer->GetMesh()->GetAnimInstance();
+	const uint64 ExecutionId = ++ReloadExecutionId;
+
+	SetActionState(EPlayerActionState::Reload);
+
+	// 상태 변경 이벤트에서 피격이나 사망 등으로 전환된 경우.
+	if (ActionState != EPlayerActionState::Reload) return;
+
+	const float PlayedLength = AnimInstance->Montage_Play(ReloadMontage);
+
+	if (PlayedLength <= 0.0f)
+	{
+		FinishAction(EPlayerActionState::Reload);
+		UE_LOG(LogTemp, Warning, TEXT("재장전 몽타주 재생에 실패했습니다."));
+		return;
+	}
+
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(
+		this,
+		&UCombatComponent::OnReloadMontageEnded,
+		ExecutionId
+	);
+	AnimInstance->Montage_SetEndDelegate(EndDelegate, ReloadMontage);
+}
+
+void UCombatComponent::OnReloadMontageEnded(
+	UAnimMontage* Montage,
+	bool bInterrupted,
+	uint64 ExecutionId
+)
+{
+	if (Montage != ReloadMontage || ExecutionId != ReloadExecutionId)
+	{
+		return;
+	}
+
+	// 정상 종료와 중단 모두 처리하되, 피격/사망 상태는 덮어쓰지 않는다.
+	FinishAction(EPlayerActionState::Reload);
 }
 
 bool UCombatComponent::CanAttack() const

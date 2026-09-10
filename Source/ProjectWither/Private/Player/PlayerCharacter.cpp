@@ -393,6 +393,7 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopZoomInput);
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopZoomInput);
     EnhancedInput->BindAction(LockOnAction, ETriggerEvent::Started, this, &APlayerCharacter::LockOnInput);
+    EnhancedInput->BindAction(ReloadAction, ETriggerEvent::Started, this, &APlayerCharacter::ReloadInput);
     
 }
 
@@ -651,6 +652,12 @@ void APlayerCharacter::StopZoomInput()
 
 void APlayerCharacter::LockOnInput()
 {
+    if (IsValid(CombatComponent) &&
+        CombatComponent->GetActionState() == EPlayerActionState::Reload)
+    {
+        return;
+    }
+
     if (!IsValid(PlayerCameraComponent)) return;
 
     if (IsValid(CombatComponent))
@@ -663,6 +670,12 @@ void APlayerCharacter::LockOnInput()
 
 void APlayerCharacter::SwapWeaponInput()
 {
+    if (IsValid(CombatComponent) &&
+        CombatComponent->GetActionState() == EPlayerActionState::Reload)
+    {
+        return;
+    }
+
     if (!IsValid(WeaponComponent)) return;
 
     if (IsValid(CombatComponent))
@@ -733,5 +746,20 @@ void APlayerCharacter::InteractInput()
     {
         InteractionComponent->TryInteract();
     }
+}
+
+void APlayerCharacter::ReloadInput()
+{
+    if (!IsValid(WeaponComponent))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("PlayerCharacter::ReloadInput - WeaponComponent가 유효하지 않습니다.")
+        );
+        return;
+    }
+    
+    WeaponComponent->Reload();
 }
 
