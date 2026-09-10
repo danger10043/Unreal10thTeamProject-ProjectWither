@@ -1,6 +1,8 @@
 #include "Monster/MonsterCharacterBase.h"
 #include "Component/MonsterComponent.h"
 #include "Component/StatComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 AMonsterCharacterBase::AMonsterCharacterBase()
@@ -10,6 +12,26 @@ AMonsterCharacterBase::AMonsterCharacterBase()
     StatComponent = CreateDefaultSubobject<UStatComponent>(TEXT("StatComponent"));
 
     MonsterComponent = CreateDefaultSubobject<UMonsterComponent>(TEXT("MonsterComponent"));
+
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionProfileName(TEXT("Pawn"));
+		Capsule->SetGenerateOverlapEvents(false);
+		Capsule->SetNotifyRigidBodyCollision(false);
+		Capsule->CanCharacterStepUpOn = ECB_No;
+	}
+
+	if (USkeletalMeshComponent* MonsterMesh = GetMesh())
+	{
+		MonsterMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		MonsterMesh->SetCollisionObjectType(ECC_WorldDynamic);
+		MonsterMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+		MonsterMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+		MonsterMesh->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+		MonsterMesh->SetGenerateOverlapEvents(true);
+		MonsterMesh->SetNotifyRigidBodyCollision(false);
+		MonsterMesh->CanCharacterStepUpOn = ECB_No;
+	}
 
     bUseControllerRotationYaw = false;
     bUseControllerRotationPitch = false;
