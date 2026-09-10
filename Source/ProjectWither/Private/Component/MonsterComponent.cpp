@@ -822,6 +822,11 @@ void UMonsterComponent::ScheduleFinishDeath(float MinimumDelay)
 
 UAnimMontage* UMonsterComponent::SelectAttackMontage() const
 {
+	if (bUseOnlyAdditionalAttackMontage && IsValid(AdditionalAttackMontage))
+	{
+		return AdditionalAttackMontage.Get();
+	}
+
 	if (IsValid(AttackMontage) && IsValid(AdditionalAttackMontage))
 	{
 		return FMath::RandBool() ? AttackMontage.Get() : AdditionalAttackMontage.Get();

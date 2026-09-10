@@ -28,6 +28,12 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Phase")
     TObjectPtr<UAnimMontage> Phase2AttackMontage;
 
+    // When enabled, phase two uses only Phase2AttackMontage instead of mixing it
+    // with the base attack montage. This setting affects only this Boss Data Asset.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Phase",
+        meta = (EditCondition = "Phase2AttackMontage != nullptr", EditConditionHides))
+    bool bUseOnlyPhase2AttackMontage = false;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Visual")
     TArray<FName> BodyMaterialSlots;
 
