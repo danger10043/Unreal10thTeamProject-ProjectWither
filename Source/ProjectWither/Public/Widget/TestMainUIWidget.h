@@ -5,7 +5,7 @@
 #include "CommonHeader/PlayerActionStateEnums.h"
 #include "TestMainUIWidget.generated.h"
 
-class UProgressBarBaseWidget;
+class USegmentedStatBarWidget;
 class UCurrentStateWidget;
 class UStatComponent;
 class UCombatComponent;
@@ -23,7 +23,6 @@ private:
 	void BindPlayerComponents();
 	void UnbindPlayerComponents();
 	void InitializeWidgetValues();
-	void InitializeWidgetColors();
 
 	UFUNCTION()
 	void HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount);
@@ -36,10 +35,10 @@ private:
 
 protected:
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UProgressBarBaseWidget> HealthBarWidget;
+	TObjectPtr<USegmentedStatBarWidget> HealthBarWidget;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UProgressBarBaseWidget> StaminaBarWidget;
+	TObjectPtr<USegmentedStatBarWidget> StaminaBarWidget;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UCurrentStateWidget> CurrentStateWidget;

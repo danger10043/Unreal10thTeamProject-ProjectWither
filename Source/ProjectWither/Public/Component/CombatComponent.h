@@ -72,6 +72,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void GunAttack();
 
+	bool CanReload() const;
+
+	void PlayReloadMontage();
+
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void Roll();
 
@@ -138,6 +142,18 @@ protected:
 	);
 
 private:
+	void OnReloadMontageEnded(UAnimMontage* Montage, bool bInterrupted, uint64 ExecutionId);
+
+	UPROPERTY(
+		EditDefaultsOnly, 
+		BlueprintReadOnly, 
+		Category = "Combat|Reload", 
+		meta = (AllowPrivateAccess = "true")
+	)
+	TObjectPtr<UAnimMontage> ReloadMontage;
+
+	uint64 ReloadExecutionId = 0;
+
 	bool IsOwnerAlive() const;
 
 	bool TrySpendStamina(float Cost);

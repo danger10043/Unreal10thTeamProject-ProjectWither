@@ -1,5 +1,6 @@
 #include "Component/WeaponComponent.h"
 #include "Component/InventoryComponent.h"
+#include "Component/CombatComponent.h"
 #include "Component/StatComponent.h"
 #include "Equipment/EquipmentComponent.h"
 #include "Equipment/Weapon/RangedWeaponActorBase.h"
@@ -257,6 +258,18 @@ bool UWeaponComponent::IsGunEquipped() const
 
 bool UWeaponComponent::FireGun()
 {	
+	const AActor* CombatOwner = GetOwner();
+	const UCombatComponent* Combat =
+		IsValid(CombatOwner)
+		? CombatOwner->FindComponentByClass<UCombatComponent>()
+		: nullptr;
+
+	if (IsValid(Combat) &&
+		Combat->GetActionState() == EPlayerActionState::Reload)
+	{
+		return false;
+	}
+
 	if (!IsGunEquipped())
 	{
 		UE_LOG(
@@ -267,13 +280,17 @@ bool UWeaponComponent::FireGun()
 		return false;
 	}
 
-	if (GetCurrentAmmo() <= 0 && !Reload())
+	if (GetCurrentAmmo() <= 0)
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("WeaponComponent::FireGun - 장전된 탄약이 없고 재장전할 탄약도 없습니다.")
-		);
+		if (!Reload())
+		{
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("WeaponComponent::FireGun - 재장전할 수 없습니다.")
+			);
+		}
+
 		return false;
 	}
 
@@ -424,10 +441,36 @@ bool UWeaponComponent::ConsumeAmmo()
 
 bool UWeaponComponent::Reload()
 {
+	AActor* CombatOwner = GetOwner();
+	UCombatComponent* Combat =
+		IsValid(CombatOwner)
+		? CombatOwner->FindComponentByClass<UCombatComponent>()
+		: nullptr;
+
+	if (!IsValid(Combat) || !Combat->CanReload())
+	{
+		return false;
+	}
+
 	const UWeaponDataAsset* WeaponData = GetCurrentWeaponData();
 
-	if (!WeaponData || WeaponData->GetWeaponType() != EWeaponType::Gun)
+	if (!WeaponData)
 	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::Reload - WeaponData 가 유효하지 않습니다.")
+		);
+		return false;
+	}
+
+	if (WeaponData->GetWeaponType() != EWeaponType::Gun)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::Reload - 플레이어가 총을 장착하고 있지 않습니다.")
+		);
 		return false;
 	}
 
@@ -449,6 +492,9 @@ bool UWeaponComponent::Reload()
 
 	CurrentWeapon.CurrentAmmo = FMath::Clamp(CurrentWeapon.CurrentAmmo + LoadedAmmo, 0, MaxAmmo);
 	SyncCurrentWeaponToEquipment();
+
+	Combat->PlayReloadMontage();
+
 	OnWeaponChanged.Broadcast();
 
 	return true;
