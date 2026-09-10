@@ -7,6 +7,9 @@
 class USegmentedStatBarWidget;
 class UStatComponent;
 class UCombatComponent;
+class UAmmoCountWidget;
+class UWeaponComponent;
+class UWeaponTypeWidget;
 
 UCLASS()
 class PROJECTWITHER_API UTestMainUIWidget : public UUserWidget
@@ -23,6 +26,9 @@ private:
 	void InitializeWidgetValues();
 
 	UFUNCTION()
+	void HandleWeaponChanged();
+
+	UFUNCTION()
 	void HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount);
 
 	UFUNCTION()
@@ -35,8 +41,17 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<USegmentedStatBarWidget> StaminaBarWidget;
 
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UAmmoCountWidget> AmmoCountWidget;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UWeaponTypeWidget> WeaponTypeWidget;
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UStatComponent> StatComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UWeaponComponent> WeaponComponent;
 
 };
