@@ -5,52 +5,52 @@
 #include "CrosshairUI.generated.h"
 
 class UImage;
+class UWidgetAnimation;
+class UWeaponComponent;
+class UPlayerCameraComponent;
 
 UCLASS()
 class PROJECTWITHER_API UCrosshairUI : public UUserWidget
 {
 	GENERATED_BODY()
-	
+
 protected:
 	virtual void NativeConstruct() override;
-	virtual void NativeTick(const FGeometry& MyGeometry, float DeltaTime) override;
+	virtual void NativeDestruct() override;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> CrossHairImage;
+
+	UPROPERTY(Transient, meta = (BindWidgetAnim))
+	TObjectPtr<UWidgetAnimation> ZoomStartAnim;
+
+	UPROPERTY(Transient, meta = (BindWidgetAnim))
+	TObjectPtr<UWidgetAnimation> ZoomEndAnim;
+
+	UPROPERTY(Transient, meta = (BindWidgetAnim))
+	TObjectPtr<UWidgetAnimation> GunFireAnim;
 
 private:
-	void UpdateCrosshair(float DeltaTime);
-	void SetCrosshairVisible(bool bVisible);
-	void ApplyCrosshairGap();
+	UFUNCTION()
+	void HandleWeaponChanged();
 
-protected:
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UImage> CenterDot;
+	UFUNCTION()
+	void HandleZoomChanged(bool bIsZooming);
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UImage> TopBar;
+	UFUNCTION()
+	void HandleGunFired();
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UImage> BottomBar;
+	void ResetCrosshair();
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UImage> LeftBar;
+	UPROPERTY(Transient)
+	TObjectPtr<UWeaponComponent> WeaponComponent;
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UImage> RightBar;
+	UPROPERTY(Transient)
+	TObjectPtr<UPlayerCameraComponent> CameraComponent;
 
-	// 점 가장자리와 막대 안쪽 끝 사이의 간격
-	UPROPERTY(EditDefaultsOnly, Category = "Crosshair", meta = (ClampMin = "0.0"))
-	float MinGap = 6.0f;
+	FWidgetTransform DefaultImageTransform;
+	float DefaultImageOpacity = 1.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Crosshair", meta = (ClampMin = "0.0"))
-	float MaxGap = 28.0f;
-
-	// 최대 간격이 되는 수평 이동 속도(cm/s)
-	UPROPERTY(EditDefaultsOnly, Category = "Crosshair", meta = (ClampMin = "1.0"))
-	float SpeedForMaxSpread = 1200.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Crosshair", meta = (ClampMin = "0.1"))
-	float SpreadInterpSpeed = 10.0f;
-
-private:
-	float CurrentGap = 6.0f;
-	bool bCrosshairVisible = false;
+	bool bGunEquipped = false;
+	bool bZooming = false;
 };

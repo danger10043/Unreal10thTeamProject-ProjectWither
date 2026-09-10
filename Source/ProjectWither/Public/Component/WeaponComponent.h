@@ -13,6 +13,8 @@ class UWeaponDataAsset;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWeaponChangedDelegate);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGunFiredDelegate);
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class PROJECTWITHER_API UWeaponComponent : public UActorComponent
 {
@@ -23,6 +25,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Weapon|Event")
 	FOnWeaponChangedDelegate OnWeaponChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Weapon|Event")
+	FOnGunFiredDelegate OnGunFired;
 
 protected:
 	virtual void BeginPlay() override;

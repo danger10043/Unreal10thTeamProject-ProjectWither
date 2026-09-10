@@ -190,6 +190,8 @@ void UPlayerCameraComponent::StopZoom()
 
 void UPlayerCameraComponent::ChangeCameraState(EPlayerCameraState NewState)
 {
+	const bool bWasZooming = IsZooming();
+
 	switch (NewState)
 	{
 	case EPlayerCameraState::None:
@@ -236,6 +238,13 @@ void UPlayerCameraComponent::ChangeCameraState(EPlayerCameraState NewState)
 	if (IsValid(OwnerPlayer))
 	{
 		OwnerPlayer->RefreshMovementForCameraState();
+	}
+
+	const bool bNowZooming = IsZooming();
+
+	if (bWasZooming != bNowZooming)
+	{
+		OnZoomChanged.Broadcast(bNowZooming);
 	}
 }
 

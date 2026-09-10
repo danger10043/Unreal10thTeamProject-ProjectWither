@@ -9,6 +9,12 @@ class APlayerCharacter;
 class UCameraComponent;
 class USpringArmComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FOnZoomChangedDelegate,
+	bool,
+	bIsZooming
+);
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class PROJECTWITHER_API UPlayerCameraComponent : public UActorComponent
 {
@@ -16,6 +22,9 @@ class PROJECTWITHER_API UPlayerCameraComponent : public UActorComponent
 
 public:	
 	UPlayerCameraComponent();
+
+	UPROPERTY(BlueprintAssignable, Category = "Player|Camera")
+	FOnZoomChangedDelegate OnZoomChanged;
 
 	// 플레이어가 사용하는 실제 카메라와 암 연결
 	void InitializeCamera(
