@@ -77,3 +77,4 @@ DerivedDataCache/*
 
 # Ignore Asset Folder
 Content/ExternalAssets/
+/ArtSource

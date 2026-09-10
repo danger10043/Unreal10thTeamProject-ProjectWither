@@ -62,6 +62,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster|Drop")
     TSubclassOf<APickupItem> ItemPickupClass;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster|Reward", meta = (ClampMin = "0"))
+    int32 GoldReward = 0;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster|Death")
     EMonsterDespawnPolicy DespawnPolicy = EMonsterDespawnPolicy::Destroy;
 
