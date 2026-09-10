@@ -11,6 +11,7 @@
 #include "Component/WeaponComponent.h"
 #include "Component/MonsterComponent.h"
 #include "Component/PlayerCameraComponent.h"
+#include "Component/InventoryComponent.h"
 #include "Engine/GameInstance.h"
 #include "Framework/SubSystem/SavePointSubsystem.h"
 #include "CollisionQueryParams.h"
@@ -795,6 +796,22 @@ void UCombatComponent::Die()
 	// 기존 몽타주 종료 롤백이 이동이나 상태를 복구하지 못하도록 막기
 	OwnerPlayer->SetCanMove(false);
 	SetActionState(EPlayerActionState::Dead);
+
+	UInventoryComponent* Inventory =
+		OwnerPlayer->FindComponentByClass<UInventoryComponent>();
+
+	if (IsValid(Inventory))
+	{
+		const int32 CurrentGold = FMath::Max(0, Inventory->GetGold());
+		const int32 LostGold = static_cast<int32>(
+			static_cast<int64>(CurrentGold) * 70 / 100
+			);
+
+		if (LostGold > 0)
+		{
+			Inventory->SpendGold(LostGold);
+		}
+	}
 
 	if (!IsValid(AnimInstance))
 	{
