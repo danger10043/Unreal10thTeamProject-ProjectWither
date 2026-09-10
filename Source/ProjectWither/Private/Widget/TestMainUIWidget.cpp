@@ -6,14 +6,13 @@
 #include "Interface/CombatComponentUserInterface.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Widget/CurrentStateWidget.h"
-#include "Widget/ProgressBarBaseWidget.h"
+#include "Widget/SegmentedStatBarWidget.h"
 
 void UTestMainUIWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
 	BindPlayerComponents();
-	InitializeWidgetColors();
 	InitializeWidgetValues();
 }
 
@@ -120,25 +119,6 @@ void UTestMainUIWidget::InitializeWidgetValues()
 	else if (IsValid(CurrentStateWidget))
 	{
 		CurrentStateWidget->SetPlayerActionState(EPlayerActionState::None);
-	}
-}
-
-void UTestMainUIWidget::InitializeWidgetColors()
-{
-	if (IsValid(HealthBarWidget))
-	{
-		HealthBarWidget->SetBarColors(
-			FLinearColor(0.4f, 0.0f, 0.0f, 0.35f),
-			FLinearColor(0.9f, 0.05f, 0.05f, 1.0f)
-		);
-	}
-
-	if (IsValid(StaminaBarWidget))
-	{
-		StaminaBarWidget->SetBarColors(
-			FLinearColor(0.0f, 0.1f, 0.4f, 0.35f),
-			FLinearColor(0.05f, 0.25f, 1.0f, 1.0f)
-		);
 	}
 }
 

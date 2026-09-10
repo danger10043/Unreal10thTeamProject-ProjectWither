@@ -2,6 +2,7 @@
 
 
 #include "Component/MonsterComponent.h"
+#include "Component/InventoryComponent.h"
 #include "Component/StatComponent.h"
 #include "Data/ItemDropTable.h"
 #include "Item/PickupItem.h"
@@ -169,6 +170,7 @@ void UMonsterComponent::HandleDeath()
 
 	CalculateDrops();
 	DropItems();
+	GrantGoldReward();
 
 	OnMonsterDied.Broadcast();
 
@@ -268,6 +270,26 @@ void UMonsterComponent::DropItems()
 	}
 
 	DropItem.Reset();
+}
+
+void UMonsterComponent::GrantGoldReward()
+{
+	if (!IsValid(MonsterData) || MonsterData->GoldReward <= 0)
+	{
+		return;
+	}
+
+	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!IsValid(PlayerPawn))
+	{
+		return;
+	}
+
+	if (UInventoryComponent* InventoryComponent =
+		PlayerPawn->FindComponentByClass<UInventoryComponent>())
+	{
+		InventoryComponent->AddGold(MonsterData->GoldReward);
+	}
 }
 
 bool UMonsterComponent::IsInAttackRange()
@@ -800,6 +822,11 @@ void UMonsterComponent::ScheduleFinishDeath(float MinimumDelay)
 
 UAnimMontage* UMonsterComponent::SelectAttackMontage() const
 {
+	if (bUseOnlyAdditionalAttackMontage && IsValid(AdditionalAttackMontage))
+	{
+		return AdditionalAttackMontage.Get();
+	}
+
 	if (IsValid(AttackMontage) && IsValid(AdditionalAttackMontage))
 	{
 		return FMath::RandBool() ? AttackMontage.Get() : AdditionalAttackMontage.Get();

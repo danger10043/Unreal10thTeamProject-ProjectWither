@@ -441,7 +441,9 @@ void UBossComponent::ApplyPhaseSettings(EBossPhase Phase)
 		Monster->SetAdditionalAttackMontage(
 			Phase == EBossPhase::Phase2 && IsValid(BossData)
 			? BossData->Phase2AttackMontage.Get()
-			: nullptr);
+			: nullptr,
+			Phase == EBossPhase::Phase2 && IsValid(BossData) &&
+			BossData->bUseOnlyPhase2AttackMontage);
 	}
 
 	if (UStatComponent* Stat = OwnerCharacter->FindComponentByClass<UStatComponent>())

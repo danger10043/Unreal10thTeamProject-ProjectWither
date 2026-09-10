@@ -54,7 +54,11 @@ public:
 	void SetAttackCooldown(float NewCooldown) { AttackCooldown = FMath::Max(0.0f, NewCooldown); }
 	void SetAttackRange(float NewRange) { AttackRange = FMath::Max(0.0f, NewRange); }
 	void SetAllowRange(float NewRange) { AllowRange = FMath::Max(0.0f, NewRange); }
-	void SetAdditionalAttackMontage(UAnimMontage* NewMontage) { AdditionalAttackMontage = NewMontage; }
+	void SetAdditionalAttackMontage(UAnimMontage* NewMontage, bool bUseOnlyAdditional = false)
+	{
+		AdditionalAttackMontage = NewMontage;
+		bUseOnlyAdditionalAttackMontage = bUseOnlyAdditional && IsValid(NewMontage);
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Monster")
 	bool IsDead() const { return bIsDead; }
@@ -161,6 +165,7 @@ public:
 private:
 	UFUNCTION()
 	void HandleDeath();
+	void GrantGoldReward();	// 데이터 에셋에 설정된 골드를 플레이어에게 지급
 
 	FName SelectAttackSection(UAnimMontage* Montage) const;	// 공격 애니메이션 섹션 랜덤 선택 함수
 	UAnimMontage* SelectAttackMontage() const;
@@ -290,6 +295,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> AdditionalAttackMontage = nullptr;
+
+	UPROPERTY(Transient)
+	bool bUseOnlyAdditionalAttackMontage = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveAttackMontage = nullptr;
