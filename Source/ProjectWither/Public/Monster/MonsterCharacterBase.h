@@ -22,6 +22,7 @@ class PROJECTWITHER_API AMonsterCharacterBase :
 
 public:
     AMonsterCharacterBase();
+    virtual void Tick(float DeltaTime) override;
     virtual float TakeDamage(float Damage, const FDamageEvent& DamageEvent,
         AController* EventInstigator, AActor* DamageCauser) override;
     virtual UStatComponent* GetStatComponent_Implementation() const override;
