@@ -2,11 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "CommonHeader/PlayerActionStateEnums.h"
 #include "TestMainUIWidget.generated.h"
 
 class USegmentedStatBarWidget;
-class UCurrentStateWidget;
 class UStatComponent;
 class UCombatComponent;
 
@@ -30,9 +28,6 @@ private:
 	UFUNCTION()
 	void HandleStaminaChanged(float CurrentStamina, float MaxStamina, float ChangedAmount);
 
-	UFUNCTION()
-	void HandleActionStateChanged(EPlayerActionState PreviousState, EPlayerActionState NewState);
-
 protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<USegmentedStatBarWidget> HealthBarWidget;
@@ -40,13 +35,7 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<USegmentedStatBarWidget> StaminaBarWidget;
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UCurrentStateWidget> CurrentStateWidget;
-
 private:
-	UPROPERTY(Transient)
-	TObjectPtr<UCombatComponent> CombatComponent;
-	
 	UPROPERTY(Transient)
 	TObjectPtr<UStatComponent> StatComponent;
 

@@ -1,11 +1,8 @@
 #include "Widget/TestMainUIWidget.h"
 
-#include "Component/CombatComponent.h"
 #include "Component/StatComponent.h"
 #include "GameFramework/Pawn.h"
-#include "Interface/CombatComponentUserInterface.h"
 #include "Interface/StatComponentUserInterface.h"
-#include "Widget/CurrentStateWidget.h"
 #include "Widget/SegmentedStatBarWidget.h"
 
 void UTestMainUIWidget::NativeConstruct()
@@ -36,13 +33,6 @@ void UTestMainUIWidget::BindPlayerComponents()
 		StatComponent = IStatComponentUserInterface::Execute_GetStatComponent(OwningPawn);
 	}
 
-	if (OwningPawn->GetClass()->ImplementsInterface(
-		UCombatComponentUserInterface::StaticClass()
-	))
-	{
-		CombatComponent = ICombatComponentUserInterface::Execute_GetCombatComponent(OwningPawn);
-	}
-
 	if (IsValid(StatComponent))
 	{
 		StatComponent->OnHealthChanged.AddUniqueDynamic(
@@ -53,14 +43,6 @@ void UTestMainUIWidget::BindPlayerComponents()
 		StatComponent->OnStaminaChanged.AddUniqueDynamic(
 			this,
 			&UTestMainUIWidget::HandleStaminaChanged
-		);
-	}
-
-	if (IsValid(CombatComponent))
-	{
-		CombatComponent->OnActionStateChangedEvent.AddUniqueDynamic(
-			this,
-			&UTestMainUIWidget::HandleActionStateChanged
 		);
 	}
 }
@@ -80,16 +62,7 @@ void UTestMainUIWidget::UnbindPlayerComponents()
 		);
 	}
 
-	if (IsValid(CombatComponent))
-	{
-		CombatComponent->OnActionStateChangedEvent.RemoveDynamic(
-			this,
-			&UTestMainUIWidget::HandleActionStateChanged
-		);
-	}
-
 	StatComponent = nullptr;
-	CombatComponent = nullptr;
 }
 
 void UTestMainUIWidget::InitializeWidgetValues()
@@ -108,18 +81,6 @@ void UTestMainUIWidget::InitializeWidgetValues()
 			0.0f
 		);
 	}
-
-	if (IsValid(CombatComponent))
-	{
-		HandleActionStateChanged(
-			EPlayerActionState::None,
-			CombatComponent->GetActionState()
-		);
-	}
-	else if (IsValid(CurrentStateWidget))
-	{
-		CurrentStateWidget->SetPlayerActionState(EPlayerActionState::None);
-	}
 }
 
 void UTestMainUIWidget::HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount)
@@ -135,14 +96,6 @@ void UTestMainUIWidget::HandleStaminaChanged(float CurrentStamina, float MaxStam
 	if (IsValid(StaminaBarWidget))
 	{
 		StaminaBarWidget->SetValues(CurrentStamina, MaxStamina);
-	}
-}
-
-void UTestMainUIWidget::HandleActionStateChanged(EPlayerActionState PreviousState, EPlayerActionState NewState)
-{
-	if (IsValid(CurrentStateWidget))
-	{
-		CurrentStateWidget->SetPlayerActionState(NewState);
 	}
 }
 
