@@ -1,11 +1,12 @@
 #include "Widget/TestMainUIWidget.h"
 
-#include "Component/CombatComponent.h"
 #include "Component/StatComponent.h"
+#include "Component/WeaponComponent.h"
+#include "DataAsset/WeaponDataAsset.h"
+#include "Widget/AmmoCountWidget.h"
+#include "Widget/WeaponTypeWidget.h"
 #include "GameFramework/Pawn.h"
-#include "Interface/CombatComponentUserInterface.h"
 #include "Interface/StatComponentUserInterface.h"
-#include "Widget/CurrentStateWidget.h"
 #include "Widget/SegmentedStatBarWidget.h"
 
 void UTestMainUIWidget::NativeConstruct()
@@ -29,18 +30,21 @@ void UTestMainUIWidget::BindPlayerComponents()
 
 	if (!IsValid(OwningPawn)) return;
 
+	WeaponComponent = OwningPawn->FindComponentByClass<UWeaponComponent>();
+
+	if (IsValid(WeaponComponent))
+	{
+		WeaponComponent->OnWeaponChanged.AddUniqueDynamic(
+			this,
+			&UTestMainUIWidget::HandleWeaponChanged
+		);
+	}
+
 	if (OwningPawn->GetClass()->ImplementsInterface(
 		UStatComponentUserInterface::StaticClass()
 	))
 	{
 		StatComponent = IStatComponentUserInterface::Execute_GetStatComponent(OwningPawn);
-	}
-
-	if (OwningPawn->GetClass()->ImplementsInterface(
-		UCombatComponentUserInterface::StaticClass()
-	))
-	{
-		CombatComponent = ICombatComponentUserInterface::Execute_GetCombatComponent(OwningPawn);
 	}
 
 	if (IsValid(StatComponent))
@@ -55,18 +59,20 @@ void UTestMainUIWidget::BindPlayerComponents()
 			&UTestMainUIWidget::HandleStaminaChanged
 		);
 	}
-
-	if (IsValid(CombatComponent))
-	{
-		CombatComponent->OnActionStateChangedEvent.AddUniqueDynamic(
-			this,
-			&UTestMainUIWidget::HandleActionStateChanged
-		);
-	}
 }
 
 void UTestMainUIWidget::UnbindPlayerComponents()
 {
+	if (IsValid(WeaponComponent))
+	{
+		WeaponComponent->OnWeaponChanged.RemoveDynamic(
+			this,
+			&UTestMainUIWidget::HandleWeaponChanged
+		);
+	}
+
+	WeaponComponent = nullptr;
+
 	if (IsValid(StatComponent))
 	{
 		StatComponent->OnHealthChanged.RemoveDynamic(
@@ -80,20 +86,13 @@ void UTestMainUIWidget::UnbindPlayerComponents()
 		);
 	}
 
-	if (IsValid(CombatComponent))
-	{
-		CombatComponent->OnActionStateChangedEvent.RemoveDynamic(
-			this,
-			&UTestMainUIWidget::HandleActionStateChanged
-		);
-	}
-
 	StatComponent = nullptr;
-	CombatComponent = nullptr;
 }
 
 void UTestMainUIWidget::InitializeWidgetValues()
 {
+	HandleWeaponChanged();
+
 	if (IsValid(StatComponent))
 	{
 		HandleHealthChanged(
@@ -108,18 +107,43 @@ void UTestMainUIWidget::InitializeWidgetValues()
 			0.0f
 		);
 	}
+}
 
-	if (IsValid(CombatComponent))
+void UTestMainUIWidget::HandleWeaponChanged()
+{
+	if (IsValid(WeaponTypeWidget))
 	{
-		HandleActionStateChanged(
-			EPlayerActionState::None,
-			CombatComponent->GetActionState()
-		);
+		const EWeaponType CurrentWeaponType =
+			IsValid(WeaponComponent)
+			? WeaponComponent->GetWeaponType()
+			: EWeaponType::None;
+
+		WeaponTypeWidget->SetWeaponType(CurrentWeaponType);
 	}
-	else if (IsValid(CurrentStateWidget))
+
+	if (!IsValid(AmmoCountWidget)) return;
+
+	if (!IsValid(WeaponComponent) || !WeaponComponent->IsGunEquipped())
 	{
-		CurrentStateWidget->SetPlayerActionState(EPlayerActionState::None);
+		AmmoCountWidget->SetVisibility(ESlateVisibility::Collapsed);
+		return;
 	}
+
+	const UWeaponDataAsset* WeaponData =
+		WeaponComponent->GetCurrentWeaponData();
+
+	if (!IsValid(WeaponData))
+	{
+		AmmoCountWidget->SetVisibility(ESlateVisibility::Collapsed);
+		return;
+	}
+
+	AmmoCountWidget->SetAmmo(
+		WeaponComponent->GetCurrentAmmo(),
+		WeaponData->GetMaxAmmo()
+	);
+
+	AmmoCountWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
 void UTestMainUIWidget::HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount)
@@ -135,14 +159,6 @@ void UTestMainUIWidget::HandleStaminaChanged(float CurrentStamina, float MaxStam
 	if (IsValid(StaminaBarWidget))
 	{
 		StaminaBarWidget->SetValues(CurrentStamina, MaxStamina);
-	}
-}
-
-void UTestMainUIWidget::HandleActionStateChanged(EPlayerActionState PreviousState, EPlayerActionState NewState)
-{
-	if (IsValid(CurrentStateWidget))
-	{
-		CurrentStateWidget->SetPlayerActionState(NewState);
 	}
 }
 
