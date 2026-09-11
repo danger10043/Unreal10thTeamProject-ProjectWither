@@ -1,8 +1,19 @@
 #include "Widget/SegmentedStatBarWidget.h"
 
+#include "Components/Image.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Widget/StatBarSegmentWidget.h"
+
+void USegmentedStatBarWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	if (IsValid(StatTypeTextImage))
+	{
+		StatTypeTextImage->SetBrushFromTexture(StatType.Get(), false);
+	}
+}
 
 void USegmentedStatBarWidget::NativePreConstruct()
 {

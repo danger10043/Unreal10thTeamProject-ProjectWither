@@ -2,13 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "CommonHeader/PlayerActionStateEnums.h"
 #include "TestMainUIWidget.generated.h"
 
 class USegmentedStatBarWidget;
-class UCurrentStateWidget;
 class UStatComponent;
 class UCombatComponent;
+class UAmmoCountWidget;
+class UWeaponComponent;
+class UWeaponTypeWidget;
 
 UCLASS()
 class PROJECTWITHER_API UTestMainUIWidget : public UUserWidget
@@ -25,13 +26,13 @@ private:
 	void InitializeWidgetValues();
 
 	UFUNCTION()
+	void HandleWeaponChanged();
+
+	UFUNCTION()
 	void HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount);
 
 	UFUNCTION()
 	void HandleStaminaChanged(float CurrentStamina, float MaxStamina, float ChangedAmount);
-
-	UFUNCTION()
-	void HandleActionStateChanged(EPlayerActionState PreviousState, EPlayerActionState NewState);
 
 protected:
 	UPROPERTY(meta = (BindWidget))
@@ -41,13 +42,16 @@ protected:
 	TObjectPtr<USegmentedStatBarWidget> StaminaBarWidget;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UCurrentStateWidget> CurrentStateWidget;
+	TObjectPtr<UAmmoCountWidget> AmmoCountWidget;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UWeaponTypeWidget> WeaponTypeWidget;
 
 private:
 	UPROPERTY(Transient)
-	TObjectPtr<UCombatComponent> CombatComponent;
-	
-	UPROPERTY(Transient)
 	TObjectPtr<UStatComponent> StatComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UWeaponComponent> WeaponComponent;
 
 };
