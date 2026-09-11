@@ -10,6 +10,7 @@ class AActor;
 class UInventoryComponent;
 class UStatComponent;
 class UWeaponDataAsset;
+class UNiagaraComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWeaponChangedDelegate);
 
@@ -63,6 +64,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	bool IsSwordEquipped() const;
 
+	void BeginSwordTrail();
+	void EndSwordTrail();
+
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	bool IsGunEquipped() const;
 
@@ -104,4 +108,7 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> WeaponActor = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> SwordTrailComponent = nullptr;
 };

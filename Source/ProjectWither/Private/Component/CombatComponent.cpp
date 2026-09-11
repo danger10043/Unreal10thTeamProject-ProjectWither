@@ -288,6 +288,8 @@ void UCombatComponent::BeginSwordDamageWindow()
 		|| !IsValid(WeaponComponent)
 		|| !WeaponComponent->IsSwordEquipped()) return;
 
+	WeaponComponent->BeginSwordTrail();
+
 	UCapsuleComponent* SwordCollision = FindSwordCollision();
 
 	if (!IsValid(SwordCollision))
@@ -309,6 +311,11 @@ void UCombatComponent::BeginSwordDamageWindow()
 
 void UCombatComponent::EndSwordDamageWindow()
 {
+	if (IsValid(WeaponComponent))
+	{
+		WeaponComponent->EndSwordTrail();
+	}
+
 	if (IsValid(ActiveSwordCollision))
 	{
 		ActiveSwordCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);

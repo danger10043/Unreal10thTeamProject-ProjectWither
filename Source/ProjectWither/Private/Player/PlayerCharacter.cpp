@@ -671,21 +671,17 @@ void APlayerCharacter::LockOnInput()
 void APlayerCharacter::SwapWeaponInput()
 {
     if (IsValid(CombatComponent) &&
-        CombatComponent->GetActionState() == EPlayerActionState::Reload)
+        (CombatComponent->GetActionState() == EPlayerActionState::Reload ||
+            CombatComponent->IsSwordAttackInProgress()))
     {
         return;
     }
 
     if (!IsValid(WeaponComponent)) return;
 
-    if (IsValid(CombatComponent))
-    {
-        CombatComponent->CancelSwordRecovery();
-    }
-
     if (!WeaponComponent->SwapWeapon())
     {
-		UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::SwapWeaponInput - 무기 교체에 실패했습니다."));
+        UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::SwapWeaponInput - 무기 교체에 실패했습니다."));
     }
 }
 
