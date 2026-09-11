@@ -7,6 +7,7 @@
 #include "Components/TextBlock.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "NPC/StatUpgradeNPC.h"
 #include "Player/PlayerCharacter.h"
 
 namespace
@@ -336,6 +337,11 @@ void UStatUpgradeWindowWidget::HandleDefensePowerUpgradeClicked()
 
 void UStatUpgradeWindowWidget::HandleCloseClicked()
 {
+	if (AStatUpgradeNPC* NPC = OwningNPC.Get())
+	{
+		NPC->EndGreetingMontage();
+	}
+
 	APlayerController* PlayerController = GetOwningPlayer();
 
 	if (APlayerCharacter* PlayerCharacter = Cast<APlayerCharacter>(GetOwningPlayerPawn()))
