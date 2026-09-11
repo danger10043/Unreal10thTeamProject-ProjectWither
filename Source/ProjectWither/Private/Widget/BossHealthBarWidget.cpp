@@ -51,9 +51,30 @@ void UBossHealthBarWidget::SetBossInfo(const FText& BossName, float CurrentHealt
 
 	if (IsValid(HealthProgressBar))
 	{
-		const float Percent = MaxHealth > UE_SMALL_NUMBER
+		TargetHealthPercent = MaxHealth > UE_SMALL_NUMBER
 			? FMath::Clamp(CurrentHealth / MaxHealth, 0.0f, 1.0f)
 			: 0.0f;
-		HealthProgressBar->SetPercent(Percent);
+		if (!bHealthInitialized)
+		{
+			DisplayedHealthPercent = TargetHealthPercent;
+			bHealthInitialized = true;
+		}
+		HealthProgressBar->SetPercent(DisplayedHealthPercent);
 	}
+}
+
+void UBossHealthBarWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (!bHealthInitialized || !IsValid(HealthProgressBar)) return;
+
+	DisplayedHealthPercent = HealthInterpolationSpeed <= 0.0f
+		? TargetHealthPercent
+		: FMath::FInterpTo(
+			DisplayedHealthPercent, TargetHealthPercent, InDeltaTime, HealthInterpolationSpeed);
+	if (FMath::IsNearlyEqual(DisplayedHealthPercent, TargetHealthPercent, 0.001f))
+	{
+		DisplayedHealthPercent = TargetHealthPercent;
+	}
+	HealthProgressBar->SetPercent(DisplayedHealthPercent);
 }

@@ -19,10 +19,19 @@ public:
 
 protected:
 	virtual void NativeOnInitialized() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> MonsterNameText;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UProgressBar> HealthProgressBar;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|UI", meta = (ClampMin = "0.0"))
+	float HealthInterpolationSpeed = 5.0f;
+
+private:
+	float DisplayedHealthPercent = 1.0f;
+	float TargetHealthPercent = 1.0f;
+	bool bHealthInitialized = false;
 };
