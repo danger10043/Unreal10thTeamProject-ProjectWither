@@ -13,6 +13,7 @@ class UAnimInstance;
 class UAnimMontage;
 class UBrainComponent;
 class UBossDataAsset;
+class UStatComponent;
 class UMaterialInstanceDynamic;
 struct FBossPhaseSettings;
 
@@ -60,6 +61,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Boss")
     void FinishPhaseTransition();
 
+	/** Shows the screen-fixed health bar and restarts its inactivity timer. */
+	UFUNCTION(BlueprintCallable, Category = "Boss|UI")
+	void ShowHealthBar();
+
+	UFUNCTION(BlueprintCallable, Category = "Boss|UI")
+	void HideHealthBar();
+
     UPROPERTY(BlueprintAssignable, Category = "Boss|Event")
     FOnBossPhaseChanged OnBossPhaseChanged;
 
@@ -83,6 +91,8 @@ private:
 
     UFUNCTION()
     void HandleBossDeath();
+	void CheckHealthBarVisibility();
+	void RefreshHealthBar(float CurrentHealth, float MaxHealth);
 
     void SetPhase(EBossPhase NewPhase);
     void HandlePhaseTransitionTimeout();
@@ -121,6 +131,12 @@ private:
     FTimerHandle PhaseTransitionTimerHandle;
 
     FTimerHandle EntranceTimerHandle;
+	FTimerHandle HealthBarCheckTimerHandle;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStatComponent> BossStatComponent;
+
+	double LastDamageTime = -1.0;
 
     UPROPERTY(Transient)
     TArray<TObjectPtr<UMaterialInstanceDynamic>> BodyDynamicMaterials;

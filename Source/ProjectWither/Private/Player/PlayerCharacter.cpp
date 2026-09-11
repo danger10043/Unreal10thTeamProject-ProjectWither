@@ -26,6 +26,11 @@
 #include "GameFramework/PlayerController.h"
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
+#include "Component/BossComponent.h"
+#include "Component/MonsterComponent.h"
+#include "DataAsset/MonsterDataAsset.h"
+#include "Interface/StatComponentUserInterface.h"
+#include "Widget/BossHealthBarWidget.h"
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -360,6 +365,13 @@ void APlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
         TestMainUIInstance->RemoveFromParent();
         TestMainUIInstance = nullptr;
     }
+
+	if (IsValid(BossHealthBarUIInstance))
+	{
+		BossHealthBarUIInstance->RemoveFromParent();
+		BossHealthBarUIInstance = nullptr;
+		DisplayedBossActor = nullptr;
+	}
 
     CloseStatWindow();
 
@@ -799,3 +811,59 @@ void APlayerCharacter::ReloadInput()
     WeaponComponent->Reload();
 }
 
+bool APlayerCharacter::ShowBossHealthBar(AActor* BossActor)
+{
+	if (!IsValid(BossActor)) return false;
+
+	if (!BossActor->FindComponentByClass<UBossComponent>()) return false;
+
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (!IsValid(PlayerController) || !PlayerController->IsLocalController()) return false;
+
+	if (!IsValid(BossHealthBarUIInstance))
+	{
+		TSubclassOf<UBossHealthBarWidget> WidgetClass = UBossHealthBarWidget::StaticClass();
+		if (BossHealthBarUIClass)
+		{
+			WidgetClass = BossHealthBarUIClass;
+		}
+		BossHealthBarUIInstance = CreateWidget<UBossHealthBarWidget>(PlayerController, WidgetClass);
+		if (!IsValid(BossHealthBarUIInstance)) return false;
+		BossHealthBarUIInstance->AddToViewport(20);
+	}
+
+	DisplayedBossActor = BossActor;
+	if (BossActor->Implements<UStatComponentUserInterface>())
+	{
+		if (UStatComponent* BossStat = IStatComponentUserInterface::Execute_GetStatComponent(BossActor))
+		{
+			UpdateBossHealthBar(BossActor, BossStat->GetCurrentHealth(), BossStat->GetMaxHealth());
+		}
+	}
+	BossHealthBarUIInstance->SetVisibility(ESlateVisibility::HitTestInvisible);
+	return true;
+}
+
+bool APlayerCharacter::HideBossHealthBar(AActor* BossActor)
+{
+	if (!IsValid(BossActor) || DisplayedBossActor != BossActor || !IsValid(BossHealthBarUIInstance)) return false;
+
+	BossHealthBarUIInstance->SetVisibility(ESlateVisibility::Collapsed);
+	DisplayedBossActor = nullptr;
+	return true;
+}
+
+void APlayerCharacter::UpdateBossHealthBar(AActor* BossActor, float CurrentHealth, float MaxHealth)
+{
+	if (!IsValid(BossActor) || DisplayedBossActor != BossActor || !IsValid(BossHealthBarUIInstance)) return;
+
+	FText BossName = FText::FromString(BossActor->GetName());
+	if (const UMonsterComponent* MonsterComponent = BossActor->FindComponentByClass<UMonsterComponent>())
+	{
+		if (const UMonsterDataAsset* MonsterData = MonsterComponent->GetMonsterData())
+		{
+			if (!MonsterData->MonsterName.IsEmpty()) BossName = MonsterData->MonsterName;
+		}
+	}
+	BossHealthBarUIInstance->SetBossInfo(BossName, CurrentHealth, MaxHealth);
+}
