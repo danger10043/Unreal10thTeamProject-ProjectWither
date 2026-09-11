@@ -69,6 +69,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|Inventory")
 	bool IsInventoryOpen() const { return bIsInventoryOpen; }
 
+	UFUNCTION(BlueprintCallable, Category = "Player|Potion")
+	bool UsePotion();
+
 	UFUNCTION(BlueprintCallable, Category = "Player|UI")
 	void ToggleStatWindow();
 
@@ -130,6 +133,7 @@ private:
 	void InteractInput();
 
 	void ReloadInput();
+	void UsePotionInput();
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
@@ -245,6 +249,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> ReloadAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> PotionAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
