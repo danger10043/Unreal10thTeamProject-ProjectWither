@@ -676,6 +676,12 @@ AActor* UWeaponComponent::SpawnWeaponActor(const UWeaponDataAsset* WeaponData) c
 
 	if (!IsValid(NewWeaponActor)) return nullptr;
 
+	if (ARangedWeaponActorBase* RangedWeapon =
+		Cast<ARangedWeaponActorBase>(NewWeaponActor))
+	{
+		RangedWeapon->SetFireInterval(WeaponData->GetFireInterval());
+	}
+
 	const bool bAttached = NewWeaponActor->AttachToComponent(
 		OwnerCharacter->GetMesh(),
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale,

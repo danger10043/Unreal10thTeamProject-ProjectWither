@@ -378,7 +378,8 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
     EnhancedInput->BindAction(RollAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRoll);
 
-	EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &APlayerCharacter::AttackInput);
+    EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &APlayerCharacter::AttackInput);
+    EnhancedInput->BindAction(AttackAction, ETriggerEvent::Triggered, this, &APlayerCharacter::AttackHeldInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Started, this, &APlayerCharacter::StartBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
@@ -580,6 +581,31 @@ void APlayerCharacter::AttackInput()
         return; 
     }
     CombatComponent->Attack();
+}
+
+void APlayerCharacter::AttackHeldInput()
+{
+    if (!IsValid(CombatComponent) ||
+        !IsValid(WeaponComponent) ||
+        !WeaponComponent->IsGunEquipped())
+    {
+        return;
+    }
+
+    const UWeaponDataAsset* WeaponData =
+        WeaponComponent->GetCurrentWeaponData();
+
+    if (!IsValid(WeaponData) || !WeaponData->IsAutomaticFire())
+    {
+        return;
+    }
+
+    if (!CombatComponent->CanAttack())
+    {
+        return;
+    }
+
+    CombatComponent->GunAttack();
 }
 
 void APlayerCharacter::StartBlockInput()

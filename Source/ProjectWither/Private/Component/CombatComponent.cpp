@@ -12,6 +12,7 @@
 #include "Component/MonsterComponent.h"
 #include "Component/PlayerCameraComponent.h"
 #include "Component/InventoryComponent.h"
+#include "Equipment/Weapon/RangedWeaponActorBase.h"
 #include "Engine/GameInstance.h"
 #include "Framework/SubSystem/SavePointSubsystem.h"
 #include "CollisionQueryParams.h"
@@ -349,6 +350,14 @@ void UCombatComponent::GunAttack()
 			Warning,
 			TEXT("UCombatComponent::GunAttack - 총이 장착되어 있지 않습니다.")
 		);
+		return;
+	}
+
+	const ARangedWeaponActorBase* RangedWeapon =
+		Cast<ARangedWeaponActorBase>(WeaponComponent->GetWeaponActor());
+
+	if (!IsValid(RangedWeapon) || !RangedWeapon->CanFire())
+	{
 		return;
 	}
 

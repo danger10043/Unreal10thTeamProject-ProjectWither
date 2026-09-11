@@ -37,15 +37,23 @@ class PROJECTWITHER_API ARangedWeaponActorBase : public AActor
 public:	
 	ARangedWeaponActorBase();
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Weapon|Gun")
+	UFUNCTION(BlueprintCallable, Category = "Weapon|Gun")
 	bool Fire(const FGunFireContext& FireContext);
 
-	virtual bool Fire_Implementation(const FGunFireContext& FireContext);
+	UFUNCTION(BlueprintPure, Category = "Weapon|Gun")
+	bool CanFire() const;
+
+	void SetFireInterval(float InFireInterval);
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|Gun")
 	USceneComponent* GetMuzzleComponent() const;
 
 protected:
+	UFUNCTION(BlueprintNativeEvent, Category = "Weapon|Gun")
+	bool ExecuteFire(const FGunFireContext& FireContext);
+
+	virtual bool ExecuteFire_Implementation(const FGunFireContext& FireContext);
+
 	UPROPERTY(
 		VisibleAnywhere,
 		BlueprintReadOnly,
@@ -73,4 +81,9 @@ protected:
 		)
 	)
 	float HitscanRange = 10000.0f;
+
+private:
+	float FireInterval = 0.2f;
+	double NextAllowedFireTime = 0.0;
+	bool bExecutingFire = false;
 };

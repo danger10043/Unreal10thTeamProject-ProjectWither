@@ -115,6 +115,8 @@ private:
 
 	void AttackInput();
 
+	void AttackHeldInput();
+
 	void StartBlockInput();
 	void StopBlockInput();
 
@@ -252,13 +254,13 @@ private:
 
 	// 이동 설정
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float WalkSpeed = 600.0f;
+	float WalkSpeed = 300.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RunSpeed = 1200.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float ZoomWalkSpeed = 300.0f;
+	float ZoomWalkSpeed = 200.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement|Run", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RunStaminaCostPerTick = 2.0f;
