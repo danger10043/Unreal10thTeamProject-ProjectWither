@@ -16,6 +16,8 @@
 #include "GameFramework/Character.h"
 #include "DataAsset/BossDataAsset.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "GameFramework/PlayerController.h"
+#include "Player/PlayerCharacter.h"
 
 // Sets default values for this component's properties
 UBossComponent::UBossComponent()
@@ -42,6 +44,7 @@ void UBossComponent::RestartEncounterFromPool()
 	{
 		World->GetTimerManager().ClearTimer(EntranceTimerHandle);
 		World->GetTimerManager().ClearTimer(PhaseTransitionTimerHandle);
+		World->GetTimerManager().ClearTimer(HealthBarCheckTimerHandle);
 	}
 
 	EntranceAnimInstance.Reset();
@@ -49,6 +52,8 @@ void UBossComponent::RestartEncounterFromPool()
 	bEncounterStarted = false;
 	bEntrancePlaying = false;
 	bPhase2Triggered = false;
+	LastDamageTime = -1.0;
+	HideHealthBar();
 	CurrentPhase = EBossPhase::Phase1;
 	ReleaseTransitionMovement(true);
 	ApplyPhaseSettings(EBossPhase::Phase1);
@@ -57,6 +62,7 @@ void UBossComponent::RestartEncounterFromPool()
 
 void UBossComponent::PrepareForPoolReturn()
 {
+	HideHealthBar();
 	bEntrancePlaying = false;
 	StopEntranceMontage();
 	StopPhaseTransitionMontage();
@@ -66,6 +72,7 @@ void UBossComponent::PrepareForPoolReturn()
 	{
 		World->GetTimerManager().ClearTimer(EntranceTimerHandle);
 		World->GetTimerManager().ClearTimer(PhaseTransitionTimerHandle);
+		World->GetTimerManager().ClearTimer(HealthBarCheckTimerHandle);
 	}
 }
 
@@ -180,6 +187,11 @@ void UBossComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		World->GetTimerManager().ClearTimer(PhaseTransitionTimerHandle);
 		World->GetTimerManager().ClearTimer(EntranceTimerHandle);
+		World->GetTimerManager().ClearTimer(HealthBarCheckTimerHandle);
+	}
+	if (IsValid(BossStatComponent))
+	{
+		BossStatComponent->OnHealthChanged.RemoveDynamic(this, &UBossComponent::HandleHealthChanged);
 	}
 	Super::EndPlay(EndPlayReason);
 }
@@ -198,10 +210,12 @@ void UBossComponent::BeginPlay()
     {
 		if (UStatComponent* Stat = IStatComponentUserInterface::Execute_GetStatComponent(OwnerActor))
         {
+			BossStatComponent = Stat;
             Stat->OnHealthChanged.AddUniqueDynamic(
                 this,
                 &UBossComponent::HandleHealthChanged
-            );
+			);
+			RefreshHealthBar(Stat->GetCurrentHealth(), Stat->GetMaxHealth());
         }
     }
 
@@ -222,6 +236,12 @@ void UBossComponent::BeginPlay()
 
 void UBossComponent::HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount)
 {
+	RefreshHealthBar(CurrentHealth, MaxHealth);
+	if (ChangedAmount < 0.0f && CurrentHealth > 0.0f)
+	{
+		ShowHealthBar();
+	}
+
 	if (bPhase2Triggered || CurrentPhase != EBossPhase::Phase1 || MaxHealth <= 0.0f)
 	{
 		return;
@@ -245,6 +265,7 @@ void UBossComponent::HandleHealthChanged(float CurrentHealth, float MaxHealth, f
 
 void UBossComponent::HandleBossDeath()
 {
+	HideHealthBar();
 	bEntrancePlaying = false;
 	StopEntranceMontage();
 	if (UWorld* World = GetWorld())
@@ -254,6 +275,73 @@ void UBossComponent::HandleBossDeath()
 	ReleaseTransitionMovement(false);
 	SetPhase(EBossPhase::Dead);
 	OnBossEncounterEnded.Broadcast();
+}
+
+void UBossComponent::RefreshHealthBar(float CurrentHealth, float MaxHealth)
+{
+	UWorld* World = GetWorld();
+	APlayerController* PlayerController = IsValid(World) ? World->GetFirstPlayerController() : nullptr;
+	if (APlayerCharacter* Player = IsValid(PlayerController)
+		? Cast<APlayerCharacter>(PlayerController->GetPawn()) : nullptr)
+	{
+		Player->UpdateBossHealthBar(GetOwner(), CurrentHealth, MaxHealth);
+	}
+}
+
+void UBossComponent::ShowHealthBar()
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World)) return;
+
+	APlayerController* PlayerController = World->GetFirstPlayerController();
+	if (!IsValid(PlayerController) || !PlayerController->IsLocalController()) return;
+
+	LastDamageTime = World->GetTimeSeconds();
+	APlayerCharacter* Player = Cast<APlayerCharacter>(PlayerController->GetPawn());
+	if (!IsValid(Player) || !Player->ShowBossHealthBar(GetOwner()))
+	{
+		return;
+	}
+	World->GetTimerManager().SetTimer(
+		HealthBarCheckTimerHandle, this, &UBossComponent::CheckHealthBarVisibility, 0.2f, true);
+}
+
+void UBossComponent::HideHealthBar()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HealthBarCheckTimerHandle);
+	}
+	UWorld* World = GetWorld();
+	APlayerController* PlayerController = IsValid(World) ? World->GetFirstPlayerController() : nullptr;
+	if (APlayerCharacter* Player = IsValid(PlayerController)
+		? Cast<APlayerCharacter>(PlayerController->GetPawn()) : nullptr)
+	{
+		Player->HideBossHealthBar(GetOwner());
+	}
+}
+
+void UBossComponent::CheckHealthBarVisibility()
+{
+	UWorld* World = GetWorld();
+	const UBossDataAsset* BossData = GetBossData();
+	APlayerController* PlayerController = IsValid(World) ? World->GetFirstPlayerController() : nullptr;
+	APawn* PlayerPawn = IsValid(PlayerController) ? PlayerController->GetPawn() : nullptr;
+	if (!IsValid(World) || !IsValid(BossData) || !IsValid(PlayerPawn) || !IsValid(GetOwner()))
+	{
+		HideHealthBar();
+		return;
+	}
+
+	const bool bTimedOut = BossData->HealthBarInactiveTime <= 0.0f ||
+		World->GetTimeSeconds() - LastDamageTime >= BossData->HealthBarInactiveTime;
+	const bool bTooFar = BossData->HealthBarMaxDistance <= 0.0f ||
+		FVector::DistSquared(PlayerPawn->GetActorLocation(), GetOwner()->GetActorLocation()) >
+		FMath::Square(BossData->HealthBarMaxDistance);
+	if (bTimedOut || bTooFar)
+	{
+		HideHealthBar();
+	}
 }
 
 void UBossComponent::SetPhase(EBossPhase NewPhase)
