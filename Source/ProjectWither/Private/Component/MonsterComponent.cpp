@@ -396,6 +396,23 @@ bool UMonsterComponent::Attack()
 	return true;
 }
 
+bool UMonsterComponent::IsAttackMontagePlaying() const
+{
+	if (!IsValid(ActiveAttackMontage))
+	{
+		return false;
+	}
+
+	const AActor* Owner = GetOwner();
+	const USkeletalMeshComponent* Mesh =
+		IsValid(Owner) ? Owner->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+	const UAnimInstance* AnimInstance =
+		IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+
+	return IsValid(AnimInstance) &&
+		AnimInstance->Montage_IsPlaying(ActiveAttackMontage);
+}
+
 void UMonsterComponent::FinishAttack()
 {
 	DisableAllAttackHitboxes();

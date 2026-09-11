@@ -63,6 +63,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Monster")
 	bool IsDead() const { return bIsDead; }
 
+	bool IsAttackMontagePlaying() const;
+
 	UFUNCTION(BlueprintPure, Category = "Monster")
 	int32 GetMonsterId() const { return MonsterId; }
 
