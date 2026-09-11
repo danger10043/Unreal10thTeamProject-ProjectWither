@@ -388,7 +388,8 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
     EnhancedInput->BindAction(RollAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRoll);
 
-	EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &APlayerCharacter::AttackInput);
+    EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &APlayerCharacter::AttackInput);
+    EnhancedInput->BindAction(AttackAction, ETriggerEvent::Triggered, this, &APlayerCharacter::AttackHeldInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Started, this, &APlayerCharacter::StartBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
@@ -596,6 +597,31 @@ void APlayerCharacter::AttackInput()
     CombatComponent->Attack();
 }
 
+void APlayerCharacter::AttackHeldInput()
+{
+    if (!IsValid(CombatComponent) ||
+        !IsValid(WeaponComponent) ||
+        !WeaponComponent->IsGunEquipped())
+    {
+        return;
+    }
+
+    const UWeaponDataAsset* WeaponData =
+        WeaponComponent->GetCurrentWeaponData();
+
+    if (!IsValid(WeaponData) || !WeaponData->IsAutomaticFire())
+    {
+        return;
+    }
+
+    if (!CombatComponent->CanAttack())
+    {
+        return;
+    }
+
+    CombatComponent->GunAttack();
+}
+
 void APlayerCharacter::StartBlockInput()
 {
     if (!IsValid(CombatComponent)) { return; }
@@ -685,21 +711,17 @@ void APlayerCharacter::LockOnInput()
 void APlayerCharacter::SwapWeaponInput()
 {
     if (IsValid(CombatComponent) &&
-        CombatComponent->GetActionState() == EPlayerActionState::Reload)
+        (CombatComponent->GetActionState() == EPlayerActionState::Reload ||
+            CombatComponent->IsSwordAttackInProgress()))
     {
         return;
     }
 
     if (!IsValid(WeaponComponent)) return;
 
-    if (IsValid(CombatComponent))
-    {
-        CombatComponent->CancelSwordRecovery();
-    }
-
     if (!WeaponComponent->SwapWeapon())
     {
-		UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::SwapWeaponInput - 무기 교체에 실패했습니다."));
+        UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::SwapWeaponInput - 무기 교체에 실패했습니다."));
     }
 }
 

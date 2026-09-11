@@ -12,6 +12,7 @@
 #include "Component/MonsterComponent.h"
 #include "Component/PlayerCameraComponent.h"
 #include "Component/InventoryComponent.h"
+#include "Equipment/Weapon/RangedWeaponActorBase.h"
 #include "Engine/GameInstance.h"
 #include "Framework/SubSystem/SavePointSubsystem.h"
 #include "CollisionQueryParams.h"
@@ -288,6 +289,8 @@ void UCombatComponent::BeginSwordDamageWindow()
 		|| !IsValid(WeaponComponent)
 		|| !WeaponComponent->IsSwordEquipped()) return;
 
+	WeaponComponent->BeginSwordTrail();
+
 	UCapsuleComponent* SwordCollision = FindSwordCollision();
 
 	if (!IsValid(SwordCollision))
@@ -309,6 +312,11 @@ void UCombatComponent::BeginSwordDamageWindow()
 
 void UCombatComponent::EndSwordDamageWindow()
 {
+	if (IsValid(WeaponComponent))
+	{
+		WeaponComponent->EndSwordTrail();
+	}
+
 	if (IsValid(ActiveSwordCollision))
 	{
 		ActiveSwordCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -342,6 +350,14 @@ void UCombatComponent::GunAttack()
 			Warning,
 			TEXT("UCombatComponent::GunAttack - 총이 장착되어 있지 않습니다.")
 		);
+		return;
+	}
+
+	const ARangedWeaponActorBase* RangedWeapon =
+		Cast<ARangedWeaponActorBase>(WeaponComponent->GetWeaponActor());
+
+	if (!IsValid(RangedWeapon) || !RangedWeapon->CanFire())
+	{
 		return;
 	}
 

@@ -16,9 +16,43 @@ ARangedWeaponActorBase::ARangedWeaponActorBase()
 	Muzzle->SetupAttachment(SceneRoot);
 }
 
-bool ARangedWeaponActorBase::Fire_Implementation(const FGunFireContext& FireContext)
+void ARangedWeaponActorBase::SetFireInterval(float InFireInterval)
 {
+	FireInterval = FMath::Max(0.01f, InFireInterval);
+}
+
+bool ARangedWeaponActorBase::CanFire() const
+{
+	const UWorld* World = GetWorld();
+
+	return IsValid(World) &&
+		!bExecutingFire &&
+		static_cast<double>(World->GetTimeSeconds()) >= NextAllowedFireTime;
+}
+
+bool ARangedWeaponActorBase::Fire(const FGunFireContext& FireContext)
+{
+	if (!CanFire()) return false;
+
+	UWorld* World = GetWorld();
+	if (!IsValid(World)) return false;
+
+	const double FireTime = static_cast<double>(World->GetTimeSeconds());
+
+	bExecutingFire = true;
+	const bool bFired = ExecuteFire(FireContext);
+	bExecutingFire = false;
+
+	if (!bFired) return false;
+
+	NextAllowedFireTime = FireTime + static_cast<double>(FireInterval);
 	return true;
+}
+
+bool ARangedWeaponActorBase::ExecuteFire_Implementation(
+	const FGunFireContext& FireContext)
+{
+	return false;
 }
 
 USceneComponent* ARangedWeaponActorBase::GetMuzzleComponent() const
