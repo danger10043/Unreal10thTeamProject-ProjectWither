@@ -30,6 +30,7 @@ class UInteractionComponent;
 class UCrosshairUI;
 class ULockOnWidget;
 class UStatWindowWidget;
+class UBossHealthBarWidget;
 
 UCLASS()
 class PROJECTWITHER_API APlayerCharacter : 
@@ -80,6 +81,16 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Player|UI")
 	void CloseStatWindow();
+
+	/** Shows a boss's screen-fixed health bar and restarts its inactivity timer. */
+	UFUNCTION(BlueprintCallable, Category = "Player|UI|Boss")
+	bool ShowBossHealthBar(AActor* BossActor);
+
+	UFUNCTION(BlueprintCallable, Category = "Player|UI|Boss")
+	bool HideBossHealthBar(AActor* BossActor);
+
+	/** Updates the currently displayed boss without changing its visibility timer. */
+	void UpdateBossHealthBar(AActor* BossActor, float CurrentHealth, float MaxHealth);
 
 	virtual UStatComponent* GetStatComponent_Implementation() const override;
 
@@ -204,6 +215,16 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULockOnWidget> LockOnUIInstance;
+
+	/** Assign WBP_BossHealthBar here in BP_MainPlayerCharacter defaults. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|UI", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UBossHealthBarWidget> BossHealthBarUIClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBossHealthBarWidget> BossHealthBarUIInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> DisplayedBossActor;
 
 	// 카메라
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Camera", meta = (AllowPrivateAccess = "true"))

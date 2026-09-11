@@ -17,7 +17,17 @@ public:
 	void SetHealth(float CurrentHealth, float MaxHealth);
 
 protected:
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
 	// The Widget Blueprint progress bar must use this name.
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> HealthProgressBar;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster|UI", meta = (ClampMin = "0.0"))
+	float HealthInterpolationSpeed = 5.0f;
+
+private:
+	float DisplayedHealthPercent = 1.0f;
+	float TargetHealthPercent = 1.0f;
+	bool bHealthInitialized = false;
 };

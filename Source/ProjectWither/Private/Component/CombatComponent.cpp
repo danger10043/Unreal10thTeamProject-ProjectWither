@@ -14,6 +14,7 @@
 #include "Component/InventoryComponent.h"
 #include "Equipment/Weapon/RangedWeaponActorBase.h"
 #include "Engine/GameInstance.h"
+#include "Framework/SubSystem/MonsterSpawnSubsystem.h"
 #include "Framework/SubSystem/SavePointSubsystem.h"
 #include "CollisionQueryParams.h"
 #include "Engine/OverlapResult.h"
@@ -551,7 +552,7 @@ void UCombatComponent::HandleSwordCollisionBeginOverlap(
 	if (SwordDamage <= 0.0f) return;
 
 	SwordHitActors.Add(OtherActor);
-	
+
 	const UWeaponDataAsset* WeaponData =
 		IsValid(WeaponComponent)
 		? WeaponComponent->GetCurrentWeaponData()
@@ -640,7 +641,7 @@ float UCombatComponent::CalculateSwordDamage() const
 	if (!IsValid(WeaponData) || WeaponData->GetWeaponType() != EWeaponType::Sword) { return 0.0f; }
 
 	const float MinAttackPower = FMath::Min(StatComponent->GetMinAttackPower(), StatComponent->GetMaxAttackPower());
-	
+
 	const float MaxAttackPower = FMath::Max(StatComponent->GetMinAttackPower(), StatComponent->GetMaxAttackPower());
 
 	const float CharacterAttackPower = FMath::FRandRange(MinAttackPower, MaxAttackPower);
@@ -961,6 +962,15 @@ void UCombatComponent::HandleRespawn()
 	if (IsValid(StatComponent))
 	{
 		StatComponent->ResetStat();
+	}
+
+	// 부활할 때도 세이브 포인트 휴식과 동일하게 레벨의 몬스터를 전부 리스폰
+	if (UWorld* World = GetWorld())
+	{
+		if (UMonsterSpawnSubsystem* SpawnSubsystem = World->GetSubsystem<UMonsterSpawnSubsystem>())
+		{
+			SpawnSubsystem->RespawnAllZones();
+		}
 	}
 
 	OwnerPlayer->SetCanMove(true);

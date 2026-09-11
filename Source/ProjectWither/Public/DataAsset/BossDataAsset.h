@@ -12,6 +12,12 @@ class PROJECTWITHER_API UBossDataAsset : public UMonsterDataAsset
     GENERATED_BODY()
 
 public:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|UI", meta = (ClampMin = "0.0", Units = "cm"))
+	float HealthBarMaxDistance = 3000.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|UI", meta = (ClampMin = "0.0", Units = "s"))
+	float HealthBarInactiveTime = 5.0f;
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Boss|Phase")
     float Phase2HealthRatio = 0.5f;
 

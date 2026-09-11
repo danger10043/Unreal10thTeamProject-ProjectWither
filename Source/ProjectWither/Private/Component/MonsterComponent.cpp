@@ -259,13 +259,30 @@ void UMonsterComponent::DropItems()
 			continue;
 		}
 
-		const FVector DropLocation =
+		FVector DropLocation =
 			GetOwner()->GetActorLocation() +
 			FVector(
 				FMath::RandRange(-DropRange, DropRange),
 				FMath::RandRange(-DropRange, DropRange),
 				DropHeight
 			);
+
+		// 높은 위치에서 죽더라도 픽업이 공중에 남지 않도록 월드 지형까지 내린다.
+		FHitResult FloorHit;
+		FCollisionQueryParams FloorTraceParams(SCENE_QUERY_STAT(PickupFloorTrace), false, GetOwner());
+		const FVector TraceStart = DropLocation + FVector(0.0f, 0.0f, 200.0f);
+		const FVector TraceEnd = DropLocation - FVector(0.0f, 0.0f, 5000.0f);
+		const FCollisionObjectQueryParams FloorObjectTypes(ECC_TO_BITFIELD(ECC_WorldStatic));
+
+		if (World->LineTraceSingleByObjectType(
+			FloorHit,
+			TraceStart,
+			TraceEnd,
+			FloorObjectTypes,
+			FloorTraceParams))
+		{
+			DropLocation = FloorHit.ImpactPoint + FVector(0.0f, 0.0f, 5.0f);
+		}
 
 		const FTransform PickupTransform(FRotator::ZeroRotator, DropLocation);
 		APickupItem* Pickup = World->SpawnActorDeferred<APickupItem>(
