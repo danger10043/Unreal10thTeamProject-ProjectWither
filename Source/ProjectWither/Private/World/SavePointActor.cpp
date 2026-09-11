@@ -9,6 +9,7 @@
 #include "Component/StatComponent.h"
 #include "Component/WeaponComponent.h"
 #include "Engine/GameInstance.h"
+#include "Framework/SubSystem/MonsterSpawnSubsystem.h"
 #include "Framework/SubSystem/SavePointSubsystem.h"
 #include "GameFramework/PlayerController.h"
 #include "Interface/StatComponentUserInterface.h"
@@ -89,6 +90,15 @@ void ASavePointActor::Interact_Implementation(AActor* Interactor)
 
 	RestPlayer(Player);
 	OnRested();
+
+	// 휴식할 때마다 레벨에 배치된 몬스터를 전부 리스폰
+	if (UWorld* World = GetWorld())
+	{
+		if (UMonsterSpawnSubsystem* SpawnSubsystem = World->GetSubsystem<UMonsterSpawnSubsystem>())
+		{
+			SpawnSubsystem->RespawnAllZones();
+		}
+	}
 
 	OpenSavePointMenu(Player);
 }
