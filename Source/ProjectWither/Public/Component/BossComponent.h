@@ -68,6 +68,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Boss|UI")
 	void HideHealthBar();
 
+	/** Display name read directly from this boss's Boss Data Asset. */
+	UFUNCTION(BlueprintPure, Category = "Boss|UI")
+	FText GetBossDisplayName() const;
+
     UPROPERTY(BlueprintAssignable, Category = "Boss|Event")
     FOnBossPhaseChanged OnBossPhaseChanged;
 
