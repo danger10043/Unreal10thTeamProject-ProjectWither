@@ -6,6 +6,9 @@
 #include "Equipment/Weapon/RangedWeaponActorBase.h"
 
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Engine/World.h"
 #include "DataAsset/WeaponDataAsset.h"
 #include "GameFramework/Actor.h"
@@ -175,6 +178,17 @@ void UWeaponComponent::UnequipWeapon()
 bool UWeaponComponent::SwapWeapon()
 {
 	AActor* OwnerActor = GetOwner();
+
+	const UCombatComponent* Combat =
+		IsValid(OwnerActor)
+		? OwnerActor->FindComponentByClass<UCombatComponent>()
+		: nullptr;
+
+	if (IsValid(Combat) && Combat->IsSwordAttackInProgress())
+	{
+		return false;
+	}
+
 	UEquipmentComponent* EquipmentComponent =
 		IsValid(OwnerActor)
 		? OwnerActor->FindComponentByClass<UEquipmentComponent>()
@@ -249,6 +263,75 @@ EWeaponType UWeaponComponent::GetWeaponType() const
 bool UWeaponComponent::IsSwordEquipped() const
 {
 	return GetWeaponType() == EWeaponType::Sword;
+}
+
+void UWeaponComponent::BeginSwordTrail()
+{
+	if (!IsSwordEquipped() || !IsValid(WeaponActor)) return;
+
+	if (!IsValid(SwordTrailComponent))
+	{
+		const UWeaponDataAsset* WeaponData = GetCurrentWeaponData();
+
+		if (!IsValid(WeaponData) ||
+			!IsValid(WeaponData->GetWeaponTrailEffect()))
+		{
+			return;
+		}
+
+		const FName TrailSocketName(TEXT("TrailSocket"));
+		TArray<UStaticMeshComponent*> MeshComponents;
+		WeaponActor->GetComponents<UStaticMeshComponent>(MeshComponents);
+
+		UStaticMeshComponent* TrailMesh = nullptr;
+
+		for (UStaticMeshComponent* MeshComponent : MeshComponents)
+		{
+			if (IsValid(MeshComponent) &&
+				MeshComponent->DoesSocketExist(TrailSocketName))
+			{
+				TrailMesh = MeshComponent;
+				break;
+			}
+		}
+
+		if (!IsValid(TrailMesh))
+		{
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("WeaponComponent::BeginSwordTrail - TrailSocket을 가진 StaticMeshComponent가 없습니다.")
+			);
+			return;
+		}
+
+		SwordTrailComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			WeaponData->GetWeaponTrailEffect(),
+			TrailMesh,
+			TrailSocketName,
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			EAttachLocation::SnapToTarget,
+			false, // bAutoDestroy
+			false, // bAutoActivate
+			ENCPoolMethod::None,
+			false  // bPreCullCheck
+		);
+	}
+
+	if (IsValid(SwordTrailComponent))
+	{
+		SwordTrailComponent->SetVisibility(true);
+		SwordTrailComponent->Activate(true);
+	}
+}
+
+void UWeaponComponent::EndSwordTrail()
+{
+	if (!IsValid(SwordTrailComponent)) return;
+
+	SwordTrailComponent->SetVisibility(false);
+	SwordTrailComponent->DeactivateImmediate();
 }
 
 bool UWeaponComponent::IsGunEquipped() const
@@ -593,6 +676,12 @@ AActor* UWeaponComponent::SpawnWeaponActor(const UWeaponDataAsset* WeaponData) c
 
 	if (!IsValid(NewWeaponActor)) return nullptr;
 
+	if (ARangedWeaponActorBase* RangedWeapon =
+		Cast<ARangedWeaponActorBase>(NewWeaponActor))
+	{
+		RangedWeapon->SetFireInterval(WeaponData->GetFireInterval());
+	}
+
 	const bool bAttached = NewWeaponActor->AttachToComponent(
 		OwnerCharacter->GetMesh(),
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
@@ -624,6 +713,15 @@ AActor* UWeaponComponent::SpawnWeaponActor(const UWeaponDataAsset* WeaponData) c
 
 void UWeaponComponent::DestroyWeaponActor()
 {
+	EndSwordTrail();
+
+	if (IsValid(SwordTrailComponent))
+	{
+		SwordTrailComponent->DestroyComponent();
+	}
+
+	SwordTrailComponent = nullptr;
+
 	if (IsValid(WeaponActor))
 	{
 		WeaponActor->Destroy();

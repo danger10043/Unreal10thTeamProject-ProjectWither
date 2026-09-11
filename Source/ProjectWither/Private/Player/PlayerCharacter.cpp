@@ -180,6 +180,16 @@ void APlayerCharacter::CloseInventory()
     PlayerController->SetInputMode(InputMode);														// 설정한 입력 모드를 PlayerController에 적용한다.
 }
 
+bool APlayerCharacter::UsePotion()
+{
+	return IsValid(InventoryComponent) && InventoryComponent->UsePotion();
+}
+
+void APlayerCharacter::UsePotionInput()
+{
+	UsePotion();
+}
+
 void APlayerCharacter::ToggleStatWindow()
 {
     if (IsValid(StatWindowInstance))
@@ -378,7 +388,8 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
     EnhancedInput->BindAction(RollAction, ETriggerEvent::Started, this, &APlayerCharacter::StartRoll);
 
-	EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &APlayerCharacter::AttackInput);
+    EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &APlayerCharacter::AttackInput);
+    EnhancedInput->BindAction(AttackAction, ETriggerEvent::Triggered, this, &APlayerCharacter::AttackHeldInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Started, this, &APlayerCharacter::StartBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Completed, this, &APlayerCharacter::StopBlockInput);
     EnhancedInput->BindAction(BlockAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopBlockInput);
@@ -394,6 +405,10 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopZoomInput);
     EnhancedInput->BindAction(LockOnAction, ETriggerEvent::Started, this, &APlayerCharacter::LockOnInput);
     EnhancedInput->BindAction(ReloadAction, ETriggerEvent::Started, this, &APlayerCharacter::ReloadInput);
+	if (IsValid(PotionAction))
+	{
+		EnhancedInput->BindAction(PotionAction, ETriggerEvent::Started, this, &APlayerCharacter::UsePotionInput);
+	}
     
 }
 
@@ -582,6 +597,31 @@ void APlayerCharacter::AttackInput()
     CombatComponent->Attack();
 }
 
+void APlayerCharacter::AttackHeldInput()
+{
+    if (!IsValid(CombatComponent) ||
+        !IsValid(WeaponComponent) ||
+        !WeaponComponent->IsGunEquipped())
+    {
+        return;
+    }
+
+    const UWeaponDataAsset* WeaponData =
+        WeaponComponent->GetCurrentWeaponData();
+
+    if (!IsValid(WeaponData) || !WeaponData->IsAutomaticFire())
+    {
+        return;
+    }
+
+    if (!CombatComponent->CanAttack())
+    {
+        return;
+    }
+
+    CombatComponent->GunAttack();
+}
+
 void APlayerCharacter::StartBlockInput()
 {
     if (!IsValid(CombatComponent)) { return; }
@@ -671,21 +711,17 @@ void APlayerCharacter::LockOnInput()
 void APlayerCharacter::SwapWeaponInput()
 {
     if (IsValid(CombatComponent) &&
-        CombatComponent->GetActionState() == EPlayerActionState::Reload)
+        (CombatComponent->GetActionState() == EPlayerActionState::Reload ||
+            CombatComponent->IsSwordAttackInProgress()))
     {
         return;
     }
 
     if (!IsValid(WeaponComponent)) return;
 
-    if (IsValid(CombatComponent))
-    {
-        CombatComponent->CancelSwordRecovery();
-    }
-
     if (!WeaponComponent->SwapWeapon())
     {
-		UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::SwapWeaponInput - 무기 교체에 실패했습니다."));
+        UE_LOG(LogTemp, Warning, TEXT("APlayerCharacter::SwapWeaponInput - 무기 교체에 실패했습니다."));
     }
 }
 

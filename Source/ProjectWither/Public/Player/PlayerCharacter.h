@@ -69,6 +69,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Player|Inventory")
 	bool IsInventoryOpen() const { return bIsInventoryOpen; }
 
+	UFUNCTION(BlueprintCallable, Category = "Player|Potion")
+	bool UsePotion();
+
 	UFUNCTION(BlueprintCallable, Category = "Player|UI")
 	void ToggleStatWindow();
 
@@ -115,6 +118,8 @@ private:
 
 	void AttackInput();
 
+	void AttackHeldInput();
+
 	void StartBlockInput();
 	void StopBlockInput();
 
@@ -130,6 +135,7 @@ private:
 	void InteractInput();
 
 	void ReloadInput();
+	void UsePotionInput();
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Component", meta = (AllowPrivateAccess = "true"))
@@ -247,18 +253,21 @@ private:
 	TObjectPtr<UInputAction> ReloadAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> PotionAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
 
 	// 이동 설정
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float WalkSpeed = 600.0f;
+	float WalkSpeed = 300.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RunSpeed = 1200.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-	float ZoomWalkSpeed = 300.0f;
+	float ZoomWalkSpeed = 200.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player|Movement|Run", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 	float RunStaminaCostPerTick = 2.0f;

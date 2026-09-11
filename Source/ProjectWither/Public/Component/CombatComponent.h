@@ -98,6 +98,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	FORCEINLINE EPlayerActionState GetActionState() const { return ActionState; }
 
+	UFUNCTION(BlueprintPure, Category = "Combat|Sword")
+	bool IsSwordAttackInProgress() const
+	{
+		return ActionState == EPlayerActionState::AttackingWithSword || bSwordRecovery;
+	}
+
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	bool CanAttack() const;
 

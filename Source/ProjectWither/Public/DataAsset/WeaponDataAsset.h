@@ -30,6 +30,25 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (EditCondition = "WeaponType == EWeaponType::Gun", ClampMin = "0")) // 탄환의 최대 개수 기본값 : 0
 	int32 MaxAmmo = 0;
 
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Weapon|Gun",
+		meta = (
+			EditCondition = "WeaponType == EWeaponType::Gun",
+			ClampMin = "0.01",
+			Units = "s"
+			)
+	)
+	float FireInterval = 0.2f;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Weapon|Gun",
+		meta = (EditCondition = "WeaponType == EWeaponType::Gun")
+	)
+	bool bAutomaticFire = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon", meta = (ClampMin = "0.0"))	// 무기 공격력
 	float WeaponPower = 0.0f;
@@ -67,6 +86,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	int32 GetMaxAmmo() const;
+
+	UFUNCTION(BlueprintPure, Category = "Weapon|Gun")
+	float GetFireInterval() const
+	{
+		return FMath::Max(0.01f, FireInterval);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Weapon|Gun")
+	bool IsAutomaticFire() const
+	{
+		return bAutomaticFire;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	float GetWeaponPower() const;
