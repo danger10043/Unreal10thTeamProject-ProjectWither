@@ -19,6 +19,7 @@ APickupItem::APickupItem()
 	SphereCollision->InitSphereRadius(100.0f);
 	SphereCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
 	SphereCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SetRootComponent(SphereCollision);
 
 	ItemMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh"));
@@ -30,13 +31,17 @@ APickupItem::APickupItem()
 	NiagaraComponent->SetupAttachment(SphereCollision);
 }
 
-void APickupItem::InitializePickup(FItemInstance InItemData)
+void APickupItem::InitializePickup(const FItemInstance& InItemData)
 {
 	ItemInstance = InItemData;
 
-	if (ItemMeshComponent && ItemInstance.ItemData)
+	if (IsValid(ItemMeshComponent))
 	{
-		ItemMeshComponent->SetStaticMesh(ItemInstance.ItemData->GetItemMesh());
+		UStaticMesh* ItemMesh = IsValid(ItemInstance.ItemData)
+			? ItemInstance.ItemData->GetItemMesh()
+			: nullptr;
+
+		ItemMeshComponent->SetStaticMesh(ItemMesh);
 	}
 }
 
@@ -56,18 +61,25 @@ void APickupItem::BeginPlay()
 	Super::BeginPlay();
 	
 	ElapsedTime = 0.0f;
+	OnActorBeginOverlap.AddUniqueDynamic(this, &APickupItem::OnBeginOverlap);
+	SphereCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	FTimerHandle PickupDelayHandle;
 	GetWorld()->GetTimerManager().SetTimer(
-		PickupDelayHandle,
-		[this]()
-		{
-			UE_LOG(LogTemp, Log, TEXT("픽업을 획득할 수 있습니다."));
-			OnActorBeginOverlap.AddDynamic(this, &APickupItem::OnBeginOverlap);
-		},
-		PickupDelayTime,
+		PickupDelayTimerHandle,
+		this,
+		&APickupItem::EnablePickup,
+		FMath::Max(2.0f, PickupDelayTime),
 		false
 	);
+}
+
+void APickupItem::EnablePickup()
+{
+	if (!IsValid(SphereCollision)) return;
+
+	UE_LOG(LogTemp, Log, TEXT("%s 픽업을 획득할 수 있습니다."), *GetName());
+	SphereCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	SphereCollision->UpdateOverlaps();
 }
 
 // Called every frame

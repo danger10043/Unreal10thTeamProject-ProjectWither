@@ -252,8 +252,10 @@ bool UInventoryComponent::UseItemAtSlot(int32 SlotIndex)
 			return false;
 		}
 
-		StatComponent->RecoverHealth(PotionData->GetHealAmount());									// 현재 체력 상태와 관계없이 포션 효과를 적용한다.
-		return RemoveItemAtSlot(SlotIndex, 1);														// 포션 사용 처리가 끝나면 포션 1개를 소비한다.
+		const float HealPercent = PotionData->GetHealAmount() / 100.0f;
+		const float HealAmount = StatComponent->GetMaxHealth() * HealPercent;
+		StatComponent->RecoverHealth(HealAmount);									// 최대 체력의 해당 퍼센트로 포션 효과를 적용한다.
+		return RemoveItemAtSlot(SlotIndex, 1);										// 포션 사용 처리가 끝나면 포션 1개를 소비한다.
 	}
 	case EItemType::Weapon:
 	case EItemType::Armor:
