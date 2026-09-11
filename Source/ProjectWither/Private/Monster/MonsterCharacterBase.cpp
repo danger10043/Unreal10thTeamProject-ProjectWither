@@ -49,6 +49,32 @@ AMonsterCharacterBase::AMonsterCharacterBase()
     }
 }
 
+void AMonsterCharacterBase::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    if (!IsValid(MonsterComponent) ||
+        !MonsterComponent->IsAttackMontagePlaying())
+    {
+        return;
+    }
+
+    const AActor* TargetActor = MonsterComponent->GetTargetActor();
+    if (!IsValid(TargetActor))
+    {
+        return;
+    }
+
+    FVector ToTarget = TargetActor->GetActorLocation() - GetActorLocation();
+    ToTarget.Z = 0.0f;
+    if (ToTarget.IsNearlyZero())
+    {
+        return;
+    }
+
+    SetActorRotation(FRotator(0.0f, ToTarget.Rotation().Yaw, 0.0f));
+}
+
 float AMonsterCharacterBase::TakeDamage(float Damage, const FDamageEvent& DamageEvent,
     AController* EventInstigator, AActor* DamageCauser)
 {
