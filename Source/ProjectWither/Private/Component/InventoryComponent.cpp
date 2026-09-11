@@ -11,10 +11,18 @@
 #include "Interface/StatComponentUserInterface.h"
 #include "DataAsset/AmmoDataAsset.h"
 #include "DataAsset/WeaponDataAsset.h"
+#include "UObject/ConstructorHelpers.h"
 
 UInventoryComponent::UInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+
+	static ConstructorHelpers::FObjectFinder<UPotionDataAsset> DefaultPotionAsset(
+		TEXT("/Game/Main/DataAsset/Item/1_UseItem/1_Potion/DA_ID1101_Healpack.DA_ID1101_Healpack"));
+	if (DefaultPotionAsset.Succeeded())
+	{
+		PotionItem.ItemData = DefaultPotionAsset.Object;
+	}
 }
 
 namespace
@@ -36,6 +44,9 @@ void UInventoryComponent::BeginPlay()
 	Super::BeginPlay();
 
 	InventoryItems.SetNum(MaxInventorySlot);
+	MigrateInventoryPotions();
+	PotionItem.Quantity = FMath::Clamp(PotionItem.Quantity, 0, GetMaxPotionQuantity());
+	OnPotionChanged.Broadcast(PotionItem.Quantity, GetMaxPotionQuantity());
 }
 
 
@@ -56,6 +67,11 @@ int32 UInventoryComponent::AddItem(UItemDataAsset* Item, int32 AddQuantity)
 int32 UInventoryComponent::AddItemInstance(const FItemInstance& NewItemInstance)
 {
 	if (!IsValid(NewItemInstance.ItemData) || NewItemInstance.Quantity <= 0) return 0;
+
+	if (NewItemInstance.ItemData->GetItemType() == EItemType::Potion)
+	{
+		return AddPotion(Cast<UPotionDataAsset>(NewItemInstance.ItemData.Get()), NewItemInstance.Quantity);
+	}
 
 	const int32 MaxStack = FMath::Max(1, NewItemInstance.ItemData->GetMaxStack());
 	int32 RemainingAddQuantity = NewItemInstance.Quantity;
@@ -115,6 +131,14 @@ int32 UInventoryComponent::AddItemInstance(const FItemInstance& NewItemInstance)
 
 bool UInventoryComponent::RemoveItem(int32 ItemId, int32 RemoveQuantity)
 {
+	if (IsValid(PotionItem.ItemData) && PotionItem.ItemData->GetItemId() == ItemId)
+	{
+		if (RemoveQuantity <= 0 || PotionItem.Quantity < RemoveQuantity) return false;
+		PotionItem.Quantity -= RemoveQuantity;
+		OnPotionChanged.Broadcast(PotionItem.Quantity, GetMaxPotionQuantity());
+		return true;
+	}
+
 	if (RemoveQuantity <= 0)																		// 제거 요청 수량이 0 이하이면 실패 처리
 	{
 		return false;
@@ -284,7 +308,81 @@ bool UInventoryComponent::UseItemAtSlot(int32 SlotIndex)
 
 bool UInventoryComponent::UseItem(int32 ItemId)
 {
+	if (IsValid(PotionItem.ItemData) && PotionItem.ItemData->GetItemId() == ItemId)
+	{
+		return UsePotion();
+	}
+
 	return false;
+}
+
+bool UInventoryComponent::UsePotion()
+{
+	UPotionDataAsset* PotionData = GetPotionData();
+	AActor* OwnerActor = GetOwner();
+
+	if (!IsValid(PotionData) || PotionItem.Quantity <= 0 || !IsValid(OwnerActor) ||
+		!OwnerActor->GetClass()->ImplementsInterface(UStatComponentUserInterface::StaticClass()))
+	{
+		return false;
+	}
+
+	UStatComponent* StatComponent = IStatComponentUserInterface::Execute_GetStatComponent(OwnerActor);
+	if (!IsValid(StatComponent) || StatComponent->IsHealthZero() ||
+		StatComponent->GetCurrentHealth() >= StatComponent->GetMaxHealth())
+	{
+		return false;
+	}
+
+	const float HealAmount = StatComponent->GetMaxHealth() * (PotionData->GetHealAmount() / 100.0f);
+	if (StatComponent->RecoverHealth(HealAmount) <= 0.0f) return false;
+
+	--PotionItem.Quantity;
+	OnPotionChanged.Broadcast(PotionItem.Quantity, GetMaxPotionQuantity());
+	return true;
+}
+
+UPotionDataAsset* UInventoryComponent::GetPotionData() const
+{
+	return Cast<UPotionDataAsset>(PotionItem.ItemData.Get());
+}
+
+int32 UInventoryComponent::GetMaxPotionQuantity() const
+{
+	const UPotionDataAsset* PotionData = GetPotionData();
+	return IsValid(PotionData) ? FMath::Max(1, PotionData->GetMaxStack()) : 0;
+}
+
+int32 UInventoryComponent::AddPotion(UPotionDataAsset* InPotionData, int32 AddQuantity)
+{
+	if (!IsValid(InPotionData) || AddQuantity <= 0) return 0;
+
+	UPotionDataAsset* CurrentPotionData = GetPotionData();
+	if (IsValid(CurrentPotionData) && CurrentPotionData->GetItemId() != InPotionData->GetItemId()) return 0;
+
+	PotionItem.ItemData = InPotionData;
+	const int32 PreviousQuantity = PotionItem.Quantity;
+	PotionItem.Quantity = FMath::Clamp(PreviousQuantity + AddQuantity, 0, GetMaxPotionQuantity());
+	const int32 AddedQuantity = PotionItem.Quantity - PreviousQuantity;
+
+	if (AddedQuantity > 0)
+	{
+		OnPotionChanged.Broadcast(PotionItem.Quantity, GetMaxPotionQuantity());
+	}
+
+	return AddedQuantity;
+}
+
+void UInventoryComponent::MigrateInventoryPotions()
+{
+	for (FItemInstance& InventoryItem : InventoryItems)
+	{
+		UPotionDataAsset* PotionData = Cast<UPotionDataAsset>(InventoryItem.ItemData.Get());
+		if (!IsValid(PotionData) || InventoryItem.Quantity <= 0) continue;
+
+		AddPotion(PotionData, InventoryItem.Quantity);
+		ClearSlotData(InventoryItem);
+	}
 }
 
 
@@ -295,7 +393,9 @@ bool UInventoryComponent::HasItem(int32 ItemId) const												// 아이템 �
 
 int32 UInventoryComponent::GetItemCount(int32 ItemId) const
 {
-	int32 TotalQuantity = 0;
+	int32 TotalQuantity = IsValid(PotionItem.ItemData) && PotionItem.ItemData->GetItemId() == ItemId
+		? PotionItem.Quantity
+		: 0;
 	
 	for (const FItemInstance& InventoryItem : InventoryItems)
 	{
@@ -470,6 +570,15 @@ int32 UInventoryComponent::ConsumeAmmoByType(EAmmoType AmmoType, int32 Requested
 
 bool UInventoryComponent::CanAddItem(UItemDataAsset* Item, int32 AddQuantity) const
 {
+	if (IsValid(Item) && Item->GetItemType() == EItemType::Potion)
+	{
+		const UPotionDataAsset* IncomingPotion = Cast<UPotionDataAsset>(Item);
+		const UPotionDataAsset* CurrentPotion = GetPotionData();
+		return AddQuantity > 0 && IsValid(IncomingPotion) &&
+			(!IsValid(CurrentPotion) || CurrentPotion->GetItemId() == IncomingPotion->GetItemId()) &&
+			PotionItem.Quantity + AddQuantity <= FMath::Max(1, IncomingPotion->GetMaxStack());
+	}
+
 	if (Item == nullptr || AddQuantity <= 0)
 	{
 		return false;
@@ -546,6 +655,9 @@ void UInventoryComponent::ClearSlotData(FItemInstance& InventoryItem)
 
 void UInventoryComponent::ClearInventory()
 {
+	PotionItem.Quantity = 0;
+	OnPotionChanged.Broadcast(PotionItem.Quantity, GetMaxPotionQuantity());
+
 	for (FItemInstance& InventoryItem : InventoryItems)												// 모든 슬롯을 순회하며 슬롯 데이터 초기화
 	{
 		ClearSlotData(InventoryItem);
@@ -556,26 +668,15 @@ void UInventoryComponent::ClearInventory()
 
 int32 UInventoryComponent::RefillPotionsToMax()
 {
-	int32 TotalRefilledQuantity = 0;
+	MigrateInventoryPotions();
+	const int32 MaxQuantity = GetMaxPotionQuantity();
+	const int32 RefilledQuantity = FMath::Max(0, MaxQuantity - PotionItem.Quantity);
+	PotionItem.Quantity = MaxQuantity;
 
-	for (FItemInstance& InventoryItem : InventoryItems)
+	if (RefilledQuantity > 0)
 	{
-		if (!IsValid(InventoryItem.ItemData) || InventoryItem.ItemData->GetItemType() != EItemType::Potion)
-		{
-			continue;
-		}
-
-		const int32 MaxStack = FMath::Max(1, InventoryItem.ItemData->GetMaxStack());
-		const int32 RefilledQuantity = FMath::Max(0, MaxStack - InventoryItem.Quantity);
-
-		InventoryItem.Quantity = MaxStack;
-		TotalRefilledQuantity += RefilledQuantity;
+		OnPotionChanged.Broadcast(PotionItem.Quantity, MaxQuantity);
 	}
 
-	if (TotalRefilledQuantity > 0)
-	{
-		OnInventoryChanged.Broadcast();
-	}
-
-	return TotalRefilledQuantity;
+	return RefilledQuantity;
 }

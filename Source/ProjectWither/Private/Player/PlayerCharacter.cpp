@@ -180,6 +180,16 @@ void APlayerCharacter::CloseInventory()
     PlayerController->SetInputMode(InputMode);														// 설정한 입력 모드를 PlayerController에 적용한다.
 }
 
+bool APlayerCharacter::UsePotion()
+{
+	return IsValid(InventoryComponent) && InventoryComponent->UsePotion();
+}
+
+void APlayerCharacter::UsePotionInput()
+{
+	UsePotion();
+}
+
 void APlayerCharacter::ToggleStatWindow()
 {
     if (IsValid(StatWindowInstance))
@@ -394,6 +404,10 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
     EnhancedInput->BindAction(ZoomAction, ETriggerEvent::Canceled, this, &APlayerCharacter::StopZoomInput);
     EnhancedInput->BindAction(LockOnAction, ETriggerEvent::Started, this, &APlayerCharacter::LockOnInput);
     EnhancedInput->BindAction(ReloadAction, ETriggerEvent::Started, this, &APlayerCharacter::ReloadInput);
+	if (IsValid(PotionAction))
+	{
+		EnhancedInput->BindAction(PotionAction, ETriggerEvent::Started, this, &APlayerCharacter::UsePotionInput);
+	}
     
 }
 

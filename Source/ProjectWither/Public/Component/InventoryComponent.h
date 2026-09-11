@@ -10,9 +10,11 @@
 #include "InventoryComponent.generated.h"
 
 class UItemDataAsset;
+class UPotionDataAsset;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChangedDelegate);														// 인벤토리 아이템 목록이 변경되었을 때 호출되는 델리게이트
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGoldChangedDelegate, int32, CurrentGold, int32, ChangedAmount);			// 골드가 변경되었을 때 현재 골드와 변경량을 전달하는 델리게이트
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPotionChangedDelegate, int32, CurrentQuantity, int32, MaxQuantity);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class PROJECTWITHER_API UInventoryComponent : public UActorComponent
@@ -33,6 +35,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory|Event")										// 바인딩 가능한 골드 변경 이벤트 델리게이트
 	FOnGoldChangedDelegate OnGoldChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Potion|Event")
+	FOnPotionChangedDelegate OnPotionChanged;
 
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
@@ -55,6 +60,21 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool UseItem(int32 ItemId);																		// 지정한 아이템을 사용
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Potion")
+	bool UsePotion();
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Potion")
+	UPotionDataAsset* GetPotionData() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Inventory|Potion")
+	inline int32 GetCurrentPotionQuantity() const { return PotionItem.Quantity; }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Potion")
+	int32 GetPotionQuantity() const { return PotionItem.Quantity; }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Potion")
+	int32 GetMaxPotionQuantity() const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	bool HasItem(int32 ItemId) const;																// 지정한 아이템 보유 여부 반환
@@ -110,9 +130,15 @@ public:
 
 private:
 	void ClearSlotData(FItemInstance& InventoryItem);												// 슬롯 하나의 아이템 데이터 초기화
+	int32 AddPotion(UPotionDataAsset* InPotionData, int32 AddQuantity);
+	void MigrateInventoryPotions();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))		// 현재 보유 아이템 목록 배열
 	TArray<FItemInstance> InventoryItems;
+
+	// 일반 슬롯과 분리된 전용 포션 데이터 및 현재 수량
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory|Potion", meta = (AllowPrivateAccess = "true"))
+	FItemInstance PotionItem;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory", meta = (ClampMin = "1", AllowPrivateAccess = "true"))
 	int32 MaxInventorySlot = 40;
