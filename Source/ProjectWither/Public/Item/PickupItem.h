@@ -79,6 +79,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect|Spawn")
 	float UpDownHeight = 100.0f;
 
+	// 커브가 지정되지 않았을 때 사용하는 기본 부유 높이
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect|Spawn", meta = (ClampMin = "0.0"))
+	float DefaultFloatingHeight = 15.0f;
+
+	// 커브가 지정되지 않았을 때 사용하는 초당 회전 각도
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect|Spawn")
+	float DefaultSpinSpeed = 60.0f;
+
 	// 아이템을 줍는 연출의 진행 상황용 커브
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect|Pickup")
 	TObjectPtr<UCurveFloat> PickupAlpha;

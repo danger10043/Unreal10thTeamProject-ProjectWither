@@ -204,8 +204,6 @@ void APickupItem::OnFinishPickupEffect()
 
 void APickupItem::OnUpdateUpdownSpin(float InDeltaTime)
 {
-	if (!IsCurveAssetReady()) return;
-
 	ElapsedTime += InDeltaTime;
 
 	if (UMeshComponent* PickupMesh = GetMesh())
@@ -213,11 +211,17 @@ void APickupItem::OnUpdateUpdownSpin(float InDeltaTime)
 		float Div = FMath::Max(UpDownDuration, 0.001f);
 		float Progress = FMath::Fmod(ElapsedTime / Div, 1.0f);
 		FVector NewMeshLocation = MeshBaseLocation;
-		NewMeshLocation.Z += UpDownCurve->GetFloatValue(Progress) * UpDownHeight;
+
+		const float HeightOffset = IsValid(UpDownCurve)
+			? UpDownCurve->GetFloatValue(Progress) * UpDownHeight
+			: FMath::Sin(Progress * UE_TWO_PI) * DefaultFloatingHeight;
+		NewMeshLocation.Z += HeightOffset;
 
 		PickupMesh->SetRelativeLocation(NewMeshLocation);
 
-		float NewAngle = SpinCurve->GetFloatValue(Progress) * 360.0f;
+		const float NewAngle = IsValid(SpinCurve)
+			? SpinCurve->GetFloatValue(Progress) * 360.0f
+			: FMath::Fmod(ElapsedTime * DefaultSpinSpeed, 360.0f);
 		PickupMesh->SetRelativeRotation(FRotator(0.0f, NewAngle, 0.0f));
 	}
 }
