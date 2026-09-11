@@ -115,7 +115,7 @@ private:
 	TArray<FItemInstance> InventoryItems;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory", meta = (ClampMin = "1", AllowPrivateAccess = "true"))
-	int32 MaxInventorySlot = 20;
+	int32 MaxInventorySlot = 40;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory", meta = (ClampMin = "0", AllowPrivateAccess = "true"))
 	int32 Gold = 0;

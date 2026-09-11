@@ -5,6 +5,7 @@
 #include "Data/StatUpgradeTypes.h"
 #include "StatUpgradeWindowWidget.generated.h"
 
+class AStatUpgradeNPC;
 class UButton;
 class UInventoryComponent;
 class UStatComponent;
@@ -17,6 +18,9 @@ class PROJECTWITHER_API UStatUpgradeWindowWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	// 창을 닫을 때 인사 애니메이션을 재생시킬 NPC 지정
+	void SetOwningNPC(AStatUpgradeNPC* NPC) { OwningNPC = NPC; }
+
 	UFUNCTION(BlueprintCallable, Category = "UI|Stat Upgrade")
 	void RefreshUpgradeInfo();
 
@@ -118,6 +122,8 @@ protected:
 	TObjectPtr<UTextBlock> ResultText;
 
 private:
+	TWeakObjectPtr<AStatUpgradeNPC> OwningNPC;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UStatUpgradeComponent> StatUpgradeComponent;
 
