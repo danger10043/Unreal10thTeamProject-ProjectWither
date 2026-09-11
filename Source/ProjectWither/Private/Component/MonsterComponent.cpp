@@ -5,6 +5,7 @@
 #include "Component/InventoryComponent.h"
 #include "Component/StatComponent.h"
 #include "Data/ItemDropTable.h"
+#include "DataAsset/ItemDataAsset.h"
 #include "Item/PickupItem.h"
 #include "Monster/MonsterAIController.h"
 #include "Monster/MonsterProjectile.h"
@@ -67,8 +68,15 @@ void UMonsterComponent::ApplyMonsterData()
 	ParriedMontage = MonsterData->ParriedMontage;
 	DeathMontage = MonsterData->DeathMontage;
 	SearchMontage = MonsterData->SearchMontage;
-	ItemDropTable = MonsterData->ItemDropTable;
-	ItemPickupClass = MonsterData->ItemPickupClass;
+	// 데이터 에셋에 값이 지정된 경우 우선 사용하고, 비어 있으면 몬스터 BP에 설정된 값을 유지한다.
+	if (IsValid(MonsterData->ItemDropTable))
+	{
+		ItemDropTable = MonsterData->ItemDropTable;
+	}
+	if (MonsterData->ItemPickupClass)
+	{
+		ItemPickupClass = MonsterData->ItemPickupClass;
+	}
 
 	if (IsValid(StatComponent))
 	{
@@ -230,7 +238,13 @@ void UMonsterComponent::CalculateDrops()
 
 void UMonsterComponent::DropItems()
 {
-	if (!ItemPickupClass || !GetOwner()) return;
+	if (!GetOwner()) return;
+
+	if (!ItemPickupClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s: ItemPickupClass가 없어 드랍 아이템을 스폰할 수 없습니다."), *GetOwner()->GetName());
+		return;
+	}
 
 	UWorld* World = GetWorld();
 	if (!World)
@@ -253,10 +267,13 @@ void UMonsterComponent::DropItems()
 				DropHeight
 			);
 
-		APickupItem* Pickup = World->SpawnActor<APickupItem>(
+		const FTransform PickupTransform(FRotator::ZeroRotator, DropLocation);
+		APickupItem* Pickup = World->SpawnActorDeferred<APickupItem>(
 			ItemPickupClass,
-			DropLocation,
-			FRotator::ZeroRotator
+			PickupTransform,
+			GetOwner(),
+			nullptr,
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn
 		);
 
 		if (Pickup)
@@ -266,6 +283,12 @@ void UMonsterComponent::DropItems()
 			DroppedItem.Quantity = Drop.Value;
 
 			Pickup->InitializePickup(DroppedItem);
+			Pickup->FinishSpawning(PickupTransform);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("%s: %s 픽업 액터 스폰에 실패했습니다."),
+				*GetOwner()->GetName(), *Drop.Key->GetName());
 		}
 	}
 

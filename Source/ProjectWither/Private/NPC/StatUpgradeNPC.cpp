@@ -3,7 +3,10 @@
 
 #include "NPC/StatUpgradeNPC.h"
 
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "Player/PlayerCharacter.h"
@@ -36,6 +39,9 @@ void AStatUpgradeNPC::HandleInteraction(AActor* Interactor)
 		return;
 	}
 
+	FacePlayer(InteractingPawn);
+	PlayGreetingMontage();
+
 	if (!IsValid(StatUpgradeWindowInstance))
 	{
 		StatUpgradeWindowInstance = CreateWidget<UStatUpgradeWindowWidget>(
@@ -47,6 +53,8 @@ void AStatUpgradeNPC::HandleInteraction(AActor* Interactor)
 	{
 		return;
 	}
+
+	StatUpgradeWindowInstance->SetOwningNPC(this);
 
 	if (APlayerCharacter* PlayerCharacter = Cast<APlayerCharacter>(InteractingPawn))
 	{
@@ -68,4 +76,57 @@ void AStatUpgradeNPC::HandleInteraction(AActor* Interactor)
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	InputMode.SetWidgetToFocus(StatUpgradeWindowInstance->TakeWidget());
 	PlayerController->SetInputMode(InputMode);
+}
+
+void AStatUpgradeNPC::FacePlayer(const AActor* Interactor)
+{
+	if (!IsValid(Interactor))
+	{
+		return;
+	}
+
+	FVector ToInteractor = Interactor->GetActorLocation() - GetActorLocation();
+	ToInteractor.Z = 0.0f;
+
+	if (ToInteractor.IsNearlyZero())
+	{
+		return;
+	}
+
+	SetActorRotation(FRotator(0.0f, ToInteractor.Rotation().Yaw, 0.0f));
+}
+
+void AStatUpgradeNPC::PlayGreetingMontage()
+{
+	if (!IsValid(GreetingMontage) || !IsValid(NPCMesh))
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = NPCMesh->GetAnimInstance();
+
+	if (!IsValid(AnimInstance))
+	{
+		return;
+	}
+
+	AnimInstance->Montage_Play(GreetingMontage);
+	AnimInstance->Montage_JumpToSection(GreetingStartSection, GreetingMontage);
+}
+
+void AStatUpgradeNPC::EndGreetingMontage()
+{
+	if (!IsValid(GreetingMontage) || !IsValid(NPCMesh))
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = NPCMesh->GetAnimInstance();
+
+	if (!IsValid(AnimInstance) || !AnimInstance->Montage_IsPlaying(GreetingMontage))
+	{
+		return;
+	}
+
+	AnimInstance->Montage_JumpToSection(GreetingEndSection, GreetingMontage);
 }

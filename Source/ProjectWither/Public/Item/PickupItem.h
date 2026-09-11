@@ -22,7 +22,8 @@ public:
 	// Sets default values for this actor's properties
 	APickupItem();
 
-	void InitializePickup(FItemInstance InItemData);
+	UFUNCTION(BlueprintCallable, Category = "Item")
+	void InitializePickup(const FItemInstance& InItemData);
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -47,6 +48,7 @@ protected:
 
 	virtual UMeshComponent* GetMesh() const;
 private:
+	void EnablePickup();
 	bool IsCurveAssetReady() const;
 	bool IsPickupEffectAssetReady() const;
 
@@ -59,7 +61,7 @@ protected:
 	FVector MeshBaseLocation = FVector(0, 0, 50.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Base Data")
-	float PickupDelayTime = 1.0f; // 스폰 직후에 아이템이 안먹어지는 시간
+	float PickupDelayTime = 2.0f; // 스폰 직후에 아이템이 안먹어지는 시간
 
 	// 맵에 있을 때 위아래로 왕복하는 모습용 커브
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Effect|Spawn")
@@ -116,6 +118,9 @@ private:
 
 	// 아이템을 줍는 연출용 타이머 핸들
 	FTimerHandle PickupEffectTimerHandle;
+
+	// 스폰 후 획득 가능 상태로 전환하기 위한 타이머 핸들
+	FTimerHandle PickupDelayTimerHandle;
 
 	// 아이템을 줍는 대상
 	TWeakObjectPtr<AActor> TargetActor = nullptr;
