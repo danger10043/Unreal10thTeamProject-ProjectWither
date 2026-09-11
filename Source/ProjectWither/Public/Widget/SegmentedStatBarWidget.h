@@ -9,6 +9,7 @@
 class UImage;
 class UHorizontalBox;
 class UStatBarSegmentWidget;
+class UTexture2D;
 
 UCLASS()
 class PROJECTWITHER_API USegmentedStatBarWidget : public UUserWidget
@@ -22,11 +23,16 @@ public:
 protected:
 	virtual void NativePreConstruct() override;
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UHorizontalBox> SegmentContainer;
+	virtual void NativeConstruct() override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI|Stat Bar")
+	TObjectPtr<UTexture2D> StatType;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> StatTypeTextImage;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UHorizontalBox> SegmentContainer;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI|Stat Bar")
 	TSubclassOf<UStatBarSegmentWidget> SegmentWidgetClass;

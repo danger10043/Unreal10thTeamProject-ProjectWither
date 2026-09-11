@@ -418,6 +418,8 @@ bool UWeaponComponent::FireGun()
 		return false;
 	}
 
+	OnGunFired.Broadcast();
+
 	if (GetCurrentAmmo() <= 0)
 	{
 		Reload();
