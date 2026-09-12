@@ -1,4 +1,5 @@
 #include "Monster/MonsterPawnBase.h"
+#include "Monster/MonsterAIController.h"
 #include "Component/MonsterComponent.h"
 #include "Component/StatComponent.h"
 
@@ -15,7 +16,18 @@ float AMonsterPawnBase::TakeDamage(float Damage, const FDamageEvent& DamageEvent
 {
 	if (!MonsterComponent || MonsterComponent->IsDead()) return 0.0f;
 	const float ReceivedDamage = Super::TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
-	return MonsterComponent->ApplyMonsterDamage(ReceivedDamage);
+	const float AppliedDamage = MonsterComponent->ApplyMonsterDamage(ReceivedDamage);
+
+	if (AppliedDamage > 0.0f && !MonsterComponent->IsDead())
+	{
+		if (AMonsterAIController* MonsterController =
+			Cast<AMonsterAIController>(GetController()))
+		{
+			MonsterController->SetTargetFromDamage(EventInstigator, DamageCauser);
+		}
+	}
+
+	return AppliedDamage;
 }
 
 UStatComponent* AMonsterPawnBase::GetStatComponent_Implementation() const
