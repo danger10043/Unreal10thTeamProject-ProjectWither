@@ -5,6 +5,7 @@
 #include "DataAsset/WeaponDataAsset.h"
 #include "Widget/AmmoCountWidget.h"
 #include "Widget/WeaponTypeWidget.h"
+#include "Widget/PotionCountWidget.h"
 #include "GameFramework/Pawn.h"
 #include "Interface/StatComponentUserInterface.h"
 #include "Widget/SegmentedStatBarWidget.h"

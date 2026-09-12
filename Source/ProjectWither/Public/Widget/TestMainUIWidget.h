@@ -10,6 +10,7 @@ class UCombatComponent;
 class UAmmoCountWidget;
 class UWeaponComponent;
 class UWeaponTypeWidget;
+class UPotionCountWidget;
 
 UCLASS()
 class PROJECTWITHER_API UTestMainUIWidget : public UUserWidget
@@ -46,6 +47,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWeaponTypeWidget> WeaponTypeWidget;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UPotionCountWidget> PotionCountWidget;
 
 private:
 	UPROPERTY(Transient)

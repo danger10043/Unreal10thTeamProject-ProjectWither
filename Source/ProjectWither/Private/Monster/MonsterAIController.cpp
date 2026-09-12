@@ -130,6 +130,36 @@ void AMonsterAIController::ClearTargetActor()
 	}
 }
 
+void AMonsterAIController::SetTargetFromDamage(
+	AController* EventInstigator,
+	AActor* DamageCauser)
+{
+	AActor* AggroTarget = IsValid(EventInstigator)
+		? EventInstigator->GetPawn()
+		: nullptr;
+
+	if (!IsValidTarget(AggroTarget) && IsValid(DamageCauser))
+	{
+		if (IsValidTarget(DamageCauser))
+		{
+			AggroTarget = DamageCauser;
+		}
+		else if (IsValidTarget(DamageCauser->GetOwner()))
+		{
+			AggroTarget = DamageCauser->GetOwner();
+		}
+		else if (IsValidTarget(DamageCauser->GetInstigator()))
+		{
+			AggroTarget = DamageCauser->GetInstigator();
+		}
+	}
+
+	if (IsValidTarget(AggroTarget))
+	{
+		SetTargetActor(AggroTarget);
+	}
+}
+
 void AMonsterAIController::StopAI()
 {
 	// 사망 이후 새로운 시야 감지 중단

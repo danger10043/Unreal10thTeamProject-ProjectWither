@@ -1,4 +1,5 @@
 #include "Monster/MonsterCharacterBase.h"
+#include "Monster/MonsterAIController.h"
 #include "Component/MonsterComponent.h"
 #include "Component/StatComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -80,7 +81,18 @@ float AMonsterCharacterBase::TakeDamage(float Damage, const FDamageEvent& Damage
 {
     if (!MonsterComponent || MonsterComponent->IsDead()) return 0.0f;
     const float ReceivedDamage = Super::TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
-    return MonsterComponent->ApplyMonsterDamage(ReceivedDamage);
+    const float AppliedDamage = MonsterComponent->ApplyMonsterDamage(ReceivedDamage);
+
+    if (AppliedDamage > 0.0f && !MonsterComponent->IsDead())
+    {
+        if (AMonsterAIController* MonsterController =
+            Cast<AMonsterAIController>(GetController()))
+        {
+            MonsterController->SetTargetFromDamage(EventInstigator, DamageCauser);
+        }
+    }
+
+    return AppliedDamage;
 }
 
 UStatComponent* AMonsterCharacterBase::GetStatComponent_Implementation() const
