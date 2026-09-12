@@ -321,6 +321,12 @@ void UBossComponent::HideHealthBar()
 	}
 }
 
+FText UBossComponent::GetBossDisplayName() const
+{
+	const UBossDataAsset* BossData = GetBossData();
+	return IsValid(BossData) ? BossData->MonsterName : FText::GetEmpty();
+}
+
 void UBossComponent::CheckHealthBarVisibility()
 {
 	UWorld* World = GetWorld();

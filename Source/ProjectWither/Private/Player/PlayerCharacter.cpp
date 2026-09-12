@@ -265,7 +265,6 @@ UCombatComponent* APlayerCharacter::GetCombatComponent_Implementation() const
 void APlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
-
     if (IsValid(PlayerCameraComponent))
     {
         PlayerCameraComponent->InitializeCamera(PlayerCamera.Get(), CameraArm.Get());
@@ -857,13 +856,10 @@ void APlayerCharacter::UpdateBossHealthBar(AActor* BossActor, float CurrentHealt
 {
 	if (!IsValid(BossActor) || DisplayedBossActor != BossActor || !IsValid(BossHealthBarUIInstance)) return;
 
-	FText BossName = FText::FromString(BossActor->GetName());
-	if (const UMonsterComponent* MonsterComponent = BossActor->FindComponentByClass<UMonsterComponent>())
+	FText BossName = FText::GetEmpty();
+	if (const UBossComponent* BossComponent = BossActor->FindComponentByClass<UBossComponent>())
 	{
-		if (const UMonsterDataAsset* MonsterData = MonsterComponent->GetMonsterData())
-		{
-			if (!MonsterData->MonsterName.IsEmpty()) BossName = MonsterData->MonsterName;
-		}
+		BossName = BossComponent->GetBossDisplayName();
 	}
 	BossHealthBarUIInstance->SetBossInfo(BossName, CurrentHealth, MaxHealth);
 }
