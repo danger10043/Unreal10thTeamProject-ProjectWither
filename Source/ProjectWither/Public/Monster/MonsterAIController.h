@@ -28,6 +28,7 @@ public:
 
 	void SetMonsterComponent(APawn* InPawn);
 	void SetTargetActor(AActor* NewTarget);
+	void SetTargetFromDamage(AController* EventInstigator, AActor* DamageCauser);
 	void ClearTargetActor();
 	void StopAI();
 	void RestartAI();
