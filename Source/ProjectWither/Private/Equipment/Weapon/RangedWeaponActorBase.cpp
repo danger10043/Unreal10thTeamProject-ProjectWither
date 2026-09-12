@@ -30,8 +30,12 @@ bool ARangedWeaponActorBase::CanFire() const
 		static_cast<double>(World->GetTimeSeconds()) >= NextAllowedFireTime;
 }
 
-bool ARangedWeaponActorBase::Fire(const FGunFireContext& FireContext)
+bool ARangedWeaponActorBase::Fire(
+	const FGunFireContext& FireContext,
+	bool& bOutConsumeAmmo)
 {
+	bOutConsumeAmmo = false;
+
 	if (!CanFire()) return false;
 
 	UWorld* World = GetWorld();
@@ -39,19 +43,24 @@ bool ARangedWeaponActorBase::Fire(const FGunFireContext& FireContext)
 
 	const double FireTime = static_cast<double>(World->GetTimeSeconds());
 
+	bool bConsumeAmmo = true;
+
 	bExecutingFire = true;
-	const bool bFired = ExecuteFire(FireContext);
+	const bool bFired = ExecuteFire(FireContext, bConsumeAmmo);
 	bExecutingFire = false;
 
 	if (!bFired) return false;
 
+	bOutConsumeAmmo = bConsumeAmmo;
 	NextAllowedFireTime = FireTime + static_cast<double>(FireInterval);
 	return true;
 }
 
 bool ARangedWeaponActorBase::ExecuteFire_Implementation(
-	const FGunFireContext& FireContext)
+	const FGunFireContext& FireContext,
+	bool& bOutConsumeAmmo)
 {
+	bOutConsumeAmmo = true;
 	return false;
 }
 

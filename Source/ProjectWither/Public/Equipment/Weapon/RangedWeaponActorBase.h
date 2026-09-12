@@ -38,7 +38,7 @@ public:
 	ARangedWeaponActorBase();
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Gun")
-	bool Fire(const FGunFireContext& FireContext);
+	bool Fire(const FGunFireContext& FireContext, bool& bOutConsumeAmmo);
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|Gun")
 	bool CanFire() const;
@@ -50,9 +50,15 @@ public:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Weapon|Gun")
-	bool ExecuteFire(const FGunFireContext& FireContext);
+	bool ExecuteFire(
+		const FGunFireContext& FireContext,
+		bool& bOutConsumeAmmo
+	);
 
-	virtual bool ExecuteFire_Implementation(const FGunFireContext& FireContext);
+	virtual bool ExecuteFire_Implementation(
+		const FGunFireContext& FireContext,
+		bool& bOutConsumeAmmo
+	);
 
 	UPROPERTY(
 		VisibleAnywhere,
