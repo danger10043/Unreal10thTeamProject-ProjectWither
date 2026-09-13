@@ -67,6 +67,18 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Monster Spawn", meta = (ClampMin = "0.0", Units = "cm"))
 	float MinSpawnSpacing = 150.0f;
 
+	UPROPERTY(EditAnywhere, Category = "Monster Spawn|Difficulty", meta = (ClampMin = "0.01"))
+	float HealthMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Monster Spawn|Difficulty", meta = (ClampMin = "0.0"))
+	float AttackMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Monster Spawn|Difficulty", meta = (ClampMin = "0.0"))
+	float DefenseMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Monster Spawn|Difficulty", meta = (ClampMin = "0.0"))
+	float GoldMultiplier = 1.0f;
+
 	// 이 존이 현재 스폰해서 관리 중인 몬스터
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AActor>> SpawnedMonsters;

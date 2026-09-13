@@ -58,6 +58,7 @@ void UMonsterComponent::ApplyMonsterData()
 	}
 
 	MonsterId = MonsterData->MonsterId;
+	RuntimeGoldReward = FMath::Max(0, MonsterData->GoldReward);
 	AllowRange = FMath::Max(0.0f, MonsterData->BaseSettings.AllowRange);
 	AttackRange = FMath::Max(0.0f, MonsterData->BaseSettings.AttackRange);
 	AttackCooldown = FMath::Max(0.0f, MonsterData->BaseSettings.AttackCooldown);
@@ -96,6 +97,32 @@ void UMonsterComponent::ApplyMonsterData()
 		Character->GetCharacterMovement()->MaxWalkSpeed =
 			FMath::Max(0.0f, MonsterData->BaseSettings.MoveSpeed);
 	}
+}
+
+void UMonsterComponent::ApplySpawnZoneScaling(float HealthMultiplier, float AttackMultiplier,
+	float DefenseMultiplier, float GoldMultiplier)
+{
+	if (!IsValid(MonsterData) || !IsValid(StatComponent))
+	{
+		return;
+	}
+
+	const float SafeHealthMultiplier = FMath::Max(0.01f, HealthMultiplier);
+	const float SafeAttackMultiplier = FMath::Max(0.0f, AttackMultiplier);
+	const float SafeDefenseMultiplier = FMath::Max(0.0f, DefenseMultiplier);
+	const float SafeGoldMultiplier = FMath::Max(0.0f, GoldMultiplier);
+
+	StatComponent->ConfigureStats(
+		MonsterData->MaxHealth * SafeHealthMultiplier,
+		MonsterData->MaxStamina,
+		MonsterData->MinAttackPower * SafeAttackMultiplier,
+		MonsterData->MaxAttackPower * SafeAttackMultiplier,
+		MonsterData->DefensePower * SafeDefenseMultiplier);
+	StatComponent->SetCombatMultipliers(
+		MonsterData->BaseSettings.AttackPowerMultiplier,
+		MonsterData->BaseSettings.DefenseMultiplier);
+
+	RuntimeGoldReward = FMath::Max(0, FMath::RoundToInt(MonsterData->GoldReward * SafeGoldMultiplier));
 }
 
 void UMonsterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -314,7 +341,7 @@ void UMonsterComponent::DropItems()
 
 void UMonsterComponent::GrantGoldReward()
 {
-	if (!IsValid(MonsterData) || MonsterData->GoldReward <= 0)
+	if (!IsValid(MonsterData) || RuntimeGoldReward <= 0)
 	{
 		return;
 	}
@@ -328,7 +355,7 @@ void UMonsterComponent::GrantGoldReward()
 	if (UInventoryComponent* InventoryComponent =
 		PlayerPawn->FindComponentByClass<UInventoryComponent>())
 	{
-		InventoryComponent->AddGold(MonsterData->GoldReward);
+		InventoryComponent->AddGold(RuntimeGoldReward);
 	}
 }
 
