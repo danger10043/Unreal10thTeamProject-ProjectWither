@@ -4,6 +4,7 @@
 #include "Monster/MonsterSpawnZone.h"
 
 #include "Components/SceneComponent.h"
+#include "Component/MonsterComponent.h"
 #include "Framework/SubSystem/MonsterSpawnSubsystem.h"
 #include "Framework/SubSystem/ObjectPoolSubsystem.h"
 
@@ -78,6 +79,11 @@ void AMonsterSpawnZone::SpawnAll()
 
 			if (AActor* Spawned = PoolSubsystem->Spawn(Slot.MonsterClass, SpawnTransform))
 			{
+				if (UMonsterComponent* MonsterComponent = Spawned->FindComponentByClass<UMonsterComponent>())
+				{
+					MonsterComponent->ApplySpawnZoneScaling(
+						HealthMultiplier, AttackMultiplier, DefenseMultiplier, GoldMultiplier);
+				}
 				SpawnedMonsters.Add(Spawned);
 				UsedLocations.Add(SpawnLocation);
 			}

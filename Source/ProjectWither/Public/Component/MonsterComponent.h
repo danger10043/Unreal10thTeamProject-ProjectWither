@@ -51,6 +51,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Monster|Data")
 	UMonsterDataAsset* GetMonsterData() const { return MonsterData; }
 
+	// 스폰 존별 난이도를 데이터 에셋 원본을 변경하지 않고 현재 인스턴스에만 적용한다.
+	void ApplySpawnZoneScaling(float HealthMultiplier, float AttackMultiplier,
+		float DefenseMultiplier, float GoldMultiplier);
+
 	void SetAttackCooldown(float NewCooldown) { AttackCooldown = FMath::Max(0.0f, NewCooldown); }
 	void SetAttackRange(float NewRange) { AttackRange = FMath::Max(0.0f, NewRange); }
 	void SetAllowRange(float NewRange) { AllowRange = FMath::Max(0.0f, NewRange); }
@@ -220,6 +224,9 @@ private:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Monster|Data")
 	TObjectPtr<UMonsterDataAsset> MonsterData = nullptr;
+
+	// 스폰 존 배율이 반영된 런타임 골드. 아이템 드랍 테이블에는 영향을 주지 않는다.
+	int32 RuntimeGoldReward = 0;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Base")
 	int32 MonsterId = 0; // 몬스터 고유 ID
