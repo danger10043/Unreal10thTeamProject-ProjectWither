@@ -67,6 +67,8 @@ public:
 	void BeginSwordTrail();
 	void EndSwordTrail();
 
+	void PlayParryEffect();
+
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	bool IsGunEquipped() const;
 
