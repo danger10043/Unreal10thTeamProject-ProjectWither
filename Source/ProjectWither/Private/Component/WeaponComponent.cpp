@@ -491,12 +491,14 @@ bool UWeaponComponent::FireGun()
 			) + WeaponData->GetEnhancedWeaponPower(CurrentWeapon.EnhanceLevel)
 		);
 
-	if (!RangedWeapon->Fire(FireContext))
+	bool bConsumeAmmo = true;
+
+	if (!RangedWeapon->Fire(FireContext, bConsumeAmmo))
 	{
 		return false;
 	}
 
-	if (!ConsumeAmmo())
+	if (bConsumeAmmo && !ConsumeAmmo())
 	{
 		return false;
 	}
