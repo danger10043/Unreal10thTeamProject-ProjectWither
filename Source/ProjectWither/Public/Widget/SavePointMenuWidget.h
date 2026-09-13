@@ -39,6 +39,10 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
+	virtual FReply NativeOnPreviewKeyDown(
+		const FGeometry& InGeometry,
+		const FKeyEvent& InKeyEvent) override;
+
 	// 이 위젯은 세이브 포인트 액터가 재사용하는 캐싱된 인스턴스라 Event Construct는 처음 한 번만 실행된다.
 	// 상호작용마다(=OpenAt 호출마다) 순간이동 목록을 새로 그려야 하므로, 블루프린트에서는
 	// Event Construct 대신 이 이벤트에서 GetTravelDestinations로 목록 UI를 갱신할 것.

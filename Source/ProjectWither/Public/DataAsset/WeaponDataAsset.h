@@ -74,6 +74,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Effect") // 총 발사 시 이펙트
 	TObjectPtr<UNiagaraSystem> WeaponFireEffect = nullptr;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Effect|Parry")
+	FTransform ParryEffectRelativeTransform  = FTransform::Identity;
+
 public:
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	EWeaponType GetWeaponType() const;
@@ -119,6 +122,11 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UNiagaraSystem* GetWeaponParryingEffect() const;
+
+	FTransform GetParryEffectRelativeTransform() const
+	{
+		return ParryEffectRelativeTransform;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UNiagaraSystem* GetWeaponFireEffect() const;

@@ -40,6 +40,10 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
+	virtual FReply NativeOnPreviewKeyDown(
+		const FGeometry& InGeometry,
+		const FKeyEvent& InKeyEvent) override;
+
 private:
 	void BindPlayerComponents();
 	void UnbindPlayerComponents();

@@ -728,6 +728,11 @@ float UCombatComponent::ReceiveHit(float DamageAmount, AActor* DamageCauser, ACo
 					}
 				}
 
+				if (IsValid(WeaponComponent))
+				{
+					WeaponComponent->PlayParryEffect();
+				}
+
 				OnParrySucceeded();
 
 				// 공격한 적에게 패링 성공 전달

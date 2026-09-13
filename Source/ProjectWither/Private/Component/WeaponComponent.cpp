@@ -334,6 +334,70 @@ void UWeaponComponent::EndSwordTrail()
 	SwordTrailComponent->DeactivateImmediate();
 }
 
+void UWeaponComponent::PlayParryEffect()
+{
+	if (!IsSwordEquipped() || !IsValid(WeaponActor))
+	{
+		return;
+	}
+
+	const UWeaponDataAsset* WeaponData = GetCurrentWeaponData();
+
+	if (!IsValid(WeaponData) ||
+		!IsValid(WeaponData->GetWeaponParryingEffect()))
+	{
+		return;
+	}
+
+	const FName ParrySocketName(TEXT("ParryEffectSocket"));
+
+	TArray<UStaticMeshComponent*> MeshComponents;
+	WeaponActor->GetComponents<UStaticMeshComponent>(MeshComponents);
+
+	UStaticMeshComponent* ParryMesh = nullptr;
+
+	for (UStaticMeshComponent* MeshComponent : MeshComponents)
+	{
+		if (IsValid(MeshComponent) &&
+			MeshComponent->DoesSocketExist(ParrySocketName))
+		{
+			ParryMesh = MeshComponent;
+			break;
+		}
+	}
+
+	if (!IsValid(ParryMesh))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("WeaponComponent::PlayParryEffect - 검 메시에서 ParryEffectSocket을 찾지 못했습니다.")
+		);
+		return;
+	}
+
+	const FTransform RelativeTransform =
+		WeaponData->GetParryEffectRelativeTransform();
+
+	const FTransform SocketWorldTransform =
+		ParryMesh->GetSocketTransform(ParrySocketName, RTS_World);
+
+	const FTransform EffectWorldTransform =
+		RelativeTransform * SocketWorldTransform;
+
+	UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		this,
+		WeaponData->GetWeaponParryingEffect(),
+		EffectWorldTransform.GetLocation(),
+		EffectWorldTransform.Rotator(),
+		EffectWorldTransform.GetScale3D(),
+		true, // bAutoDestroy
+		true, // bAutoActivate
+		ENCPoolMethod::None,
+		false // bPreCullCheck
+	);
+}
+
 bool UWeaponComponent::IsGunEquipped() const
 {
 	return GetWeaponType() == EWeaponType::Gun;

@@ -81,6 +81,8 @@ bool UInteractionComponent::OpenInteractionUI(AActor* Target, TSubclassOf<UUserW
 	// 상호작용 안내 문구 숨기기
 	CurrentTarget.Reset();
 
+	UpdateInteractionPrompt();
+
 	// 이동과 달리기 중단
 	OwnerPlayer->SetCanMove(false);
 
@@ -167,6 +169,7 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	if (IsInteractionUIOpen())
 	{
 		CurrentTarget.Reset();
+		UpdateInteractionPrompt();
 
 		AActor* Target = ActiveInteractionTarget.Get();
 
@@ -181,6 +184,7 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 	// 감지만 반복하고 상호작용은 실행하지 않는다.
 	CurrentTarget = FindInteractionTarget();
+	UpdateInteractionPrompt();
 }
 
 void UInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -194,6 +198,12 @@ void UInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	CloseInteractionUI();
+
+	if (IsValid(InteractionPromptWidget))
+	{
+		InteractionPromptWidget->RemoveFromParent();
+		InteractionPromptWidget = nullptr;
+	}
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -275,6 +285,69 @@ AActor* UInteractionComponent::FindInteractionTarget() const
 	}
 
 	return HitActor;
+}
+
+void UInteractionComponent::UpdateInteractionPrompt()
+{
+	AActor* Target = CurrentTarget.Get();
+	APlayerController* PlayerController = IsValid(OwnerPlayer)
+		? Cast<APlayerController>(OwnerPlayer->GetController())
+		: nullptr;
+
+	if (!IsValid(PlayerController) ||
+		!PlayerController->IsLocalController() ||
+		!IsValid(Target) ||
+		IsInteractionUIOpen())
+	{
+		if (IsValid(InteractionPromptWidget))
+		{
+			InteractionPromptWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+
+		return;
+	}
+
+	const FVector WorldLocation =
+		Target->GetActorLocation() + InteractionPromptOffset;
+
+	FVector2D ScreenPosition;
+
+	if (!PlayerController->ProjectWorldLocationToScreen(
+		WorldLocation, ScreenPosition, true))
+	{
+		if (IsValid(InteractionPromptWidget))
+		{
+			InteractionPromptWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+
+		return;
+	}
+
+	if (!IsValid(InteractionPromptWidget))
+	{
+		if (!IsValid(InteractionPromptClass.Get()))
+		{
+			return;
+		}
+
+		InteractionPromptWidget = CreateWidget<UUserWidget>(
+			PlayerController, InteractionPromptClass);
+
+		if (!IsValid(InteractionPromptWidget))
+		{
+			return;
+		}
+
+		InteractionPromptWidget->SetIsFocusable(false);
+		InteractionPromptWidget->SetAlignmentInViewport(
+			FVector2D(0.5f, 0.5f));
+		InteractionPromptWidget->SetDesiredSizeInViewport(
+			InteractionPromptSize);
+		InteractionPromptWidget->AddToPlayerScreen(5);
+	}
+
+	InteractionPromptWidget->SetPositionInViewport(ScreenPosition, true);
+	InteractionPromptWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
 void UInteractionComponent::HandleHealthChanged(float CurrentHealth, float MaxHealth, float ChangedAmount)

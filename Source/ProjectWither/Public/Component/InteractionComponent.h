@@ -58,6 +58,21 @@ private:
 	// 시선과 거리 조건을 만족하는 대상 찾기
 	AActor* FindInteractionTarget() const;
 
+	// 현재 대상의 화면 위치에 상호작용 안내 표시
+	void UpdateInteractionPrompt();
+
+	UPROPERTY(EditDefaultsOnly, Category = "Interaction|Prompt")
+	TSubclassOf<UUserWidget> InteractionPromptClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Interaction|Prompt")
+	FVector InteractionPromptOffset = FVector(0.0f, 0.0f, 100.0f);
+
+	UPROPERTY(EditDefaultsOnly, Category = "Interaction|Prompt")
+	FVector2D InteractionPromptSize = FVector2D(48.0f, 48.0f);
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> InteractionPromptWidget;
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<APlayerCharacter> OwnerPlayer;
