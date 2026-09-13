@@ -18,6 +18,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
+#include "InputCoreTypes.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
@@ -385,6 +386,12 @@ void APlayerCharacter::Tick(float DeltaTime)
 void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+    PlayerInputComponent->BindKey(
+        EKeys::Escape,
+        IE_Pressed,
+        this,
+        &APlayerCharacter::CloseStatWindow);
 
     UEnhancedInputComponent* EnhancedInput =  Cast<UEnhancedInputComponent>(PlayerInputComponent);
 

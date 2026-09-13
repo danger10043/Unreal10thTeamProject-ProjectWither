@@ -152,11 +152,10 @@ void ASavePointActor::OpenSavePointMenu(APlayerCharacter* Player)
 
 	PlayerController->bShowMouseCursor = true;
 
-	// 이 메뉴는 버튼 클릭으로만 조작하므로 키보드 포커스 대상을 지정할 필요가 없다.
-	// SetWidgetToFocus를 쓰면 UUserWidget의 Slate 래퍼가 포커스 불가로 취급되어
-	// "Attempting to focus Non-Focusable widget" 경고가 발생한다.
+	// 메뉴를 연 직후부터 ESC 입력을 받을 수 있도록 포커스를 지정한다.
 	FInputModeUIOnly InputMode;
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetWidgetToFocus(SavePointMenuInstance->TakeWidget());
 	PlayerController->SetInputMode(InputMode);
 }
 

@@ -3,6 +3,8 @@
 
 #include "Widget/SavePointMenuWidget.h"
 
+#include "Input/Events.h"
+#include "InputCoreTypes.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
@@ -13,6 +15,8 @@
 
 void USavePointMenuWidget::NativeConstruct()
 {
+	SetIsFocusable(true);
+
 	Super::NativeConstruct();
 
 	BindButtons();
@@ -23,6 +27,21 @@ void USavePointMenuWidget::NativeDestruct()
 	UnbindButtons();
 
 	Super::NativeDestruct();
+}
+
+FReply USavePointMenuWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (InKeyEvent.GetKey() == EKeys::Escape)
+	{
+		if (!InKeyEvent.IsRepeat())
+		{
+			CloseAndRestoreInput();
+		}
+
+		return FReply::Handled();
+	}
+
+	return Super::NativeOnPreviewKeyDown(InGeometry, InKeyEvent);
 }
 
 void USavePointMenuWidget::OpenAt(FName InCurrentSavePointId)

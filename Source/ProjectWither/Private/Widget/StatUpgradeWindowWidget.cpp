@@ -1,5 +1,7 @@
 #include "Widget/StatUpgradeWindowWidget.h"
 
+#include "Input/Events.h"
+#include "InputCoreTypes.h"
 #include "Component/InventoryComponent.h"
 #include "Component/StatComponent.h"
 #include "Component/StatUpgradeComponent.h"
@@ -41,6 +43,8 @@ namespace
 
 void UStatUpgradeWindowWidget::NativeConstruct()
 {
+	SetIsFocusable(true);
+
 	Super::NativeConstruct();
 
 	BindPlayerComponents();
@@ -54,6 +58,21 @@ void UStatUpgradeWindowWidget::NativeDestruct()
 	UnbindPlayerComponents();
 
 	Super::NativeDestruct();
+}
+
+FReply UStatUpgradeWindowWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (InKeyEvent.GetKey() == EKeys::Escape)
+	{
+		if (!InKeyEvent.IsRepeat())
+		{
+			HandleCloseClicked();
+		}
+
+		return FReply::Handled();
+	}
+
+	return Super::NativeOnPreviewKeyDown(InGeometry, InKeyEvent);
 }
 
 void UStatUpgradeWindowWidget::RefreshUpgradeInfo()
