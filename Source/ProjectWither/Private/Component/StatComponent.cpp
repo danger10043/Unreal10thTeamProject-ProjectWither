@@ -1,4 +1,6 @@
 #include "Component/StatComponent.h"
+#include "Equipment/EquipmentComponent.h"
+#include "GameFramework/Actor.h"
 
 UStatComponent::UStatComponent()
 {
@@ -105,9 +107,23 @@ float UStatComponent::ApplyDamage(float DamageAmount, float FinalDamageMultiplie
 {
 	if (DamageAmount <= 0.0f || FinalDamageMultiplier <= 0.0f || IsHealthZero()) return 0.0f;
 
-	const float Defense = FMath::Max(0.0f, GetDefensePower());
+	AActor* OwnerActor = GetOwner();
+	const UEquipmentComponent* EquipmentComponent =
+		IsValid(OwnerActor)
+		? OwnerActor->FindComponentByClass<UEquipmentComponent>()
+		: nullptr;
+
+	const float ArmorDefensePowerBonus =
+		IsValid(EquipmentComponent)
+		? EquipmentComponent->GetArmorDefensePowerBonus()
+		: 0.0f;
+
+	const float Defense = FMath::Max(
+		0.0f,
+		GetDefensePower() + ArmorDefensePowerBonus);
 	const float ScalingConstant = FMath::Max(1.0f, DefenseScalingConstant);
 	const float DamageMultiplier = ScalingConstant / (ScalingConstant + Defense);
+
 	const float FinalDamage =
 		FMath::Max(1.0f, DamageAmount * DamageMultiplier) * FinalDamageMultiplier;
 
