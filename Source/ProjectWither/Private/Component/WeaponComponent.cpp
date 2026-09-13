@@ -404,7 +404,7 @@ bool UWeaponComponent::IsGunEquipped() const
 }
 
 bool UWeaponComponent::FireGun()
-{	
+{
 	const AActor* CombatOwner = GetOwner();
 	const UCombatComponent* Combat =
 		IsValid(CombatOwner)
@@ -529,10 +529,10 @@ bool UWeaponComponent::FireGun()
 		return false;
 	}
 
-	const float MinAttackPower = 
+	const float MinAttackPower =
 		FMath::Min(
-		StatComponent->GetMinAttackPower(),
-		StatComponent->GetMaxAttackPower()
+			StatComponent->GetMinAttackPower(),
+			StatComponent->GetMaxAttackPower()
 		);
 
 	const float MaxAttackPower =
@@ -636,7 +636,7 @@ bool UWeaponComponent::Reload()
 	const int32 RequiredAmmo = MaxAmmo - CurrentWeapon.CurrentAmmo;
 
 	if (!IsValid(InventoryComponent)) return false;
-	
+
 	const int32 LoadedAmmo = InventoryComponent->ConsumeAmmoByType(WeaponData->GetAmmoType(), RequiredAmmo);
 
 	if (LoadedAmmo <= 0) return false;
@@ -658,25 +658,57 @@ int32 UWeaponComponent::GetCurrentAmmo() const
 
 bool UWeaponComponent::RefillCurrentWeaponAmmo()
 {
-	const UWeaponDataAsset* WeaponData = GetCurrentWeaponData();
+	bool bRefilled = false;
 
-	if (!WeaponData || WeaponData->GetWeaponType() != EWeaponType::Gun)
+	// 현재 손에 총을 들고 있다면 그 탄창을 직접 채운다.
+	const UWeaponDataAsset* CurrentWeaponData = GetCurrentWeaponData();
+
+	if (CurrentWeaponData && CurrentWeaponData->GetWeaponType() == EWeaponType::Gun)
 	{
-		return false;
+		const int32 MaxAmmo = FMath::Max(0, CurrentWeaponData->GetMaxAmmo());
+
+		if (CurrentWeapon.CurrentAmmo < MaxAmmo)
+		{
+			CurrentWeapon.CurrentAmmo = MaxAmmo;
+			SyncCurrentWeaponToEquipment();
+			bRefilled = true;
+		}
 	}
 
-	const int32 MaxAmmo = FMath::Max(0, WeaponData->GetMaxAmmo());
+	// 총을 뽑아 들고 있지 않아도(검을 장착 중이어도) 장착된 총의 탄창은 채워야 한다.
+	AActor* OwnerActor = GetOwner();
+	UEquipmentComponent* EquipmentComponent =
+		IsValid(OwnerActor)
+		? OwnerActor->FindComponentByClass<UEquipmentComponent>()
+		: nullptr;
 
-	if (CurrentWeapon.CurrentAmmo >= MaxAmmo)
+	if (IsValid(EquipmentComponent))
 	{
-		return false;
+		FItemInstance EquippedGun = EquipmentComponent->GetEquippedGun();
+		const UWeaponDataAsset* EquippedGunData = Cast<UWeaponDataAsset>(EquippedGun.ItemData.Get());
+
+		if (IsValid(EquippedGunData) && EquippedGun.Quantity > 0)
+		{
+			const int32 MaxAmmo = FMath::Max(0, EquippedGunData->GetMaxAmmo());
+
+			if (EquippedGun.CurrentAmmo < MaxAmmo)
+			{
+				EquippedGun.CurrentAmmo = MaxAmmo;
+
+				if (EquipmentComponent->UpdateEquippedWeaponState(EquippedGun))
+				{
+					bRefilled = true;
+				}
+			}
+		}
 	}
 
-	CurrentWeapon.CurrentAmmo = MaxAmmo;
-	SyncCurrentWeaponToEquipment();
-	OnWeaponChanged.Broadcast();
+	if (bRefilled)
+	{
+		OnWeaponChanged.Broadcast();
+	}
 
-	return true;
+	return bRefilled;
 }
 
 bool UWeaponComponent::SaveCurrentWeaponToInventory()
@@ -685,7 +717,7 @@ bool UWeaponComponent::SaveCurrentWeaponToInventory()
 	{
 		return true;
 	}
-	
+
 	if (CurrentWeaponSlot == INDEX_NONE)
 	{
 		return true;
