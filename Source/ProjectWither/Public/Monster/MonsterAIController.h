@@ -40,6 +40,7 @@ protected:
 	void OnTargetDied();
 
 	void ForgetTargetAfterSightLoss();
+	void RefreshSightConfiguration();
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "AI")
