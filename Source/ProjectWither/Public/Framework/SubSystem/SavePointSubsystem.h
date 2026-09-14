@@ -7,6 +7,8 @@
 #include "Data/SavePointTypes.h"
 #include "SavePointSubsystem.generated.h"
 
+class UTexture2D;
+
 // 세이브 포인트 한 곳의 활성화 상태와 휴식 위치를 담는 내부 기록
 USTRUCT()
 struct FSavePointRecord
@@ -21,6 +23,9 @@ struct FSavePointRecord
 
 	UPROPERTY()
 	bool bActivated = false;
+
+	UPROPERTY()
+	TObjectPtr<UTexture2D> LocationImage = nullptr;
 };
 
 /*
@@ -33,9 +38,13 @@ class PROJECTWITHER_API USavePointSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
-	// 세이브 포인트 액터가 BeginPlay에서 자신을 등록. 이미 등록된 Id면 위치/이름만 갱신하고 활성화 상태는 유지한다.
+	// 세이브 포인트 액터가 BeginPlay에서 자신을 등록. 이미 등록된 Id면 위치/이름/이미지만 갱신하고 활성화 상태는 유지한다.
 	UFUNCTION(BlueprintCallable, Category = "SavePoint")
-	void RegisterSavePoint(FName SavePointId, const FText& DisplayName, const FTransform& Transform);
+	void RegisterSavePoint(FName SavePointId, const FText& DisplayName, const FTransform& Transform, UTexture2D* LocationImage = nullptr);
+
+	// 지정한 세이브 포인트 하나의 UI 정보를 가져온다 (현재 위치한 세이브 포인트의 이미지를 기본값으로 보여줄 때 등에 사용)
+	UFUNCTION(BlueprintPure, Category = "SavePoint")
+	bool GetSavePointInfo(FName SavePointId, FSavePointInfo& OutInfo) const;
 
 	// 세이브 포인트를 활성화하고 마지막(현재) 세이브 포인트로 지정. 등록되지 않은 Id면 실패.
 	UFUNCTION(BlueprintCallable, Category = "SavePoint")
