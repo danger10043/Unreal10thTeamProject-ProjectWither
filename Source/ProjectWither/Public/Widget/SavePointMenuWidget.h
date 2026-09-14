@@ -8,7 +8,9 @@
 #include "SavePointMenuWidget.generated.h"
 
 class UButton;
+class UImage;
 class UTextBlock;
+class UTexture2D;
 class USavePointSubsystem;
 
 /*
@@ -34,6 +36,14 @@ public:
 	// 지정한 세이브 포인트로 순간이동. 성공하면 메뉴를 닫는다.
 	UFUNCTION(BlueprintCallable, Category = "UI|SavePoint")
 	bool TravelTo(FName TargetSavePointId);
+
+	// 빠른 이동 목록의 항목에 마우스를 올렸을 때 호출. 해당 장소의 이미지를 미리보기 칸에 표시한다.
+	UFUNCTION(BlueprintCallable, Category = "UI|SavePoint")
+	void SetPreviewImage(UTexture2D* Image);
+
+	// 빠른 이동 목록의 항목에서 마우스가 벗어났을 때 호출. 미리보기를 현재 위치한 세이브 포인트의 이미지로 되돌린다.
+	UFUNCTION(BlueprintCallable, Category = "UI|SavePoint")
+	void RestorePreviewImage();
 
 protected:
 	virtual void NativeConstruct() override;
@@ -66,5 +76,13 @@ private:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> RestedAtText;
 
+	// 현재 위치/빠른 이동 목록 항목의 장소 이미지를 보여주는 미리보기 칸
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> PreviewImage;
+
 	FName CurrentSavePointId = NAME_None;
+
+	// 마우스가 목록에서 벗어났을 때 되돌아갈 기본 이미지 (현재 위치한 세이브 포인트의 이미지)
+	UPROPERTY()
+	TObjectPtr<UTexture2D> DefaultPreviewImage = nullptr;
 };

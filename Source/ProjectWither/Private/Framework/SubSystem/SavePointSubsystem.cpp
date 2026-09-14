@@ -3,13 +3,29 @@
 
 #include "Framework/SubSystem/SavePointSubsystem.h"
 
-void USavePointSubsystem::RegisterSavePoint(FName SavePointId, const FText& DisplayName, const FTransform& Transform)
+void USavePointSubsystem::RegisterSavePoint(FName SavePointId, const FText& DisplayName, const FTransform& Transform, UTexture2D* LocationImage)
 {
 	if (SavePointId.IsNone()) return;
 
 	FSavePointRecord& Record = SavePoints.FindOrAdd(SavePointId);
 	Record.DisplayName = DisplayName;
 	Record.Transform = Transform;
+	Record.LocationImage = LocationImage;
+}
+
+bool USavePointSubsystem::GetSavePointInfo(FName SavePointId, FSavePointInfo& OutInfo) const
+{
+	const FSavePointRecord* Record = SavePoints.Find(SavePointId);
+
+	if (Record == nullptr) return false;
+
+	OutInfo.SavePointId = SavePointId;
+	OutInfo.DisplayName = Record->DisplayName;
+	OutInfo.Location = Record->Transform.GetLocation();
+	OutInfo.bIsCurrent = SavePointId == CurrentSavePointId;
+	OutInfo.LocationImage = Record->LocationImage;
+
+	return true;
 }
 
 bool USavePointSubsystem::ActivateSavePoint(FName SavePointId)
@@ -72,6 +88,7 @@ TArray<FSavePointInfo> USavePointSubsystem::GetActivatedSavePoints() const
 		Info.DisplayName = Pair.Value.DisplayName;
 		Info.Location = Pair.Value.Transform.GetLocation();
 		Info.bIsCurrent = Pair.Key == CurrentSavePointId;
+		Info.LocationImage = Pair.Value.LocationImage;
 
 		Result.Add(Info);
 	}

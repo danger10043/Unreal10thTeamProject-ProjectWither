@@ -11,6 +11,7 @@ class USceneComponent;
 class UStaticMeshComponent;
 class APlayerCharacter;
 class USavePointMenuWidget;
+class UTexture2D;
 
 /*
 * 오픈월드에 배치하는 세이브 포인트(휴식처) 액터.
@@ -68,6 +69,10 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SavePoint", meta = (AllowPrivateAccess = "true"))
 	FText DisplayName;
+
+	// 세이브 포인트 UI(빠른 이동 목록 등)에 표시할 이 장소의 이미지
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SavePoint|UI", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTexture2D> LocationImage;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SavePoint", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "cm"))
 	float InteractionDistance = 250.0f;

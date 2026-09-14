@@ -51,7 +51,7 @@ void ASavePointActor::BeginPlay()
 	{
 		if (USavePointSubsystem* Subsystem = GameInstance->GetSubsystem<USavePointSubsystem>())
 		{
-			Subsystem->RegisterSavePoint(SavePointId, DisplayName, GetRespawnTransform());
+			Subsystem->RegisterSavePoint(SavePointId, DisplayName, GetRespawnTransform(), LocationImage);
 		}
 	}
 }
