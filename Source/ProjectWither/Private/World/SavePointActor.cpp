@@ -143,6 +143,11 @@ void ASavePointActor::OpenSavePointMenu(APlayerCharacter* Player)
 
 	if (!IsValid(SavePointMenuInstance)) { return; }
 
+	// 이동 입력이 눌린 채로 메뉴가 열리면 UI 입력 모드로 전환된 뒤에도
+	// 눌림 상태가 남아 캐릭터가 계속 움직이므로, 이동을 멈추고 입력을 비워준다.
+	Player->SetCanMove(false);
+	PlayerController->FlushPressedKeys();
+
 	if (!SavePointMenuInstance->IsInViewport())
 	{
 		SavePointMenuInstance->AddToViewport();

@@ -12,6 +12,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/PlayerCharacter.h"
 
 void USavePointMenuWidget::NativeConstruct()
 {
@@ -142,12 +143,18 @@ void USavePointMenuWidget::UnbindButtons()
 
 void USavePointMenuWidget::CloseAndRestoreInput()
 {
+	if (APlayerCharacter* PlayerCharacter = Cast<APlayerCharacter>(GetOwningPlayerPawn()))
+	{
+		PlayerCharacter->SetCanMove(true);
+	}
+
 	RemoveFromParent();
 
 	APlayerController* PlayerController = GetOwningPlayer();
 
 	if (!IsValid(PlayerController)) { return; }
 
+	PlayerController->FlushPressedKeys();
 	PlayerController->bShowMouseCursor = false;
 
 	FInputModeGameOnly InputMode;
