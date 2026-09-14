@@ -138,6 +138,10 @@ bool AMonsterSpawnZone::FindRandomSpawnLocation(
 	for (int32 Attempt = 0; Attempt < MaxAttempts; ++Attempt)
 	{
 		FVector Candidate;
+		const float SearchRadiusScale = Attempt < 10
+			? 1.0f
+			: (Attempt < 20 ? 1.5f : 2.0f);
+		const float EffectiveSpawnRadius = SpawnRadius * SearchRadiusScale;
 
 		if (bProjectToNavigation)
 		{
@@ -147,7 +151,7 @@ bool AMonsterSpawnZone::FindRandomSpawnLocation(
 				!NavigationSystem->ProjectPointToNavigation(
 					Origin, ProjectedOrigin, FVector(500.0f, 500.0f, 1000.0f)) ||
 				!NavigationSystem->GetRandomReachablePointInRadius(
-					ProjectedOrigin.Location, SpawnRadius, ReachableLocation))
+					ProjectedOrigin.Location, EffectiveSpawnRadius, ReachableLocation))
 			{
 				continue;
 			}
@@ -155,7 +159,7 @@ bool AMonsterSpawnZone::FindRandomSpawnLocation(
 		}
 		else
 		{
-			const FVector2D RandomOffset = FMath::RandPointInCircle(SpawnRadius);
+			const FVector2D RandomOffset = FMath::RandPointInCircle(EffectiveSpawnRadius);
 			Candidate = Origin + FVector(RandomOffset.X, RandomOffset.Y, 0.0f);
 		}
 
@@ -171,23 +175,33 @@ bool AMonsterSpawnZone::FindRandomSpawnLocation(
 		}
 
 		// 다른 스폰 존에서 먼저 생성된 몬스터까지 포함해 실제 Pawn과의 간격을 확인한다.
-		bool bOverlapsExistingPawn = false;
+		bool bOverlapsExistingMonster = false;
 		if (IsValid(World) && MinSpawnSpacing > 0.0f)
 		{
 			TArray<FOverlapResult> Overlaps;
 			FCollisionObjectQueryParams ObjectQuery;
 			ObjectQuery.AddObjectTypesToQuery(ECC_Pawn);
 			FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(MonsterSpawnSpacing), false, this);
-			bOverlapsExistingPawn = World->OverlapMultiByObjectType(
+			World->OverlapMultiByObjectType(
 				Overlaps,
 				Candidate,
 				FQuat::Identity,
 				ObjectQuery,
 				FCollisionShape::MakeSphere(MinSpawnSpacing),
 				QueryParams);
+
+			// 플레이어나 다른 Pawn은 몬스터 배치 간격의 대상이 아니다.
+			// 실제 활성 몬스터와 겹칠 때만 다음 후보를 찾는다.
+			bOverlapsExistingMonster = Overlaps.ContainsByPredicate(
+				[](const FOverlapResult& Result)
+				{
+					const AActor* OverlappedActor = Result.GetActor();
+					return IsValid(OverlappedActor) &&
+						IsValid(OverlappedActor->FindComponentByClass<UMonsterComponent>());
+				});
 		}
 
-		if (!bOverlapsExistingPawn)
+		if (!bOverlapsExistingMonster)
 		{
 			OutSpawnLocation = Candidate;
 			return true;
