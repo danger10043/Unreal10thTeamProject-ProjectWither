@@ -55,9 +55,10 @@ private:
 	void ReturnAllToPool();
 
 	// 겹치지 않는 스폰 위치를 존 중심 기준 반경 안에서 찾기
-	FVector FindRandomSpawnLocation(
+	bool FindRandomSpawnLocation(
 		const TArray<FVector>& UsedLocations,
-		bool bProjectToNavigation) const;
+		bool bProjectToNavigation,
+		FVector& OutSpawnLocation) const;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Monster Spawn|Component")

@@ -692,8 +692,12 @@ void UBossComponent::ReleaseTransitionMovement(bool bRestore)
 	{
 		Brain->ResumeLogic(TEXT("Boss phase transition finished"));
 	}
-	else if (IsValid(Brain) && !Brain->IsRunning())
+
+	if (IsValid(Brain))
 	{
+		// Phase2에서 AttackRange/AllowRange가 바뀌어도 커스텀 사거리
+		// 데코레이터는 실행 중인 분기를 자동 재평가하지 않는다.
+		// 단순 Resume 대신 루트부터 다시 평가해 공격 분기로 진입시킨다.
 		Brain->RestartLogic();
 	}
 }
