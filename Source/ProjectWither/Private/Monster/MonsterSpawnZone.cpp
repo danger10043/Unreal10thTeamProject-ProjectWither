@@ -134,6 +134,9 @@ bool AMonsterSpawnZone::FindRandomSpawnLocation(
 		: nullptr;
 
 	constexpr int32 MaxAttempts = 30;
+	bool bHasFallbackCandidate = false;
+	FVector BestFallbackCandidate = Origin;
+	float BestFallbackClearanceSq = -1.0f;
 
 	for (int32 Attempt = 0; Attempt < MaxAttempts; ++Attempt)
 	{
@@ -169,9 +172,12 @@ bool AMonsterSpawnZone::FindRandomSpawnLocation(
 				return FVector::DistSquared(Candidate, Used) < FMath::Square(MinSpawnSpacing);
 			});
 
-		if (bOverlapsThisBatch)
+		float CandidateClearanceSq = TNumericLimits<float>::Max();
+		for (const FVector& Used : UsedLocations)
 		{
-			continue;
+			CandidateClearanceSq = FMath::Min(
+				CandidateClearanceSq,
+				FVector::DistSquared(Candidate, Used));
 		}
 
 		// 다른 스폰 존에서 먼저 생성된 몬스터까지 포함해 실제 Pawn과의 간격을 확인한다.
@@ -199,16 +205,51 @@ bool AMonsterSpawnZone::FindRandomSpawnLocation(
 					return IsValid(OverlappedActor) &&
 						IsValid(OverlappedActor->FindComponentByClass<UMonsterComponent>());
 				});
+
+			for (const FOverlapResult& Result : Overlaps)
+			{
+				const AActor* OverlappedActor = Result.GetActor();
+				if (IsValid(OverlappedActor) &&
+					IsValid(OverlappedActor->FindComponentByClass<UMonsterComponent>()))
+				{
+					CandidateClearanceSq = FMath::Min(
+						CandidateClearanceSq,
+						FVector::DistSquared(Candidate, OverlappedActor->GetActorLocation()));
+				}
+			}
 		}
 
-		if (!bOverlapsExistingMonster)
+		if (!bOverlapsThisBatch && !bOverlapsExistingMonster)
 		{
 			OutSpawnLocation = Candidate;
 			return true;
 		}
+
+		// 모든 후보가 겹칠 경우에도 가장 여유가 큰 위치를 보존한다.
+		if (!bHasFallbackCandidate || CandidateClearanceSq > BestFallbackClearanceSq)
+		{
+			bHasFallbackCandidate = true;
+			BestFallbackCandidate = Candidate;
+			BestFallbackClearanceSq = CandidateClearanceSq;
+		}
 	}
 
-	return false;
+	if (bHasFallbackCandidate)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("%s: 최소 스폰 간격을 확보하지 못해 가장 여유가 큰 NavMesh 후보에 확정 스폰합니다."),
+			*GetName());
+		OutSpawnLocation = BestFallbackCandidate;
+		return true;
+	}
+
+	// NavMesh 쿼리 자체가 실패해도 몬스터 수가 누락되지는 않게 한다.
+	// 이 경고가 발생하면 해당 존 주변의 NavMesh 배치를 확인해야 한다.
+	UE_LOG(LogTemp, Warning,
+		TEXT("%s: 유효한 NavMesh 후보가 없어 스폰 존 원점에 확정 스폰합니다."),
+		*GetName());
+	OutSpawnLocation = Origin;
+	return true;
 }
 
 void AMonsterSpawnZone::ReturnAllToPool()

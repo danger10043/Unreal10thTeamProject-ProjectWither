@@ -187,7 +187,30 @@ AActor* UObjectPoolSubsystem::Spawn(TSubclassOf<AActor> InClassType, const FTran
 	if (!InClassType) return nullptr;
 
 	FObjectPool* Pool = ObjectPools.Find(InClassType);
-	if (!Pool) return nullptr;
+	if (!Pool)
+	{
+		// 스폰 존의 클래스와 Object Pool Settings의 클래스가 정확히 다르면
+		// (예: BP_Boss_WeaponMaster / BP_Boss_WeaponMaster_New) 기존에는
+		// 유효한 위치를 찾았어도 즉시 스폰에 실패했다. Poolable 액터는
+		// 기본 Grow 정책의 런타임 풀을 만들어 설정 실수로 인한 누락을 막는다.
+		if (!InClassType->ImplementsInterface(UPoolableInterface::StaticClass()))
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("Spawn 실패: %s 클래스의 풀이 등록되지 않았고 PoolableInterface도 구현하지 않았습니다."),
+				*InClassType->GetName());
+			return nullptr;
+		}
+
+		FObjectPool& RuntimePool = ObjectPools.Add(InClassType);
+		RuntimePool.InitialSize = 0;
+		RuntimePool.MaxSize = 32;
+		RuntimePool.MaxPolicy = EObjectPoolPolicy::Grow;
+		Pool = &RuntimePool;
+
+		UE_LOG(LogTemp, Warning,
+			TEXT("%s 클래스가 Object Pool Settings에 없어 런타임 풀을 자동 생성했습니다."),
+			*InClassType->GetName());
+	}
 
 	RemoveInvalidActors(*Pool);
 
