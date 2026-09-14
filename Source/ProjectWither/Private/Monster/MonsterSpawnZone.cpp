@@ -205,21 +205,9 @@ bool AMonsterSpawnZone::FindRandomSpawnLocation(
 					return IsValid(OverlappedActor) &&
 						IsValid(OverlappedActor->FindComponentByClass<UMonsterComponent>());
 				});
-
-			for (const FOverlapResult& Result : Overlaps)
-			{
-				const AActor* OverlappedActor = Result.GetActor();
-				if (IsValid(OverlappedActor) &&
-					IsValid(OverlappedActor->FindComponentByClass<UMonsterComponent>()))
-				{
-					CandidateClearanceSq = FMath::Min(
-						CandidateClearanceSq,
-						FVector::DistSquared(Candidate, OverlappedActor->GetActorLocation()));
-				}
-			}
 		}
 
-		if (!bOverlapsThisBatch && !bOverlapsExistingMonster)
+		if (!bOverlapsExistingMonster)
 		{
 			OutSpawnLocation = Candidate;
 			return true;
