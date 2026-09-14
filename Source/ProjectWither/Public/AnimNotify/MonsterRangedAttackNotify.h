@@ -20,9 +20,11 @@ public:
 		UAnimSequenceBase* Animation,
 		const FAnimNotifyEventReference& EventReference) override;
 
+#if WITH_EDITOR
 	// 애니메이션 에디터 미리보기에서는 실행하지 않음
 	virtual bool ShouldFireInEditor() override
 	{
 		return false;
 	}
+#endif
 };
