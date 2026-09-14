@@ -656,20 +656,45 @@ void UBossComponent::ReleaseTransitionMovement(bool bRestore)
 		&& (!IsValid(Monster) || !Monster->IsDead())
 		&& (!IsValid(Stat) || !Stat->IsHealthZero());
 
+	APawn* Pawn = Cast<APawn>(GetOwner());
 	UCharacterMovementComponent* Movement = TransitionMovement.Get();
 	UBrainComponent* Brain = TransitionBrain.Get();
+	const bool bHadCachedMovement = IsValid(Movement);
+
+	// 전환 도중 BT task 종료 등의 타이밍으로 캐시를 잡지 못했더라도
+	// 현재 컨트롤러와 이동 컴포넌트에서 다시 찾아 복구한다.
+	if (!IsValid(Movement) && IsValid(Pawn))
+	{
+		Movement = Cast<UCharacterMovementComponent>(Pawn->GetMovementComponent());
+	}
+	if (!IsValid(Brain) && IsValid(Pawn))
+	{
+		if (AAIController* AI = Cast<AAIController>(Pawn->GetController()))
+		{
+			Brain = AI->GetBrainComponent();
+		}
+	}
+
 	TransitionMovement.Reset();
 	TransitionBrain.Reset();
 	if (!bCanRestore) return;
 
-	if (IsValid(Movement))
+	if (IsValid(Movement) && bHadCachedMovement)
 	{
 		Movement->SetMovementMode(PreviousMovementMode, PreviousCustomMovementMode);
+	}
+	else if (IsValid(Movement) && Movement->MovementMode == MOVE_None)
+	{
+		Movement->SetMovementMode(MOVE_Walking);
 	}
 
 	if (IsValid(Brain) && Brain->IsPaused())
 	{
 		Brain->ResumeLogic(TEXT("Boss phase transition finished"));
+	}
+	else if (IsValid(Brain) && !Brain->IsRunning())
+	{
+		Brain->RestartLogic();
 	}
 }
 
