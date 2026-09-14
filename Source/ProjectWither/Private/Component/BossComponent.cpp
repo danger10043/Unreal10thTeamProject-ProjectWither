@@ -66,6 +66,20 @@ void UBossComponent::PrepareForPoolReturn()
 	bEntrancePlaying = false;
 	StopEntranceMontage();
 	StopPhaseTransitionMontage();
+
+	// 등장/페이즈 전환 도중 반환되더라도 Brain의 Pause 플래그를 풀에 남기지 않는다.
+	if (APawn* Pawn = Cast<APawn>(GetOwner()))
+	{
+		if (AAIController* AI = Cast<AAIController>(Pawn->GetController()))
+		{
+			if (UBrainComponent* Brain = AI->GetBrainComponent();
+				IsValid(Brain) && Brain->IsPaused())
+			{
+				Brain->ResumeLogic(TEXT("Boss returned to pool"));
+			}
+		}
+	}
+
 	ReleaseTransitionMovement(false);
 
 	if (UWorld* World = GetWorld())

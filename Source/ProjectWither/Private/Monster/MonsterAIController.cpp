@@ -171,6 +171,14 @@ void AMonsterAIController::StopAI()
 		AIPerceptionComponent->SetSenseEnabled(UAISense_Sight::StaticClass(), false);
 	}
 
+	// 보스 등장/페이즈 전환 중 풀로 반환되면 Pause 상태가 다음 사용까지
+	// 남을 수 있다. 중단 전에 먼저 Pause를 해제해 Brain 상태를 정상화한다.
+	if (UBrainComponent* Brain = GetBrainComponent();
+		IsValid(Brain) && Brain->IsPaused())
+	{
+		Brain->ResumeLogic(TEXT("Monster returned to pool"));
+	}
+
 	// 블랙보드 변경으로 다른 행동이 시작되지 않도록 먼저 중단
 	if (UBehaviorTreeComponent* BehaviorComp =
 		Cast<UBehaviorTreeComponent>(GetBrainComponent()))
@@ -199,6 +207,14 @@ void AMonsterAIController::RestartAI()
 
 	SetMonsterComponent(ControlledPawn);
 	ClearTargetActor();
+
+	// StopTree/보스 연출에서 남은 Pause 상태는 RunBehaviorTree만으로 풀리지 않는다.
+	// 풀 재사용 시 항상 실행 가능한 상태로 되돌린다.
+	if (UBrainComponent* Brain = GetBrainComponent();
+		IsValid(Brain) && Brain->IsPaused())
+	{
+		Brain->ResumeLogic(TEXT("Monster respawned from pool"));
+	}
 
 	if (IsValid(AIPerceptionComponent))
 	{
