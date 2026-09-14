@@ -6,12 +6,15 @@
 #include "Input/Events.h"
 #include "InputCoreTypes.h"
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Texture2D.h"
 #include "Framework/SubSystem/SavePointSubsystem.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/PlayerCharacter.h"
 
 void USavePointMenuWidget::NativeConstruct()
 {
@@ -48,26 +51,45 @@ void USavePointMenuWidget::OpenAt(FName InCurrentSavePointId)
 {
 	CurrentSavePointId = InCurrentSavePointId;
 
-	if (IsValid(RestedAtText))
+	FSavePointInfo CurrentInfo;
+
+	const USavePointSubsystem* Subsystem = GetSavePointSubsystem();
+
+	if (IsValid(Subsystem))
 	{
-		FText SavePointDisplayName = FText::GetEmpty();
-
-		if (const USavePointSubsystem* Subsystem = GetSavePointSubsystem())
-		{
-			for (const FSavePointInfo& Info : Subsystem->GetActivatedSavePoints())
-			{
-				if (Info.SavePointId == CurrentSavePointId)
-				{
-					SavePointDisplayName = Info.DisplayName;
-					break;
-				}
-			}
-		}
-
-		RestedAtText->SetText(SavePointDisplayName);
+		Subsystem->GetSavePointInfo(CurrentSavePointId, CurrentInfo);
 	}
 
+	if (IsValid(RestedAtText))
+	{
+		RestedAtText->SetText(CurrentInfo.DisplayName);
+	}
+
+	// 목록에서 마우스가 벗어나면 다시 현재 위치한 세이브 포인트의 이미지로 돌아온다.
+	DefaultPreviewImage = CurrentInfo.LocationImage;
+	SetPreviewImage(DefaultPreviewImage);
+
 	OnMenuOpened();
+}
+
+void USavePointMenuWidget::SetPreviewImage(UTexture2D* Image)
+{
+	if (!IsValid(PreviewImage)) { return; }
+
+	if (IsValid(Image))
+	{
+		PreviewImage->SetBrushFromTexture(Image);
+		PreviewImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	else
+	{
+		PreviewImage->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void USavePointMenuWidget::RestorePreviewImage()
+{
+	SetPreviewImage(DefaultPreviewImage);
 }
 
 TArray<FSavePointInfo> USavePointMenuWidget::GetTravelDestinations() const
@@ -142,12 +164,18 @@ void USavePointMenuWidget::UnbindButtons()
 
 void USavePointMenuWidget::CloseAndRestoreInput()
 {
+	if (APlayerCharacter* PlayerCharacter = Cast<APlayerCharacter>(GetOwningPlayerPawn()))
+	{
+		PlayerCharacter->SetCanMove(true);
+	}
+
 	RemoveFromParent();
 
 	APlayerController* PlayerController = GetOwningPlayer();
 
 	if (!IsValid(PlayerController)) { return; }
 
+	PlayerController->FlushPressedKeys();
 	PlayerController->bShowMouseCursor = false;
 
 	FInputModeGameOnly InputMode;

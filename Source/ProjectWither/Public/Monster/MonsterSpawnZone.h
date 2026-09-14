@@ -41,6 +41,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Monster Spawn")
 	void ResetZone();
 
+	// 전체 리스폰 시 BT 종료와 재시작이 같은 호출 스택에서 겹치지 않도록
+	// 반환/스폰 단계를 분리해서 호출하기 위한 API
+	void ReturnMonstersToPool();
+	void SpawnMonstersFromPool();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -50,7 +55,9 @@ private:
 	void ReturnAllToPool();
 
 	// 겹치지 않는 스폰 위치를 존 중심 기준 반경 안에서 찾기
-	FVector FindRandomSpawnLocation(const TArray<FVector>& UsedLocations) const;
+	FVector FindRandomSpawnLocation(
+		const TArray<FVector>& UsedLocations,
+		bool bProjectToNavigation) const;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Monster Spawn|Component")

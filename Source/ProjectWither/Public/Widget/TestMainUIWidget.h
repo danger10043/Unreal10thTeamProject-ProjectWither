@@ -48,7 +48,7 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWeaponTypeWidget> WeaponTypeWidget;
 
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UPotionCountWidget> PotionCountWidget;
 
 private:

@@ -1,4 +1,4 @@
- #pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
@@ -16,12 +16,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWeaponChangedDelegate);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGunFiredDelegate);
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTWITHER_API UWeaponComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
+public:
 	UWeaponComponent();
 
 	UPROPERTY(BlueprintAssignable, Category = "Weapon|Event")
@@ -35,7 +35,7 @@ protected:
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-public:	
+public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	bool EquipWeapon(UWeaponDataAsset* WeaponData);
 
@@ -92,7 +92,7 @@ private:
 	void SyncCurrentWeaponToEquipment();
 
 	AActor* SpawnWeaponActor(const UWeaponDataAsset* WeaponData) const;
-	
+
 	void DestroyWeaponActor();
 
 private:

@@ -26,6 +26,10 @@ public:
 	void RespawnAllZones();
 
 private:
+	void FinishRespawnAllZones();
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AMonsterSpawnZone>> RegisteredZones;
+
+	bool bRespawnPending = false;
 };

@@ -7,6 +7,8 @@
 #include "Component/MonsterComponent.h"
 #include "Framework/SubSystem/MonsterSpawnSubsystem.h"
 #include "Framework/SubSystem/ObjectPoolSubsystem.h"
+#include "GameFramework/Character.h"
+#include "NavigationSystem.h"
 
 AMonsterSpawnZone::AMonsterSpawnZone()
 {
@@ -50,6 +52,16 @@ void AMonsterSpawnZone::ResetZone()
 	SpawnAll();
 }
 
+void AMonsterSpawnZone::ReturnMonstersToPool()
+{
+	ReturnAllToPool();
+}
+
+void AMonsterSpawnZone::SpawnMonstersFromPool()
+{
+	SpawnAll();
+}
+
 void AMonsterSpawnZone::SpawnAll()
 {
 	UWorld* World = GetWorld();
@@ -73,7 +85,12 @@ void AMonsterSpawnZone::SpawnAll()
 
 		for (int32 i = 0; i < Slot.Count; ++i)
 		{
-			const FVector SpawnLocation = FindRandomSpawnLocation(UsedLocations);
+			// Character 기반 지상 몬스터는 반드시 NavMesh 위에 배치한다.
+			// Pawn 기반 비행 몬스터는 기존 3D 이동 기준 위치를 유지한다.
+			const bool bGroundMonster =
+				Slot.MonsterClass->IsChildOf(ACharacter::StaticClass());
+			const FVector SpawnLocation = FindRandomSpawnLocation(
+				UsedLocations, bGroundMonster);
 			const FRotator SpawnRotation(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f);
 			const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 
@@ -97,16 +114,33 @@ void AMonsterSpawnZone::SpawnAll()
 	}
 }
 
-FVector AMonsterSpawnZone::FindRandomSpawnLocation(const TArray<FVector>& UsedLocations) const
+FVector AMonsterSpawnZone::FindRandomSpawnLocation(
+	const TArray<FVector>& UsedLocations,
+	bool bProjectToNavigation) const
 {
 	const FVector Origin = GetActorLocation();
+	UNavigationSystemV1* NavigationSystem = bProjectToNavigation
+		? FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld())
+		: nullptr;
 
 	constexpr int32 MaxAttempts = 10;
 
 	for (int32 Attempt = 0; Attempt < MaxAttempts; ++Attempt)
 	{
 		const FVector2D RandomOffset = FMath::RandPointInCircle(SpawnRadius);
-		const FVector Candidate = Origin + FVector(RandomOffset.X, RandomOffset.Y, 0.0f);
+		FVector Candidate = Origin + FVector(RandomOffset.X, RandomOffset.Y, 0.0f);
+
+		if (bProjectToNavigation)
+		{
+			FNavLocation ProjectedLocation;
+			if (!IsValid(NavigationSystem) ||
+				!NavigationSystem->ProjectPointToNavigation(
+					Candidate, ProjectedLocation, FVector(150.0f, 150.0f, 500.0f)))
+			{
+				continue;
+			}
+			Candidate = ProjectedLocation.Location;
+		}
 
 		const bool bOverlaps = UsedLocations.ContainsByPredicate(
 			[&Candidate, this](const FVector& Used)
@@ -120,7 +154,17 @@ FVector AMonsterSpawnZone::FindRandomSpawnLocation(const TArray<FVector>& UsedLo
 		}
 	}
 
-	// 반경 안에서 겹치지 않는 자리를 못 찾으면 마지막 후보라도 사용
+	// 반경 안에서 겹치지 않는 자리를 못 찾으면 NavMesh상의 존 중심을 우선 사용한다.
+	if (bProjectToNavigation && IsValid(NavigationSystem))
+	{
+		FNavLocation ProjectedOrigin;
+		if (NavigationSystem->ProjectPointToNavigation(
+			Origin, ProjectedOrigin, FVector(500.0f, 500.0f, 1000.0f)))
+		{
+			return ProjectedOrigin.Location;
+		}
+	}
+
 	const FVector2D FallbackOffset = FMath::RandPointInCircle(SpawnRadius);
 	return Origin + FVector(FallbackOffset.X, FallbackOffset.Y, 0.0f);
 }
