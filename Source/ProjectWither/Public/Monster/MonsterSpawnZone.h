@@ -41,6 +41,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Monster Spawn")
 	void ResetZone();
 
+	// 전체 리스폰 시 BT 종료와 재시작이 같은 호출 스택에서 겹치지 않도록
+	// 반환/스폰 단계를 분리해서 호출하기 위한 API
+	void ReturnMonstersToPool();
+	void SpawnMonstersFromPool();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
