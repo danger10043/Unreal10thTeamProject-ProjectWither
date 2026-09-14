@@ -9,6 +9,7 @@
 #include "Framework/SubSystem/ObjectPoolSubsystem.h"
 #include "GameFramework/Character.h"
 #include "NavigationSystem.h"
+#include "Engine/OverlapResult.h"
 
 AMonsterSpawnZone::AMonsterSpawnZone()
 {
@@ -89,8 +90,15 @@ void AMonsterSpawnZone::SpawnAll()
 			// Pawn 기반 비행 몬스터는 기존 3D 이동 기준 위치를 유지한다.
 			const bool bGroundMonster =
 				Slot.MonsterClass->IsChildOf(ACharacter::StaticClass());
-			const FVector SpawnLocation = FindRandomSpawnLocation(
-				UsedLocations, bGroundMonster);
+			FVector SpawnLocation;
+			if (!FindRandomSpawnLocation(
+				UsedLocations, bGroundMonster, SpawnLocation))
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("AMonsterSpawnZone::SpawnAll - %s: 겹치지 않는 유효한 스폰 위치를 찾지 못해 %s 스폰을 건너뜁니다."),
+					*GetName(), *Slot.MonsterClass->GetName());
+				continue;
+			}
 			const FRotator SpawnRotation(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f);
 			const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 
@@ -114,59 +122,79 @@ void AMonsterSpawnZone::SpawnAll()
 	}
 }
 
-FVector AMonsterSpawnZone::FindRandomSpawnLocation(
+bool AMonsterSpawnZone::FindRandomSpawnLocation(
 	const TArray<FVector>& UsedLocations,
-	bool bProjectToNavigation) const
+	bool bProjectToNavigation,
+	FVector& OutSpawnLocation) const
 {
 	const FVector Origin = GetActorLocation();
+	UWorld* World = GetWorld();
 	UNavigationSystemV1* NavigationSystem = bProjectToNavigation
-		? FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld())
+		? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World)
 		: nullptr;
 
-	constexpr int32 MaxAttempts = 10;
+	constexpr int32 MaxAttempts = 30;
 
 	for (int32 Attempt = 0; Attempt < MaxAttempts; ++Attempt)
 	{
-		const FVector2D RandomOffset = FMath::RandPointInCircle(SpawnRadius);
-		FVector Candidate = Origin + FVector(RandomOffset.X, RandomOffset.Y, 0.0f);
+		FVector Candidate;
 
 		if (bProjectToNavigation)
 		{
-			FNavLocation ProjectedLocation;
+			FNavLocation ProjectedOrigin;
+			FNavLocation ReachableLocation;
 			if (!IsValid(NavigationSystem) ||
 				!NavigationSystem->ProjectPointToNavigation(
-					Candidate, ProjectedLocation, FVector(150.0f, 150.0f, 500.0f)))
+					Origin, ProjectedOrigin, FVector(500.0f, 500.0f, 1000.0f)) ||
+				!NavigationSystem->GetRandomReachablePointInRadius(
+					ProjectedOrigin.Location, SpawnRadius, ReachableLocation))
 			{
 				continue;
 			}
-			Candidate = ProjectedLocation.Location;
+			Candidate = ReachableLocation.Location;
+		}
+		else
+		{
+			const FVector2D RandomOffset = FMath::RandPointInCircle(SpawnRadius);
+			Candidate = Origin + FVector(RandomOffset.X, RandomOffset.Y, 0.0f);
 		}
 
-		const bool bOverlaps = UsedLocations.ContainsByPredicate(
+		const bool bOverlapsThisBatch = UsedLocations.ContainsByPredicate(
 			[&Candidate, this](const FVector& Used)
 			{
 				return FVector::DistSquared(Candidate, Used) < FMath::Square(MinSpawnSpacing);
 			});
 
-		if (!bOverlaps)
+		if (bOverlapsThisBatch)
 		{
-			return Candidate;
+			continue;
+		}
+
+		// 다른 스폰 존에서 먼저 생성된 몬스터까지 포함해 실제 Pawn과의 간격을 확인한다.
+		bool bOverlapsExistingPawn = false;
+		if (IsValid(World) && MinSpawnSpacing > 0.0f)
+		{
+			TArray<FOverlapResult> Overlaps;
+			FCollisionObjectQueryParams ObjectQuery;
+			ObjectQuery.AddObjectTypesToQuery(ECC_Pawn);
+			FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(MonsterSpawnSpacing), false, this);
+			bOverlapsExistingPawn = World->OverlapMultiByObjectType(
+				Overlaps,
+				Candidate,
+				FQuat::Identity,
+				ObjectQuery,
+				FCollisionShape::MakeSphere(MinSpawnSpacing),
+				QueryParams);
+		}
+
+		if (!bOverlapsExistingPawn)
+		{
+			OutSpawnLocation = Candidate;
+			return true;
 		}
 	}
 
-	// 반경 안에서 겹치지 않는 자리를 못 찾으면 NavMesh상의 존 중심을 우선 사용한다.
-	if (bProjectToNavigation && IsValid(NavigationSystem))
-	{
-		FNavLocation ProjectedOrigin;
-		if (NavigationSystem->ProjectPointToNavigation(
-			Origin, ProjectedOrigin, FVector(500.0f, 500.0f, 1000.0f)))
-		{
-			return ProjectedOrigin.Location;
-		}
-	}
-
-	const FVector2D FallbackOffset = FMath::RandPointInCircle(SpawnRadius);
-	return Origin + FVector(FallbackOffset.X, FallbackOffset.Y, 0.0f);
+	return false;
 }
 
 void AMonsterSpawnZone::ReturnAllToPool()
