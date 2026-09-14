@@ -37,6 +37,7 @@ AMonsterAIController::AMonsterAIController()
 void AMonsterAIController::OnPossess(APawn* InPawn)
 {
     Super::OnPossess(InPawn);
+	RefreshSightConfiguration();
 
     SetMonsterComponent(InPawn);
 
@@ -207,6 +208,7 @@ void AMonsterAIController::RestartAI()
 
 	SetMonsterComponent(ControlledPawn);
 	ClearTargetActor();
+	RefreshSightConfiguration();
 
 	// StopTree/보스 연출에서 남은 Pause 상태는 RunBehaviorTree만으로 풀리지 않는다.
 	// 풀 재사용 시 항상 실행 가능한 상태로 되돌린다.
@@ -250,6 +252,20 @@ void AMonsterAIController::RestartAI()
 		UE_LOG(LogTemp, Warning,
 			TEXT("%s: BehaviorTree 실행에 실패했습니다."), *GetName());
 	}
+}
+
+void AMonsterAIController::RefreshSightConfiguration()
+{
+	if (!IsValid(AIPerceptionComponent) || !IsValid(SightConfig))
+	{
+		return;
+	}
+
+	// 파생 Blueprint에 저장된 예전 값이나 풀 재사용 전 리스너 캐시와 관계없이
+	// 매번 전방위 시야 설정을 다시 적용한다.
+	SightConfig->PeripheralVisionAngleDegrees = 180.0f;
+	AIPerceptionComponent->ConfigureSense(*SightConfig);
+	AIPerceptionComponent->RequestStimuliListenerUpdate();
 }
 
 bool AMonsterAIController::IsValidTarget(AActor* InActor)
