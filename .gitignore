@@ -80,3 +80,7 @@ Content/ExternalAssets/
 /ArtSource
 /output
 /tmp
+/tools
+/.codex
+*.docx
+*.docx
