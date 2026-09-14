@@ -7,6 +7,7 @@
 #include "Interface/StatComponentUserInterface.h"
 
 #include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -20,7 +21,9 @@ AMonsterAIController::AMonsterAIController()
 
 	SightConfig->SightRadius = 800.f;
 	SightConfig->LoseSightRadius = 900.f;
-	SightConfig->PeripheralVisionAngleDegrees = 90.f;
+	// AI Sight의 PeripheralVisionAngleDegrees는 전방 기준 반각이다.
+	// 180도로 설정하면 몬스터 주변 전체 360도를 감지한다.
+	SightConfig->PeripheralVisionAngleDegrees = 180.f;
 	SightConfig->SetMaxAge(5.f);
 	SightConfig->DetectionByAffiliation.bDetectEnemies = true;
 	SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
@@ -169,7 +172,13 @@ void AMonsterAIController::StopAI()
 	}
 
 	// 블랙보드 변경으로 다른 행동이 시작되지 않도록 먼저 중단
-	if (UBrainComponent* Brain = GetBrainComponent())
+	if (UBehaviorTreeComponent* BehaviorComp =
+		Cast<UBehaviorTreeComponent>(GetBrainComponent()))
+	{
+		// 풀 재사용에서는 latent task의 안전 종료를 기다릴 수 없으므로 즉시 종료한다.
+		BehaviorComp->StopTree(EBTStopMode::Forced);
+	}
+	else if (UBrainComponent* Brain = GetBrainComponent())
 	{
 		Brain->StopLogic(TEXT("Monster died"));
 	}
@@ -198,21 +207,32 @@ void AMonsterAIController::RestartAI()
 			UAISense_Sight::StaticClass(), true);
 	}
 
-	if (UBlackboardComponent* BB = GetBlackboardComponent())
+	if (!IsValid(BehaviorTree) || !IsValid(BehaviorTree->BlackboardAsset))
 	{
-		BB->SetValueAsObject(TEXT("SelfActor"), ControlledPawn);
-		BB->SetValueAsVector(
-			TEXT("SpawnLocation"),
-			ControlledPawn->GetActorLocation());
+		UE_LOG(LogTemp, Warning,
+			TEXT("%s: BehaviorTree 또는 BlackboardAsset이 없어 AI를 재시작할 수 없습니다."),
+			*GetName());
+		return;
 	}
 
-	if (UBrainComponent* Brain = GetBrainComponent())
+	UBlackboardComponent* BlackboardComp = nullptr;
+	if (!UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp))
 	{
-		Brain->RestartLogic();
+		UE_LOG(LogTemp, Warning,
+			TEXT("%s: Blackboard 초기화에 실패했습니다."), *GetName());
+		return;
 	}
-	else if (IsValid(BehaviorTree))
+
+	// UseBlackboard가 에셋을 다시 초기화할 수 있으므로 런타임 키는 그 뒤에 기록한다.
+	BlackboardComp->SetValueAsObject(TEXT("SelfActor"), ControlledPawn);
+	BlackboardComp->SetValueAsVector(
+		TEXT("SpawnLocation"),
+		ControlledPawn->GetActorLocation());
+
+	if (!RunBehaviorTree(BehaviorTree))
 	{
-		RunBehaviorTree(BehaviorTree);
+		UE_LOG(LogTemp, Warning,
+			TEXT("%s: BehaviorTree 실행에 실패했습니다."), *GetName());
 	}
 }
 

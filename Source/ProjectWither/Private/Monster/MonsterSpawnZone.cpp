@@ -50,6 +50,16 @@ void AMonsterSpawnZone::ResetZone()
 	SpawnAll();
 }
 
+void AMonsterSpawnZone::ReturnMonstersToPool()
+{
+	ReturnAllToPool();
+}
+
+void AMonsterSpawnZone::SpawnMonstersFromPool()
+{
+	SpawnAll();
+}
+
 void AMonsterSpawnZone::SpawnAll()
 {
 	UWorld* World = GetWorld();
